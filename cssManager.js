@@ -76,24 +76,56 @@ const CssManager = {
         alert('预设已保存');
     },
 
-    renderCssPresets: function() {
-        const list = document.getElementById('css-presets-container');
+    // 打开CSS预设弹窗
+    openPresetModal: function() {
+        const modal = document.getElementById('css-preset-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            this.renderPresetModalList();
+        }
+    },
+
+    // 关闭CSS预设弹窗
+    closePresetModal: function() {
+        const modal = document.getElementById('css-preset-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    },
+
+    // 渲染弹窗中的预设列表
+    renderPresetModalList: function() {
+        const list = document.getElementById('css-preset-modal-list');
         const presets = API.Settings.getCssPresets();
         
+        if (!list) return;
+        
         if (presets.length === 0) {
-            list.innerHTML = '<span class="text-xs text-gray-400 block text-center py-1">暂无预设</span>';
+            list.innerHTML = '<span class="text-xs text-gray-400 block text-center py-4">暂无预设，请先保存CSS预设</span>';
             return;
         }
 
         list.innerHTML = presets.map((p, idx) => `
-            <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-100">
-                <span class="text-xs font-medium text-gray-600 truncate">${p.name}</span>
-                <div class="flex gap-2">
-                    <button onclick="CssManager.loadCssPreset(${idx})" class="text-blue-500 text-[10px]">应用</button>
-                    <button onclick="CssManager.deleteCssPreset(${idx})" class="text-red-500 text-[10px]">删除</button>
+            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100 hover:bg-gray-100 transition">
+                <span class="text-sm font-medium text-gray-700 truncate flex-1">${p.name}</span>
+                <div class="flex gap-2 shrink-0">
+                    <button onclick="CssManager.loadCssPreset(${idx}); CssManager.closePresetModal();" class="text-blue-500 text-xs font-medium px-2 py-1 bg-blue-50 rounded">应用</button>
+                    <button onclick="CssManager.deleteCssPreset(${idx})" class="text-red-500 text-xs font-medium px-2 py-1 bg-red-50 rounded">删除</button>
                 </div>
             </div>
         `).join('');
+    },
+
+    // 清除当前CSS
+    clearCurrentCss: function() {
+        document.getElementById('custom-css-input').value = '';
+        this.applyCustomCss('');
+        this.closePresetModal();
+    },
+
+    renderCssPresets: function() {
+        // 同时更新弹窗列表（如果打开的话）
+        this.renderPresetModalList();
     },
 
     loadCssPreset: function(idx) {
@@ -111,5 +143,6 @@ const CssManager = {
         presets.splice(idx, 1);
         API.Settings.saveCssPresets(presets);
         this.renderCssPresets();
+        this.renderPresetModalList();
     }
 };

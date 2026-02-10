@@ -226,6 +226,20 @@
                 </div>
             </div>
 
+            <!-- Character Long Press Menu -->
+            <div id="char-context-menu" class="absolute z-[60] hidden">
+                <div class="bg-white rounded-xl shadow-2xl overflow-hidden min-w-[120px] border border-gray-100">
+                    <button id="char-menu-pin" class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 flex items-center gap-2 border-b border-gray-100">
+                        <i class="fa-solid fa-thumbtack text-gray-400"></i>
+                        <span>置顶</span>
+                    </button>
+                    <button id="char-menu-delete" class="w-full px-4 py-3 text-left text-sm font-medium text-red-500 hover:bg-red-50 active:bg-red-100 flex items-center gap-2">
+                        <i class="fa-solid fa-trash"></i>
+                        <span>删除</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Add Character Modal -->
             <div id="add-char-modal" class="absolute inset-0 bg-black/40 z-50 hidden flex items-center justify-center backdrop-blur-sm transition-all duration-200">
                 <div id="add-char-modal-content" class="bg-white w-[85%] max-w-[320px] rounded-2xl p-5 shadow-2xl transform transition-all duration-200 scale-95 opacity-0">
@@ -777,18 +791,18 @@
                             </div>
                         </div>
 
-                <!-- World Book Binding -->
+                <!-- World Book Binding - 可折叠，按目录展示 -->
                 <div class="bg-white rounded-xl overflow-hidden shadow-sm">
-                    <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('worldbook-binding-content').classList.toggle('hidden'); document.getElementById('worldbook-arrow').classList.toggle('rotate-90')">
                         <span class="text-sm font-bold text-gray-700">世界书绑定</span>
-                        <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                        <i id="worldbook-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
                     </div>
-                    <div class="p-4 bg-gray-50">
-                        <select id="setting-worldbook-select" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="ChatSettings.saveBinding()">
-                            <option value="">(无绑定)</option>
-                            <!-- Options injected -->
-                        </select>
-                        <p class="text-[10px] text-gray-400 mt-2">选中后，AI 将读取该世界书的设定作为背景知识。</p>
+                    <div id="worldbook-binding-content" class="hidden p-4 bg-gray-50">
+                        <!-- 世界书目录树 -->
+                        <div id="worldbook-tree-container" class="space-y-2 max-h-64 overflow-y-auto">
+                            <!-- 目录和世界书将由JS注入 -->
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-3">勾选后，AI 将读取该世界书的设定作为背景知识。支持多选。</p>
                     </div>
                 </div>
 
@@ -886,32 +900,28 @@
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-xs font-bold text-gray-500 uppercase">自定义 CSS</span>
                                 <div class="flex gap-2">
+                                    <button onclick="CssManager.openPresetModal()" class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-bold">选择预设</button>
                                     <button onclick="CssManager.saveCssPreset()" class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold">保存预设</button>
                                 </div>
                             </div>
                             <textarea id="custom-css-input" rows="6" class="w-full bg-gray-800 text-green-400 font-mono text-[10px] p-2 rounded-lg resize-none focus:outline-none" placeholder="/* 在此输入 CSS 代码 */&#10;.bubble { background: pink; }" oninput="CssManager.applyCustomCss(this.value)"></textarea>
                         </div>
 
-                        <!-- Presets List -->
-                        <div id="css-presets-container" class="space-y-2">
-                            <span class="text-xs text-gray-400 block text-center py-1">暂无预设</span>
-                        </div>
-
                     </div>
                 </div>
 
-                <!-- Emoji Pack Binding -->
+                <!-- Emoji Pack Binding - 可折叠，支持多选 -->
                 <div class="bg-white rounded-xl overflow-hidden shadow-sm">
-                    <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('emoji-binding-content').classList.toggle('hidden'); document.getElementById('emoji-arrow').classList.toggle('rotate-90')">
                         <span class="text-sm font-bold text-gray-700">表情包绑定</span>
-                        <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                        <i id="emoji-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
                     </div>
-                    <div class="p-4 bg-gray-50">
-                        <select id="setting-emoji-select" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="ChatSettings.saveEmojiBinding()">
-                            <option value="">(无绑定)</option>
-                            <!-- Options injected -->
-                        </select>
-                        <p class="text-[10px] text-gray-400 mt-2">选中后，AI 可能会根据对话内容发送该分组中的表情包。</p>
+                    <div id="emoji-binding-content" class="hidden p-4 bg-gray-50">
+                        <!-- 表情包多选列表 -->
+                        <div id="emoji-multi-select-container" class="space-y-2 max-h-48 overflow-y-auto">
+                            <!-- 表情包分组将由JS注入 -->
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-3">勾选后，AI 可能会根据对话内容发送该分组中的表情包。支持多选或不选。</p>
                     </div>
                 </div>
 
@@ -1039,6 +1049,18 @@
                             <select id="model-select" class="w-full mt-2 bg-gray-100 rounded-lg p-2 text-sm hidden" onchange="document.getElementById('api-model').value = this.value">
                                 <option value="">选择模型...</option>
                             </select>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-xs text-gray-500 uppercase font-bold">Temperature (温度)</label>
+                                <span id="api-temp-val" class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded">0.8</span>
+                            </div>
+                            <input type="range" id="api-temperature" min="0" max="2" step="0.1" value="0.8" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="document.getElementById('api-temp-val').textContent = this.value">
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>0 (稳定精确)</span>
+                                <span>1 (平衡)</span>
+                                <span>2 (创意多变)</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -1224,6 +1246,29 @@
                 </div>
             </div>
 
+        </div>
+
+        <!-- CSS Preset Modal - 弹出选择预设 -->
+        <div id="css-preset-modal" class="absolute inset-0 bg-black/40 z-[90] hidden flex items-center justify-center backdrop-blur-sm">
+            <div class="bg-white w-[85%] max-w-[300px] rounded-2xl shadow-2xl max-h-[60%] flex flex-col">
+                <div class="p-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+                    <h3 class="font-bold text-base">选择CSS预设</h3>
+                    <button onclick="CssManager.closePresetModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-3">
+                    <div id="css-preset-modal-list" class="space-y-2">
+                        <!-- Presets will be injected here -->
+                        <span class="text-xs text-gray-400 block text-center py-4">暂无预设</span>
+                    </div>
+                </div>
+
+                <div class="p-3 border-t border-gray-200 shrink-0">
+                    <button onclick="CssManager.clearCurrentCss()" class="w-full bg-gray-100 text-gray-600 font-medium py-2 rounded-xl text-sm active:scale-95 transition">
+                        清除当前CSS
+                    </button>
+                </div>
+            </div>
         </div>
 
     </div>

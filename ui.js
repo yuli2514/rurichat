@@ -271,10 +271,14 @@ const HomeManager = {
 // ==================== CHAT MANAGER UI ====================
 const ChatManager = {
     currentAvatarBase64: null,
+    longPressTimer: null,
+    longPressCharId: null,
+    isLongPress: false,
 
     init: function() {
         this.bindEvents();
         this.renderList();
+        this.initContextMenu();
     },
 
     bindEvents: function() {
@@ -284,6 +288,98 @@ const ChatManager = {
         document.getElementById('close-chat-btn').addEventListener('click', () => {
             document.getElementById('chat-app').classList.add('hidden');
         });
+    },
+
+    // 初始化长按菜单
+    initContextMenu: function() {
+        const menu = document.getElementById('char-context-menu');
+        const pinBtn = document.getElementById('char-menu-pin');
+        const deleteBtn = document.getElementById('char-menu-delete');
+
+        // 点击其他地方关闭菜单
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target)) {
+                this.hideContextMenu();
+            }
+        });
+
+        // 置顶/取消置顶按钮
+        pinBtn.addEventListener('click', () => {
+            if (this.longPressCharId) {
+                this.togglePin(this.longPressCharId);
+            }
+            this.hideContextMenu();
+        });
+
+        // 删除按钮
+        deleteBtn.addEventListener('click', () => {
+            if (this.longPressCharId) {
+                this.deleteCharacter(this.longPressCharId);
+            }
+            this.hideContextMenu();
+        });
+    },
+
+    // 显示长按菜单
+    showContextMenu: function(charId, x, y) {
+        const menu = document.getElementById('char-context-menu');
+        const pinBtn = document.getElementById('char-menu-pin');
+        const char = API.Chat.getChar(charId);
+        
+        this.longPressCharId = charId;
+        
+        // 根据置顶状态更新按钮文字
+        if (char && char.pinned) {
+            pinBtn.innerHTML = '<i class="fa-solid fa-thumbtack text-orange-400"></i><span>取消置顶</span>';
+        } else {
+            pinBtn.innerHTML = '<i class="fa-solid fa-thumbtack text-gray-400"></i><span>置顶</span>';
+        }
+        
+        // 定位菜单
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.classList.remove('hidden');
+        
+        // 确保菜单不超出屏幕
+        const menuRect = menu.getBoundingClientRect();
+        const chatApp = document.getElementById('chat-app');
+        const chatRect = chatApp.getBoundingClientRect();
+        
+        if (menuRect.right > chatRect.right) {
+            menu.style.left = (x - menuRect.width) + 'px';
+        }
+        if (menuRect.bottom > chatRect.bottom) {
+            menu.style.top = (y - menuRect.height) + 'px';
+        }
+    },
+
+    // 隐藏长按菜单
+    hideContextMenu: function() {
+        const menu = document.getElementById('char-context-menu');
+        menu.classList.add('hidden');
+        this.longPressCharId = null;
+    },
+
+    // 切换置顶状态
+    togglePin: function(charId) {
+        let chars = API.Chat.getChars();
+        const idx = chars.findIndex(c => c.id === charId);
+        if (idx !== -1) {
+            chars[idx].pinned = !chars[idx].pinned;
+            API.Chat.saveChars(chars);
+            this.renderList();
+        }
+    },
+
+    // 删除角色
+    deleteCharacter: function(charId) {
+        const char = API.Chat.getChar(charId);
+        if (!char) return;
+        
+        if (confirm('确定要删除角色 "' + (char.remark || char.name) + '" 吗？\n删除后聊天记录也会被清除。')) {
+            API.Chat.deleteChar(charId);
+            this.renderList();
+        }
     },
 
     openAddModal: function() {
@@ -384,9 +480,18 @@ const ChatManager = {
         try {
             listContainer.innerHTML = '';
             
-            chars.forEach(char => {
+            // 排序：置顶的角色排在前面，其他按原顺序
+            const pinnedChars = chars.filter(c => c.pinned);
+            const unpinnedChars = chars.filter(c => !c.pinned);
+            const sortedChars = [...pinnedChars, ...unpinnedChars];
+            
+            const self = this;
+            
+            sortedChars.forEach(char => {
                 const item = document.createElement('div');
-                item.className = 'chat-list-item cursor-pointer hover:bg-gray-100 active:bg-gray-200 transition-colors relative';
+                // 置顶的角色添加浅灰色背景
+                const pinnedClass = char.pinned ? 'bg-gray-100' : '';
+                item.className = 'chat-list-item cursor-pointer hover:bg-gray-100 active:bg-gray-200 transition-colors relative ' + pinnedClass;
                 
                 // Get last message from chat history
                 let lastMessageText = char.lastMessage || '暂无消息';
@@ -440,17 +545,86 @@ const ChatManager = {
                     }
                 }
                 
+                // 置顶图标
+                const pinIcon = char.pinned ? '<i class="fa-solid fa-thumbtack text-orange-400 text-[10px] ml-1"></i>' : '';
+                
                 item.innerHTML =
                     '<img src="' + char.avatar + '" class="w-[50px] h-[50px] rounded-full object-cover shrink-0 bg-gray-200">' +
                     '<div class="ml-3 flex-1 min-w-0 h-[50px] flex flex-col justify-center chat-list-item-content">' +
                         '<div class="flex justify-between items-center mb-0.5">' +
-                            '<h4 class="font-medium text-gray-900 text-[15px] truncate">' + char.remark + '</h4>' +
-                            '<span class="text-[10px] text-gray-400">' + timeText + '</span>' +
+                            '<div class="flex items-center min-w-0 flex-1">' +
+                                '<h4 class="font-medium text-gray-900 text-[15px] truncate">' + char.remark + '</h4>' +
+                                pinIcon +
+                            '</div>' +
+                            '<span class="text-[10px] text-gray-400 shrink-0 ml-2">' + timeText + '</span>' +
                         '</div>' +
                         '<p class="text-[13px] text-gray-400 truncate leading-tight">' + lastMessageText + '</p>' +
                     '</div>';
                 
+                // 长按事件处理
+                let longPressTimer = null;
+                let isLongPress = false;
+                let startX = 0;
+                let startY = 0;
+                
+                // 触摸开始
+                item.addEventListener('touchstart', function(e) {
+                    isLongPress = false;
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    longPressTimer = setTimeout(function() {
+                        isLongPress = true;
+                        // 获取触摸位置相对于chat-app的坐标
+                        const chatApp = document.getElementById('chat-app');
+                        const chatRect = chatApp.getBoundingClientRect();
+                        const x = e.touches[0].clientX - chatRect.left;
+                        const y = e.touches[0].clientY - chatRect.top;
+                        self.showContextMenu(char.id, x, y);
+                    }, 500); // 500ms长按触发
+                }, { passive: true });
+                
+                // 触摸移动（如果移动距离过大则取消长按）
+                item.addEventListener('touchmove', function(e) {
+                    if (longPressTimer) {
+                        const moveX = Math.abs(e.touches[0].clientX - startX);
+                        const moveY = Math.abs(e.touches[0].clientY - startY);
+                        if (moveX > 10 || moveY > 10) {
+                            clearTimeout(longPressTimer);
+                            longPressTimer = null;
+                        }
+                    }
+                }, { passive: true });
+                
+                // 触摸结束
+                item.addEventListener('touchend', function(e) {
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                    // 如果是长按，阻止点击事件
+                    if (isLongPress) {
+                        e.preventDefault();
+                        isLongPress = false;
+                    }
+                });
+                
+                // 鼠标右键菜单（桌面端）
+                item.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    const chatApp = document.getElementById('chat-app');
+                    const chatRect = chatApp.getBoundingClientRect();
+                    const x = e.clientX - chatRect.left;
+                    const y = e.clientY - chatRect.top;
+                    self.showContextMenu(char.id, x, y);
+                });
+                
+                // 点击事件
                 item.onclick = function(e) {
+                    if (isLongPress) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
                     e.preventDefault();
                     e.stopPropagation();
                     ChatInterface.open(char.id);

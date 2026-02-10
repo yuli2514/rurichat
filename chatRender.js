@@ -710,20 +710,26 @@ const ChatInterface = {
 
         const allGroups = API.Emoji.getGroups();
         const char = API.Chat.getChar(this.currentCharId);
+        const settings = char && char.settings ? char.settings : {};
+        
+        // 支持多选的表情包分组
+        const boundGroupIds = settings.emojiGroupIds || (settings.emojiGroupId ? [settings.emojiGroupId] : []);
+        const boundGroups = allGroups.filter(g => boundGroupIds.includes(g.id));
         
         // 1. Render Bar
         const bar = document.getElementById('emoji-group-bar');
         let barHtml = '';
         
-        const boundGroup = char && char.settings && char.settings.emojiGroupId ? allGroups.find(g => g.id === char.settings.emojiGroupId) : null;
         const isBoundActive = groupId === 'bound';
 
+        // 绑定的表情包按钮（显示多选数量）
         const boundButtonClass = isBoundActive ? 'text-blue-500 border-blue-500 bg-blue-50' : 'text-gray-500 border-transparent hover:bg-gray-50';
-        const boundButtonText = boundGroup ? `★ ${boundGroup.name}` : '默认';
+        const boundButtonText = boundGroups.length > 0 ? `★ 已绑定(${boundGroups.length})` : '默认';
         barHtml += `<button onclick="ChatInterface.renderEmojiGridById('bound')" class="px-4 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${boundButtonClass}">${boundButtonText}</button>`;
 
         allGroups.forEach(g => {
-            if (boundGroup && g.id === boundGroup.id) return;
+            // 跳过已绑定的分组（它们会在"已绑定"中显示）
+            if (boundGroupIds.includes(g.id)) return;
             const isActive = groupId === g.id;
             const buttonClass = isActive ? 'text-blue-500 border-blue-500 bg-blue-50' : 'text-gray-500 border-transparent hover:bg-gray-50';
             barHtml += `<button onclick="ChatInterface.renderEmojiGridById('${g.id}')" class="px-4 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${buttonClass}">${g.name}</button>`;
@@ -738,7 +744,12 @@ const ChatInterface = {
         let emojis = [];
 
         if (groupId === 'bound') {
-            if (boundGroup) emojis = boundGroup.emojis;
+            // 合并所有绑定分组的表情包
+            boundGroups.forEach(g => {
+                if (g.emojis) {
+                    emojis = emojis.concat(g.emojis);
+                }
+            });
         } else {
             const group = allGroups.find(g => g.id === groupId);
             if (group) emojis = group.emojis;

@@ -90,7 +90,8 @@ const SettingsManager = {
         const config = {
             endpoint: document.getElementById('api-endpoint').value,
             key: document.getElementById('api-key').value,
-            model: document.getElementById('api-model').value
+            model: document.getElementById('api-model').value,
+            temperature: parseFloat(document.getElementById('api-temperature').value) || 0.8
         };
         API.Settings.saveApiConfig(config);
         alert('API 配置已保存');
@@ -105,6 +106,7 @@ const SettingsManager = {
             endpoint: document.getElementById('api-endpoint').value,
             key: document.getElementById('api-key').value,
             model: document.getElementById('api-model').value,
+            temperature: parseFloat(document.getElementById('api-temperature').value) || 0.8,
             name: name.trim() || defaultName
         };
         let presets = API.Settings.getPresets();
@@ -133,6 +135,7 @@ const SettingsManager = {
         presets[index].endpoint = document.getElementById('api-endpoint').value;
         presets[index].key = document.getElementById('api-key').value;
         presets[index].model = document.getElementById('api-model').value;
+        presets[index].temperature = parseFloat(document.getElementById('api-temperature').value) || 0.8;
         
         API.Settings.savePresets(presets);
         this.renderPresets();
@@ -152,14 +155,19 @@ const SettingsManager = {
         presets.forEach((p, index) => {
             const div = document.createElement('div');
             div.className = 'bg-gray-50 p-3 rounded-lg text-xs mb-2 border border-gray-100';
+            const tempDisplay = p.temperature !== undefined ? p.temperature : 0.8;
             div.innerHTML = `
                 <div class="flex justify-between items-center mb-2">
                     <span class="font-bold text-gray-700 truncate mr-2" title="${p.name}">${p.name}</span>
                     <button onclick="SettingsManager.loadPreset(${index})" class="bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition">加载</button>
                 </div>
                 <div class="flex justify-between items-center">
-                    <span class="text-gray-400 truncate flex-1 mr-2" title="${p.model}">${p.model || 'Unknown Model'}</span>
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-2 flex-1 min-w-0 mr-2">
+                        <span class="text-gray-400 truncate" title="${p.model}">${p.model || 'Unknown Model'}</span>
+                        <span class="text-gray-300">|</span>
+                        <span class="text-orange-500 shrink-0">T:${tempDisplay}</span>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
                         <button onclick="SettingsManager.updatePreset(${index})" class="text-green-600 hover:text-green-700">更新</button>
                         <button onclick="SettingsManager.deletePreset(${index})" class="text-red-500 hover:text-red-700">删除</button>
                     </div>
@@ -176,6 +184,10 @@ const SettingsManager = {
             document.getElementById('api-endpoint').value = p.endpoint;
             document.getElementById('api-key').value = p.key;
             document.getElementById('api-model').value = p.model;
+            // 加载温度参数
+            const temp = p.temperature !== undefined ? p.temperature : 0.8;
+            document.getElementById('api-temperature').value = temp;
+            document.getElementById('api-temp-val').textContent = temp;
             alert('已加载预设: ' + p.name);
         }
     },
@@ -307,6 +319,11 @@ const SettingsManager = {
             document.getElementById('api-key').value = apiConfig.key || '';
             document.getElementById('api-model').value = apiConfig.model || '';
         }
+        // 加载温度参数
+        const temp = apiConfig.temperature !== undefined ? apiConfig.temperature : 0.8;
+        document.getElementById('api-temperature').value = temp;
+        document.getElementById('api-temp-val').textContent = temp;
+        
         this.renderPresets();
 
         const customFont = localStorage.getItem('customFont');

@@ -450,12 +450,16 @@ const API = {
                 systemPrompt += '\n[Past Memories/Context: ' + recentMemories + ']';
             }
 
-            // --- World Book Integration ---
-            if (settings.worldBookId) {
+            // --- World Book Integration (支持多选) ---
+            const worldBookIds = settings.worldBookIds || (settings.worldBookId ? [settings.worldBookId] : []);
+            if (worldBookIds.length > 0) {
                 const books = API.WorldBook.getBooks();
-                const wb = books.find(b => b.id === settings.worldBookId);
-                if (wb) {
-                    systemPrompt += '\n[World Background Info: ' + wb.title + ' - ' + wb.content + ']';
+                const selectedBooks = books.filter(b => worldBookIds.includes(b.id));
+                if (selectedBooks.length > 0) {
+                    systemPrompt += '\n\n【世界背景设定】';
+                    selectedBooks.forEach(wb => {
+                        systemPrompt += '\n[' + wb.title + ']: ' + wb.content;
+                    });
                 }
             }
 
@@ -468,16 +472,22 @@ const API = {
                 }
             }
 
-            // --- Emoji Integration ---
+            // --- Emoji Integration (支持多选) ---
             let emojiMap = {}; // URL到含义的映射
-            if (settings.emojiGroupId) {
-                const emojis = API.Emoji.getGroupEmojis(settings.emojiGroupId);
-                if (emojis.length > 0) {
+            const emojiGroupIds = settings.emojiGroupIds || (settings.emojiGroupId ? [settings.emojiGroupId] : []);
+            if (emojiGroupIds.length > 0) {
+                let allEmojis = [];
+                emojiGroupIds.forEach(groupId => {
+                    const emojis = API.Emoji.getGroupEmojis(groupId);
+                    allEmojis = allEmojis.concat(emojis);
+                });
+                
+                if (allEmojis.length > 0) {
                     // 建立URL到含义的映射
-                    emojis.forEach(e => {
+                    allEmojis.forEach(e => {
                         emojiMap[e.url] = e.meaning;
                     });
-                    const emojiList = emojis.map(e => '「' + e.meaning + '」: ' + e.url).join('\n');
+                    const emojiList = allEmojis.map(e => '「' + e.meaning + '」: ' + e.url).join('\n');
                     systemPrompt += '\n\n【表情包功能】';
                     systemPrompt += '\n你可以使用以下表情包来表达情绪，根据你的人设性格决定发送频率：';
                     systemPrompt += '\n- 如果人设活泼开朗，可以多发表情包';
@@ -506,19 +516,31 @@ const API = {
                     content = msg.content;
                 }
                 
-                // 处理引用消息 - 显示完整引用内容
+                // 处理引用消息 - 显示完整引用内容，让AI清楚知道用户引用了什么
                 if (msg.quote) {
                     const quotedMsg = fullHistory.find(m => m.id === msg.quote.id);
                     if (quotedMsg && !quotedMsg.recalled) {
                         let quotedContent = quotedMsg.content;
-                        // 如果引用的是表情包，也显示含义
+                        let quotedType = '文字消息';
+                        
+                        // 如果引用的是表情包，显示含义
                         if (quotedMsg.type === 'image' && emojiMap[quotedMsg.content]) {
-                            quotedContent = '[表情包：' + emojiMap[quotedMsg.content] + ']';
+                            quotedContent = emojiMap[quotedMsg.content];
+                            quotedType = '表情包';
                         } else if (quotedMsg.type === 'image') {
-                            quotedContent = '[图片]';
+                            // 检查是否是意念图（白底文字卡片）
+                            if (quotedMsg.content && quotedMsg.content.startsWith('data:image/')) {
+                                quotedContent = '一张图片';
+                                quotedType = '图片';
+                            } else {
+                                quotedContent = quotedMsg.content;
+                                quotedType = '图片';
+                            }
                         }
+                        
                         const quoteSender = quotedMsg.sender === 'user' ? '用户' : char.name;
-                        content = '[引用' + quoteSender + '的消息："' + quotedContent + '"] ' + content;
+                        // 更详细的引用格式，让AI清楚知道引用的类型和内容
+                        content = '[用户引用了' + quoteSender + '发送的' + quotedType + '："' + quotedContent + '"，并回复说：] ' + content;
                     }
                 }
                 
@@ -541,7 +563,7 @@ const API = {
                 body: JSON.stringify({
                     model: config.model || 'gpt-3.5-turbo',
                     messages: messages,
-                    temperature: 0.8,
+                    temperature: config.temperature !== undefined ? config.temperature : 0.8,
                     max_tokens: 4096  // 限制AI单次输出不超过约1万字符
                 })
             });
