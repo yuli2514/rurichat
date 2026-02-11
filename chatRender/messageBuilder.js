@@ -140,6 +140,56 @@ const MessageBuilder = {
     },
 
     /**
+     * 构建语音消息HTML
+     * @param {Object} params - 参数对象
+     * @returns {string} - 语音消息HTML
+     */
+    buildVoiceMessage: function(params) {
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode } = params;
+        
+        const voiceData = msg.voiceData || {};
+        const duration = voiceData.duration || 0;
+        const transcription = voiceData.transcription || '[语音消息]';
+        const isFake = voiceData.isFake;
+        // 真实语音（有音频数据且非伪造）不显示文字展开区域
+        const hasRealAudio = voiceData.audioBase64 && !isFake;
+        
+        // 根据时长计算气泡宽度（最小80px，最大200px）
+        const minWidth = 80;
+        const maxWidth = 200;
+        const widthPerSecond = 10;
+        const bubbleWidth = Math.min(maxWidth, Math.max(minWidth, minWidth + duration * widthPerSecond));
+        
+        const bubbleClass = isMe ? 'bubble bubble-user voice-bubble' : 'bubble bubble-ai voice-bubble';
+        
+        // 文字展开区域：只有伪造语音或AI语音才显示
+        const textAreaHtml = hasRealAudio ? '' :
+            '<div id="voice-text-' + index + '" class="hidden mt-1 text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-lg max-w-full break-words">' +
+                transcription +
+            '</div>';
+        
+        return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+            checkboxHtml +
+            '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+            '<div class="max-w-[70%]">' +
+                '<div onclick="' + (deleteMode ? 'ChatInterface.toggleDeleteSelection(' + index + ')' : 'VoiceHandler.playVoice(' + index + ')') + '" ' +
+                     'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                     'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                     'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                     'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                    'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '" ' +
+                    'style="width: ' + bubbleWidth + 'px;">' +
+                    '<div class="flex items-center gap-2 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                        '<i class="fa-solid fa-volume-high text-sm ' + (isMe ? 'text-white' : 'text-gray-600') + '"></i>' +
+                        '<span class="text-sm">' + duration + '"</span>' +
+                    '</div>' +
+                '</div>' +
+                textAreaHtml +
+            '</div>' +
+        '</div>';
+    },
+
+    /**
      * 构建单条消息的完整HTML
      * @param {Object} params - 参数对象
      * @returns {string} - 消息HTML
@@ -167,11 +217,16 @@ const MessageBuilder = {
         const checkboxHtml = this.buildDeleteCheckbox(index, isSelected, deleteMode);
 
         const isImage = msg.type === 'image';
+        const isVoice = msg.type === 'voice';
         
         if (isImage) {
             const imageClass = this.getImageClass(isMe, msg);
             return this.buildImageMessage({
                 msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, imageClass
+            });
+        } else if (isVoice) {
+            return this.buildVoiceMessage({
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode
             });
         } else {
             const quoteHtml = this.buildQuoteHtml(msg, history, char);

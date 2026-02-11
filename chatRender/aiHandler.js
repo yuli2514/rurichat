@@ -70,6 +70,15 @@ const AIHandler = {
                     isTextImageCard = true;
                 }
                 
+                // AI语音消息：检测 [语音:xxx] 或 [VOICE:xxx] 格式
+                let isVoiceMessage = false;
+                let voiceContent = null;
+                const voiceMatch = text.match(/^\[(?:语音|VOICE|voice)[：:]\s*(.+?)\s*\]$/i);
+                if (voiceMatch) {
+                    voiceContent = voiceMatch[1];
+                    isVoiceMessage = true;
+                }
+                
                 const isImageUrl = text.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i) ||
                                    text.startsWith('data:image/');
                 
@@ -100,14 +109,36 @@ const AIHandler = {
                 }
                 
                 const msgId = Date.now() + Math.random();
-                const msg = {
-                    id: msgId,
-                    sender: 'ai',
-                    content: text,
-                    type: isImageUrl ? 'image' : 'text',
-                    timestamp: Date.now(),
-                    quote: quote
-                };
+                
+                // 根据消息类型构建不同的消息对象
+                let msg;
+                if (isVoiceMessage) {
+                    // AI语音消息
+                    const voiceDuration = Math.max(1, Math.ceil(voiceContent.length / 3.5));
+                    msg = {
+                        id: msgId,
+                        sender: 'ai',
+                        content: voiceContent,
+                        type: 'voice',
+                        timestamp: Date.now(),
+                        quote: quote,
+                        voiceData: {
+                            duration: voiceDuration,
+                            audioBase64: null,
+                            isFake: true,
+                            transcription: voiceContent
+                        }
+                    };
+                } else {
+                    msg = {
+                        id: msgId,
+                        sender: 'ai',
+                        content: text,
+                        type: isImageUrl ? 'image' : 'text',
+                        timestamp: Date.now(),
+                        quote: quote
+                    };
+                }
                 API.Chat.addMessage(chatInterface.currentCharId, msg);
                 chatInterface.renderMessages();
                 

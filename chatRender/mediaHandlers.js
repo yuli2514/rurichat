@@ -10,12 +10,63 @@
  */
 
 const MediaHandlers = {
+    // 保存当前角色ID，防止相机返回后丢失
+    _pendingCharId: null,
+
     /**
      * 打开相机
+     * @param {string} currentCharId - 当前角色ID（可选，用于保存）
      */
-    openCamera: function() {
+    openCamera: function(currentCharId) {
+        // 保存当前角色ID到临时变量和sessionStorage（防止页面刷新丢失）
+        if (currentCharId) {
+            this._pendingCharId = currentCharId;
+            try {
+                sessionStorage.setItem('_pendingCameraCharId', currentCharId);
+            } catch (e) {
+                console.warn('[MediaHandlers] Failed to save charId to sessionStorage:', e);
+            }
+        }
         document.getElementById('panel-container').classList.add('hidden');
         document.getElementById('camera-input').click();
+    },
+
+    /**
+     * 获取待处理的角色ID（优先从参数获取，其次从缓存获取）
+     * @param {string} currentCharId - 传入的角色ID
+     * @returns {string} 有效的角色ID
+     */
+    _getValidCharId: function(currentCharId) {
+        // 优先使用传入的ID
+        if (currentCharId) return currentCharId;
+        
+        // 其次使用内存缓存
+        if (this._pendingCharId) return this._pendingCharId;
+        
+        // 最后尝试从sessionStorage恢复
+        try {
+            const savedId = sessionStorage.getItem('_pendingCameraCharId');
+            if (savedId) return savedId;
+        } catch (e) {
+            console.warn('[MediaHandlers] Failed to read charId from sessionStorage:', e);
+        }
+        
+        // 兜底：从ChatInterface获取
+        if (typeof ChatInterface !== 'undefined' && ChatInterface.currentCharId) {
+            return ChatInterface.currentCharId;
+        }
+        
+        return null;
+    },
+
+    /**
+     * 清理待处理的角色ID缓存
+     */
+    _clearPendingCharId: function() {
+        this._pendingCharId = null;
+        try {
+            sessionStorage.removeItem('_pendingCameraCharId');
+        } catch (e) {}
     },
 
     /**
@@ -29,12 +80,31 @@ const MediaHandlers = {
         const file = input.files[0];
         if (!file) return;
 
+        // 获取有效的角色ID
+        const charId = this._getValidCharId(currentCharId);
+        console.log('[MediaHandlers] handleCameraCapture - charId:', charId);
+        
+        if (!charId) {
+            console.error('[MediaHandlers] No valid charId found for camera capture');
+            alert('无法发送图片：未找到当前聊天角色');
+            input.value = '';
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             const base64Data = e.target.result;
             
             // 压缩图片
-            const compressedBase64 = await compressFunc(base64Data);
+            let compressedBase64;
+            if (compressFunc) {
+                compressedBase64 = await compressFunc(base64Data);
+            } else if (typeof ChatRenderUtils !== 'undefined') {
+                // 兜底：直接使用工具函数
+                compressedBase64 = await ChatRenderUtils.compressImageForChat(base64Data);
+            } else {
+                compressedBase64 = base64Data;
+            }
             
             // 发送图片消息到聊天（不自动触发AI回复）
             const msg = {
@@ -45,15 +115,24 @@ const MediaHandlers = {
                 timestamp: Date.now(),
                 isVisionImage: true // 标记为需要Vision识图的图片
             };
-            API.Chat.addMessage(currentCharId, msg);
+            API.Chat.addMessage(charId, msg);
+            console.log('[MediaHandlers] Image message added to chat:', charId);
             
             // 渲染消息
-            if (renderCallback) renderCallback();
+            if (renderCallback) {
+                renderCallback();
+            } else if (typeof ChatInterface !== 'undefined') {
+                // 兜底：直接调用ChatInterface渲染
+                ChatInterface.renderMessages();
+            }
             
             // 实时更新角色列表
             if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
                 ChatManager.renderList();
             }
+            
+            // 清理缓存
+            MediaHandlers._clearPendingCharId();
         };
         reader.readAsDataURL(file);
         input.value = ''; // 重置input
@@ -141,9 +220,19 @@ const MediaHandlers = {
 
     /**
      * 打开相册选择器
+     * @param {string} currentCharId - 当前角色ID（可选，用于保存）
      */
-    openGalleryPicker: function() {
+    openGalleryPicker: function(currentCharId) {
         this.closeGalleryMenu();
+        // 保存当前角色ID（与相机共用缓存机制）
+        if (currentCharId) {
+            this._pendingCharId = currentCharId;
+            try {
+                sessionStorage.setItem('_pendingCameraCharId', currentCharId);
+            } catch (e) {
+                console.warn('[MediaHandlers] Failed to save charId to sessionStorage:', e);
+            }
+        }
         document.getElementById('panel-container').classList.add('hidden');
         document.getElementById('gallery-input').click();
     },
@@ -159,12 +248,30 @@ const MediaHandlers = {
         const file = input.files[0];
         if (!file) return;
 
+        // 获取有效的角色ID
+        const charId = this._getValidCharId(currentCharId);
+        console.log('[MediaHandlers] handleGallerySelect - charId:', charId);
+        
+        if (!charId) {
+            console.error('[MediaHandlers] No valid charId found for gallery select');
+            alert('无法发送图片：未找到当前聊天角色');
+            input.value = '';
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             const base64Data = e.target.result;
             
             // 压缩图片
-            const compressedBase64 = await compressFunc(base64Data);
+            let compressedBase64;
+            if (compressFunc) {
+                compressedBase64 = await compressFunc(base64Data);
+            } else if (typeof ChatRenderUtils !== 'undefined') {
+                compressedBase64 = await ChatRenderUtils.compressImageForChat(base64Data);
+            } else {
+                compressedBase64 = base64Data;
+            }
             
             // 发送图片消息到聊天（不自动触发AI回复）
             const msg = {
@@ -175,15 +282,23 @@ const MediaHandlers = {
                 timestamp: Date.now(),
                 isVisionImage: true // 标记为需要Vision识图的图片
             };
-            API.Chat.addMessage(currentCharId, msg);
+            API.Chat.addMessage(charId, msg);
+            console.log('[MediaHandlers] Gallery image added to chat:', charId);
             
             // 渲染消息
-            if (renderCallback) renderCallback();
+            if (renderCallback) {
+                renderCallback();
+            } else if (typeof ChatInterface !== 'undefined') {
+                ChatInterface.renderMessages();
+            }
             
             // 实时更新角色列表
             if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
                 ChatManager.renderList();
             }
+            
+            // 清理缓存
+            MediaHandlers._clearPendingCharId();
         };
         reader.readAsDataURL(file);
         input.value = ''; // 重置input

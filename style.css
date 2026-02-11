@@ -378,6 +378,31 @@
             color: rgba(255, 255, 255, 0.95);
         }
 
+        /* Voice Bubble Style - 语音消息气泡 */
+        .voice-bubble {
+            min-width: 80px;
+            padding: 10px 14px;
+        }
+        .voice-bubble .fa-volume-high {
+            animation: none;
+        }
+        .voice-bubble:active .fa-volume-high {
+            animation: voice-playing 1s ease-in-out infinite;
+        }
+        @keyframes voice-playing {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
+        /* 录音按钮动画 */
+        #voice-record-btn.recording {
+            animation: recording-pulse 1s ease-in-out infinite;
+        }
+        @keyframes recording-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        }
+
         /* Vinyl Record Style */
         .vinyl-record {
             border-radius: 50%;

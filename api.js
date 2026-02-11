@@ -443,6 +443,13 @@ const API = {
             systemPrompt += '\n  示例：[图片:窗外的夕阳，金色的光芒洒在云层上，美极了]';
             systemPrompt += '\n  示例：[图片:刚做好的蛋糕，上面有草莓和奶油装饰]';
             systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起';
+            systemPrompt += '\n';
+            systemPrompt += '\n★ 语音消息 [语音:内容]：';
+            systemPrompt += '\n  格式：[语音:你想说的话]';
+            systemPrompt += '\n  用途：当你想发送语音消息时使用，会显示为语音气泡';
+            systemPrompt += '\n  示例：[语音:哈喽~在干嘛呢]';
+            systemPrompt += '\n  示例：[语音:好的好的，我知道啦]';
+            systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起';
 
             // --- Memory Integration ---
             const memories = API.Memory.getMemories(charId);
@@ -504,8 +511,15 @@ const API = {
             const recentHistory = visibleHistory.slice(-ctxLength).map(msg => {
                 let content = '';
                 
+                // 处理语音消息 - 将语音内容作为文字传递给AI
+                if (msg.type === 'voice') {
+                    const voiceData = msg.voiceData || {};
+                    const transcription = voiceData.transcription || msg.content || '[语音消息]';
+                    const sender = msg.sender === 'user' ? '用户' : char.name;
+                    content = '[' + sender + '发送了一条语音消息，内容是：] ' + transcription;
+                }
                 // 处理图片/表情包消息 - 尝试匹配表情包含义
-                if (msg.type === 'image') {
+                else if (msg.type === 'image') {
                     const imgUrl = msg.content;
                     if (emojiMap[imgUrl]) {
                         // 匹配到表情包，显示含义

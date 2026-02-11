@@ -386,7 +386,7 @@ const ChatInterface = {
 
     // ==================== 媒体处理代理 ====================
     openCamera: function() {
-        MediaHandlers.openCamera();
+        MediaHandlers.openCamera(this.currentCharId);
     },
 
     handleCameraCapture: async function(input) {
@@ -423,7 +423,7 @@ const ChatInterface = {
     },
 
     openGalleryPicker: function() {
-        MediaHandlers.openGalleryPicker();
+        MediaHandlers.openGalleryPicker(this.currentCharId);
     },
 
     handleGallerySelect: async function(input) {
@@ -433,6 +433,19 @@ const ChatInterface = {
             this.compressImageForChat.bind(this),
             this.renderMessages.bind(this)
         );
+    },
+
+    // ==================== 语音处理代理 ====================
+    openVoicePanel: function() {
+        VoiceHandler.openVoicePanel();
+    },
+
+    closeVoicePanel: function() {
+        VoiceHandler.closeVoicePanel();
+    },
+
+    playVoice: function(msgIndex) {
+        VoiceHandler.playVoice(msgIndex);
     }
 };
 
