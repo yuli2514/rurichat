@@ -75,9 +75,38 @@ function initializeApp() {
             e.preventDefault();
         }, { passive: false });
 
+        // 6. 全局相机输入事件处理（移动端更可靠）
+        setupGlobalCameraHandler();
+
     } catch (e) {
         console.error('Initialization Error:', e);
     }
+}
+
+/**
+ * 设置全局相机输入事件处理
+ * 使用事件委托确保移动端拍照后能正确处理
+ */
+function setupGlobalCameraHandler() {
+    // 使用事件委托监听 document 上的 change 事件
+    document.addEventListener('change', async function(e) {
+        if (e.target && e.target.id === 'camera-input') {
+            console.log('[Global] Camera input change detected');
+            console.log('[Global] Files:', e.target.files);
+            
+            if (e.target.files && e.target.files.length > 0) {
+                if (typeof ChatInterface !== 'undefined' && ChatInterface.handleCameraCapture) {
+                    try {
+                        await ChatInterface.handleCameraCapture(e.target);
+                    } catch (err) {
+                        console.error('[Global] Camera capture error:', err);
+                    }
+                }
+            }
+        }
+    });
+    
+    console.log('[Global] Camera handler setup complete');
 }
 
 // 检测是否使用组件化加载模式
