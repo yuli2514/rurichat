@@ -82,17 +82,22 @@ const TransferHandler = {
         overlay.id = 'transfer-overlay';
         overlay.className = 'transfer-overlay';
         overlay.innerHTML = panelHtml;
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                this.closeTransferPanel();
-            }
-        });
+        
+        // 延迟添加点击关闭事件，防止移动端touch事件立即触发
+        setTimeout(() => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.closeTransferPanel();
+                }
+            });
+        }, 300);
         
         document.getElementById('super-chat-interface').appendChild(overlay);
         
         // 聚焦金额输入框
         setTimeout(() => {
-            document.getElementById('transfer-amount-input').focus();
+            const input = document.getElementById('transfer-amount-input');
+            if (input) input.focus();
         }, 100);
     },
 
