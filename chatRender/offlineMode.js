@@ -521,6 +521,9 @@ const OfflineMode = {
          interface.style.right = '0';
          interface.style.bottom = '0';
 
+         // 应用自定义 CSS
+         this._applyCss(settings.customCss || '');
+
          // 应用壁纸或默认背景
          if (settings.wallpaper) {
              // 如果 localStorage 中有小型图片，直接使用
@@ -539,18 +542,10 @@ const OfflineMode = {
                  } else {
                      // 默认灰白色背景
                      interface.style.backgroundColor = '#f5f5f5';
+                     interface.style.backgroundImage = 'none';
                  }
              });
-             return;
          }
-         
-         // 默认灰白色背景
-         interface.style.backgroundColor = '#f5f5f5';
-             interface.style.backgroundImage = 'none';
-         }
-
-         // 应用自定义 CSS
-         this._applyCss(settings.customCss || '');
      },
 
     updateSetting: function(key, value) {

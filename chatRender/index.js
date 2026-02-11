@@ -52,8 +52,23 @@ const ChatInterface = {
             const handler = async (e) => {
                 console.log('[ChatInterface] Camera event triggered:', e.type);
                 console.log('[ChatInterface] Files:', e.target.files);
+                
+                // 防止重复触发：如果正在处理中，则忽略
+                if (this._isProcessingCamera) {
+                    console.log('[ChatInterface] Camera processing already in progress, ignoring');
+                    return;
+                }
+                
                 if (e.target.files && e.target.files.length > 0) {
-                    await this.handleCameraCapture(e.target);
+                    this._isProcessingCamera = true;
+                    try {
+                        await this.handleCameraCapture(e.target);
+                    } finally {
+                        // 延迟重置处理标志，防止某些浏览器连续触发
+                        setTimeout(() => {
+                            this._isProcessingCamera = false;
+                        }, 1000);
+                    }
                 }
             };
             

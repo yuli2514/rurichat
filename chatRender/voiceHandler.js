@@ -19,6 +19,7 @@ const VoiceHandler = {
     recordingStartTime: 0,
     recordingTimer: null,
     currentAudioBlob: null,
+    _savedCharId: null, // 保存录音时的角色ID
 
     /**
      * 打开语音面板
@@ -163,6 +164,9 @@ const VoiceHandler = {
         if (event) event.preventDefault();
         if (this.isRecording) return;
         
+        // 保存当前角色ID，防止录音过程中丢失
+        this._savedCharId = ChatInterface.currentCharId;
+        
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
@@ -179,6 +183,7 @@ const VoiceHandler = {
             this.recognizedText = '';
             this.isRecording = true;
             this.recordingStartTime = Date.now();
+            this.currentAudioBlob = null; // 清除旧的Blob
             
             // 更新UI
             const recordBtn = document.getElementById('voice-record-btn');
@@ -268,10 +273,26 @@ const VoiceHandler = {
             return;
         }
         
-        // 延迟发送，等待音频数据和识别结果
-        setTimeout(() => {
+        // 等待音频数据准备好
+        this._waitForAudioBlob(duration, 0);
+    },
+
+    /**
+     * 等待音频Blob生成
+     */
+    _waitForAudioBlob: function(duration, attempt) {
+        if (this.currentAudioBlob) {
             this.sendRealVoice(duration);
-        }, 300);
+        } else if (attempt < 10) {
+            // 每100ms检查一次，最多等待1秒
+            setTimeout(() => {
+                this._waitForAudioBlob(duration, attempt + 1);
+            }, 100);
+        } else {
+            console.warn('[VoiceHandler] Audio blob generation timeout');
+            // 即使没有音频也发送（可能只有文字）
+            this.sendRealVoice(duration);
+        }
     },
 
     /**
@@ -312,7 +333,12 @@ const VoiceHandler = {
      * 发送真实语音消息
      */
     sendRealVoice: function(duration) {
-        if (!ChatInterface.currentCharId) return;
+        // 优先使用保存的charId，如果没有则尝试获取当前的
+        const charId = this._savedCharId || ChatInterface.currentCharId;
+        if (!charId) {
+            console.error('[VoiceHandler] No charId found for sending voice');
+            return;
+        }
         
         const self = this;
         
@@ -321,17 +347,17 @@ const VoiceHandler = {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const audioBase64 = reader.result;
-                self.createAndSendVoiceMessage(duration, audioBase64, self.recognizedText || '[语音消息]', false);
+                self.createAndSendVoiceMessage(duration, audioBase64, self.recognizedText || '[语音消息]', false, charId);
                 self.closeVoicePanel();
             };
             reader.onerror = () => {
                 console.error('[VoiceHandler] FileReader error');
-                self.createAndSendVoiceMessage(duration, null, self.recognizedText || '[语音消息]', false);
+                self.createAndSendVoiceMessage(duration, null, self.recognizedText || '[语音消息]', false, charId);
                 self.closeVoicePanel();
             };
             reader.readAsDataURL(this.currentAudioBlob);
         } else {
-            this.createAndSendVoiceMessage(duration, null, this.recognizedText || '[语音消息]', false);
+            this.createAndSendVoiceMessage(duration, null, this.recognizedText || '[语音消息]', false, charId);
             this.closeVoicePanel();
         }
     },
@@ -358,7 +384,10 @@ const VoiceHandler = {
     /**
      * 创建并发送语音消息
      */
-    createAndSendVoiceMessage: function(duration, audioData, text, isFake) {
+    createAndSendVoiceMessage: function(duration, audioData, text, isFake, specificCharId) {
+        const charId = specificCharId || ChatInterface.currentCharId;
+        if (!charId) return;
+
         const msg = {
             id: Date.now(),
             sender: 'user',
@@ -373,9 +402,12 @@ const VoiceHandler = {
             }
         };
         
-        const charId = ChatInterface.currentCharId;
         API.Chat.addMessage(charId, msg);
-        ChatInterface.renderMessages();
+        
+        // 只有当当前界面仍是该角色时才渲染
+        if (ChatInterface.currentCharId === charId) {
+            ChatInterface.renderMessages();
+        }
         
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
