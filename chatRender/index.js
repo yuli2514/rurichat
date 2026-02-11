@@ -85,6 +85,10 @@ const ChatInterface = {
         try {
             this.currentCharId = charId;
             this.loadedMessageCount = 80;
+            
+            // 确保相机输入事件已绑定
+            this._bindCameraInput();
+            
             const char = API.Chat.getChar(charId);
             if (!char) {
                 console.error('Character not found');

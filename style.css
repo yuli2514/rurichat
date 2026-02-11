@@ -985,9 +985,9 @@
         .transfer-card {
             background: linear-gradient(135deg, #fff0f3 0%, #fadadd 100%);
             border-radius: 12px;
-            padding: 8px 14px;
-            min-width: 155px;
-            max-width: 175px;
+            padding: 12px 16px;
+            min-width: 180px;
+            max-width: 200px;
             box-shadow: 0 2px 6px rgba(255, 107, 138, 0.12);
             transition: all 0.2s;
         }
