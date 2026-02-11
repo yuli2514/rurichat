@@ -118,11 +118,11 @@ const OfflineMode = {
             // 消息气泡
             html += '<div class="w-full flex justify-center">';
             if (isUser) {
-                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs">';
+                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '" oncontextmenu="OfflineMode.handleBubbleContextMenu(event, ' + index + ')" ontouchstart="OfflineMode.handleTouchStart(event, ' + index + ')" onmousedown="OfflineMode.handleMouseDown(event, ' + index + ')">';
                 html += '<p class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._escapeHtml(msg.content) + '</p>';
                 html += '</div>';
             } else {
-                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs">';
+                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '" oncontextmenu="OfflineMode.handleBubbleContextMenu(event, ' + index + ')" ontouchstart="OfflineMode.handleTouchStart(event, ' + index + ')" onmousedown="OfflineMode.handleMouseDown(event, ' + index + ')">';
                 html += '<div class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._formatContent(msg.content) + '</div>';
                 html += '</div>';
             }
@@ -131,6 +131,14 @@ const OfflineMode = {
         });
 
         container.innerHTML = html;
+        
+        // 为所有气泡添加触摸事件监听
+        const bubbles = container.querySelectorAll('.offline-bubble');
+        bubbles.forEach((bubble, index) => {
+            bubble.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: true });
+            bubble.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: true });
+        });
+        
         this._scrollToBottom();
     },
 
@@ -459,6 +467,8 @@ const OfflineMode = {
                 this.loadSettings();
                 document.getElementById('offline-wallpaper-input').value = '本地图片已上传';
                 alert('背景已上传并应用');
+                // 清空 input 的 value，允许再次上传同一文件
+                input.value = '';
             };
             reader.readAsDataURL(input.files[0]);
         }
@@ -533,8 +543,11 @@ const OfflineMode = {
     _formatContent: function(content) {
         if (!content) return '';
         
-        // 先转义HTML
-        let text = this._escapeHtml(content);
+        // 先移除HTML标签（包括<center>、</center>等）
+        let text = content.replace(/<[^>]*>/g, '');
+        
+        // 再转义HTML
+        text = this._escapeHtml(text);
         
         // 移除常见的格式标记和非剧情内容
         // 移除【】括号内的内容（如【系统】、【旁白】等）
@@ -567,6 +580,282 @@ const OfflineMode = {
         text = text.replace(/<p class="mt-4">\s*<\/p>/g, '');
         
         return text;
+    },
+
+    /**
+     * 触摸开始事件处理（长按检测）
+     */
+    touchStartX: 0,
+    touchStartY: 0,
+    longPressTimer: null,
+    longPressTriggered: false,
+    currentContextMenuMsgIndex: null,
+    menuCloseHandler: null,
+    _editingMessageIndex: null,
+
+    /**
+     * 鼠标按下事件处理（桌面端长按检测）
+     */
+    handleMouseDown: function(event, index) {
+        // 只处理左键
+        if (event.button !== 0) return;
+        
+        this.touchStartX = event.clientX;
+        this.touchStartY = event.clientY;
+        this.currentContextMenuMsgIndex = index;
+        this.longPressTriggered = false;
+
+        this.longPressTimer = setTimeout(() => {
+            this.longPressTriggered = true;
+            this.showLongPressMenu(event, index);
+        }, 500); // 500ms 触发长按
+
+        // 添加鼠标移动监听
+        const handleMouseMove = (moveEvent) => {
+            const moveX = moveEvent.clientX;
+            const moveY = moveEvent.clientY;
+            // 移动超过20px则取消长按
+            if (Math.abs(moveX - this.touchStartX) > 20 || Math.abs(moveY - this.touchStartY) > 20) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            }
+        };
+
+        const handleMouseUp = (upEvent) => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            if (this.longPressTimer) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    },
+
+    handleTouchStart: function(event, index) {
+        this.touchStartX = event.touches[0].clientX;
+        this.touchStartY = event.touches[0].clientY;
+        this.currentContextMenuMsgIndex = index;
+        this.longPressTriggered = false;
+
+        this.longPressTimer = setTimeout(() => {
+            this.longPressTriggered = true;
+            this.showLongPressMenu(event, index);
+        }, 500); // 500ms 触发长按
+    },
+
+    /**
+     * 触摸移动事件处理
+     */
+    handleTouchMove: function(event) {
+        if (!this.longPressTimer) return;
+        const moveX = event.touches[0].clientX;
+        const moveY = event.touches[0].clientY;
+        // 移动超过20px则取消长按
+        if (Math.abs(moveX - this.touchStartX) > 20 || Math.abs(moveY - this.touchStartY) > 20) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+    },
+
+    /**
+     * 触摸结束事件处理
+     */
+    handleTouchEnd: function(event) {
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+        // 如果长按已触发，阻止默认点击行为
+        if (this.longPressTriggered) {
+            if (event.cancelable) event.preventDefault();
+            this.longPressTriggered = false;
+        }
+    },
+
+    /**
+     * 处理气泡右键菜单/长按菜单
+     */
+    handleBubbleContextMenu: function(event, index) {
+        if (event.type === 'contextmenu') {
+            // 桌面端右键菜单
+            event.preventDefault();
+            this.showContextMenu(event, index);
+        } else {
+            // 移动端长按菜单
+            this.showLongPressMenu(event, index);
+        }
+    },
+
+    /**
+     * 显示长按菜单
+     */
+    showLongPressMenu: function(event, index) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+        this.currentContextMenuMsgIndex = index;
+        
+        const menu = document.getElementById('offline-longpress-menu');
+        if (!menu) return;
+        
+        const container = document.getElementById('offline-mode-interface');
+        const containerRect = container.getBoundingClientRect();
+
+        let clientX = 0;
+        let clientY = 0;
+
+        if (event.touches && event.touches.length > 0) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        } else if (event.changedTouches && event.changedTouches.length > 0) {
+            clientX = event.changedTouches[0].clientX;
+            clientY = event.changedTouches[0].clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+
+        let left = clientX - containerRect.left;
+        let top = clientY - containerRect.top;
+        
+        if (left + 120 > containerRect.width) left = containerRect.width - 130;
+        if (top + 100 > containerRect.height) top = top - 100;
+
+        left = Math.max(10, left);
+        top = Math.max(10, top);
+
+        menu.style.top = top + 'px';
+        menu.style.left = left + 'px';
+        menu.classList.remove('hidden');
+
+        // 移除旧的监听器
+        if (this.menuCloseHandler) {
+            document.removeEventListener('click', this.menuCloseHandler);
+            document.removeEventListener('touchstart', this.menuCloseHandler);
+        }
+
+        // 创建新的关闭处理器
+        this.menuCloseHandler = (e) => {
+            if (menu.contains(e.target)) {
+                return;
+            }
+            setTimeout(() => {
+                this.closeLongPressMenu();
+            }, 100);
+        };
+
+        // 延迟添加关闭监听器
+        setTimeout(() => {
+            document.addEventListener('click', this.menuCloseHandler);
+            document.addEventListener('touchstart', this.menuCloseHandler, { passive: true });
+        }, 300);
+    },
+
+    /**
+     * 关闭长按菜单
+     */
+    closeLongPressMenu: function() {
+        const menu = document.getElementById('offline-longpress-menu');
+        if (menu) {
+            menu.classList.add('hidden');
+        }
+        if (this.menuCloseHandler) {
+            document.removeEventListener('click', this.menuCloseHandler);
+            document.removeEventListener('touchstart', this.menuCloseHandler);
+            this.menuCloseHandler = null;
+        }
+    },
+
+    /**
+     * 处理长按菜单操作
+     */
+    handleLongPressAction: function(action) {
+        const index = this.currentContextMenuMsgIndex;
+        if (index === null) return;
+        
+        const history = API.Offline.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg) return;
+
+        this.closeLongPressMenu();
+
+        if (action === 'edit') {
+            this.openEditMessage(index);
+        } else if (action === 'delete') {
+            this.deleteMessage(index);
+        }
+    },
+
+    /**
+     * 打开编辑消息弹窗
+     */
+    openEditMessage: function(index) {
+        const history = API.Offline.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg || msg.type !== 'text') return;
+
+        this._editingMessageIndex = index;
+        const modal = document.getElementById('offline-edit-message-modal');
+        const input = document.getElementById('offline-edit-message-input');
+        
+        input.value = msg.content;
+        modal.classList.remove('hidden');
+        input.focus();
+    },
+
+    /**
+     * 取消编辑消息
+     */
+    cancelEditMessage: function() {
+        const modal = document.getElementById('offline-edit-message-modal');
+        modal.classList.add('hidden');
+        this._editingMessageIndex = null;
+    },
+
+    /**
+     * 确认编辑消息
+     */
+    confirmEditMessage: function() {
+        const index = this._editingMessageIndex;
+        if (index === null) return;
+
+        const input = document.getElementById('offline-edit-message-input');
+        const newText = input.value.trim();
+
+        if (!newText) {
+            alert('消息内容不能为空');
+            return;
+        }
+
+        const history = API.Offline.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg) return;
+
+        msg.content = newText;
+        msg.edited = true;
+        msg.editedAt = Date.now();
+        
+        API.Offline.saveHistory(this.currentCharId, history);
+        this.renderMessages();
+
+        this.cancelEditMessage();
+    },
+
+    /**
+     * 删除消息
+     */
+    deleteMessage: function(index) {
+        if (!confirm('确定要删除这条消息吗？')) return;
+        
+        const history = API.Offline.getHistory(this.currentCharId);
+        history.splice(index, 1);
+        
+        API.Offline.saveHistory(this.currentCharId, history);
+        this.renderMessages();
     }
 };
 

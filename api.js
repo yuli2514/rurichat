@@ -954,7 +954,7 @@ const API = {
                 // 如果没有启用的预设，尝试使用旧的单预设格式
                 offlinePreset = this.getPreset(charId);
                 if (!offlinePreset) {
-                    offlinePreset = '以ai角色第一人称描写，用户称呼为你，要有环境描写心理描写等，展开线下剧情文风要求优美，文字居中对齐，段与段之间要空一行，字数不少于400字';
+                    offlinePreset = '以ai角色第一人称描写，用户称呼为你，要有环境描写心理描写等，展开线下剧情文风要求优美，段与段之间要空一行，字数不少于400字';
                 }
             }
 
