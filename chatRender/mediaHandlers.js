@@ -83,96 +83,107 @@ const MediaHandlers = {
     },
 
     /**
-     * 处理相机拍摄的图片
+     * 处理相机拍摄的图片 - 移动端优化版本
      * @param {HTMLInputElement} input - 文件输入元素
      * @param {string} currentCharId - 当前角色ID
      * @param {Function} compressFunc - 图片压缩函数
      * @param {Function} renderCallback - 渲染回调函数
      */
     handleCameraCapture: async function(input, currentCharId, compressFunc, renderCallback) {
-        console.log('[MediaHandlers] handleCameraCapture called');
-        console.log('[MediaHandlers] input.files:', input.files);
-        
-        const file = input.files[0];
+        const file = input && input.files && input.files[0];
         if (!file) {
-            console.log('[MediaHandlers] No file selected');
             return;
         }
-        
-        console.log('[MediaHandlers] File selected:', file.name, file.size, file.type);
 
         // 获取有效的角色ID
         const charId = this._getValidCharId(currentCharId);
-        console.log('[MediaHandlers] handleCameraCapture - charId:', charId);
-        
         if (!charId) {
-            console.error('[MediaHandlers] No valid charId found for camera capture');
-            alert('无法发送图片：未找到当前聊天角色');
             input.value = '';
             return;
         }
 
         try {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                console.log('[MediaHandlers] FileReader onload triggered');
-                const base64Data = e.target.result;
-                
-                // 压缩图片
-                let compressedBase64;
+            // 使用 createObjectURL 代替 FileReader，更快更省内存
+            const objectUrl = URL.createObjectURL(file);
+            
+            // 创建图片对象
+            const img = new Image();
+            
+            img.onload = async () => {
                 try {
-                    if (compressFunc) {
-                        compressedBase64 = await compressFunc(base64Data);
-                    } else if (typeof ChatRenderUtils !== 'undefined') {
-                        // 兜底：直接使用工具函数
-                        compressedBase64 = await ChatRenderUtils.compressImageForChat(base64Data);
-                    } else {
-                        compressedBase64 = base64Data;
+                    // 压缩图片
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // 移动端优化：最大600px，质量0.5
+                    const MAX_SIZE = 600;
+                    if (width > MAX_SIZE || height > MAX_SIZE) {
+                        if (width > height) {
+                            height = Math.round(height * MAX_SIZE / width);
+                            width = MAX_SIZE;
+                        } else {
+                            width = Math.round(width * MAX_SIZE / height);
+                            height = MAX_SIZE;
+                        }
                     }
-                } catch (compressError) {
-                    console.error('[MediaHandlers] Image compression failed:', compressError);
-                    compressedBase64 = base64Data; // 压缩失败则使用原图
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 质量0.5，大幅减少数据量
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
+                    
+                    // 释放 objectUrl
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    // 先发送消息，再关闭界面
+                    const msg = {
+                        id: Date.now(),
+                        sender: 'user',
+                        content: compressedBase64,
+                        type: 'image',
+                        timestamp: Date.now(),
+                        isVisionImage: true
+                    };
+                    
+                    // 添加消息
+                    API.Chat.addMessage(charId, msg);
+                    
+                    // 渲染消息
+                    if (renderCallback) {
+                        renderCallback();
+                    } else if (typeof ChatInterface !== 'undefined') {
+                        ChatInterface.renderMessages();
+                    }
+                    
+                    // 更新角色列表
+                    if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                        ChatManager.renderList();
+                    }
+                    
+                    // 清理
+                    MediaHandlers._clearPendingCharId();
+                    input.value = '';
+                    
+                } catch (e) {
+                    URL.revokeObjectURL(objectUrl);
+                    input.value = '';
                 }
-                
-                // 发送图片消息到聊天（不自动触发AI回复）
-                const msg = {
-                    id: Date.now(),
-                    sender: 'user',
-                    content: compressedBase64,
-                    type: 'image',
-                    timestamp: Date.now(),
-                    isVisionImage: true // 标记为需要Vision识图的图片
-                };
-                API.Chat.addMessage(charId, msg);
-                console.log('[MediaHandlers] Image message added to chat:', charId);
-                
-                // 渲染消息
-                if (renderCallback) {
-                    renderCallback();
-                } else if (typeof ChatInterface !== 'undefined') {
-                    // 兜底：直接调用ChatInterface渲染
-                    ChatInterface.renderMessages();
-                }
-                
-                // 实时更新角色列表
-                if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
-                    ChatManager.renderList();
-                }
-                
-                // 清理缓存
-                MediaHandlers._clearPendingCharId();
             };
             
-            reader.onerror = (e) => {
-                console.error('[MediaHandlers] FileReader error:', e);
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                input.value = '';
             };
             
-            reader.readAsDataURL(file);
+            img.src = objectUrl;
+            
         } catch (error) {
-            console.error('[MediaHandlers] handleCameraCapture error:', error);
+            input.value = '';
         }
-        
-        input.value = ''; // 重置input
     },
 
     /**

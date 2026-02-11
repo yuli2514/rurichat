@@ -93,38 +93,46 @@ const ChatRenderUtils = {
     },
 
     /**
-     * 聊天图片压缩 - 保持原始尺寸比例，只在过大时压缩
+     * 聊天图片压缩 - 移动端优化版本
      * @param {string} base64 - 图片的base64数据
      * @returns {Promise<string>} - 压缩后的base64数据
      */
     compressImageForChat: function(base64) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = function() {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
+                try {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
 
-                // 最大尺寸限制为800px（保持较大尺寸以保证清晰度）
-                const MAX_SIZE = 800;
-                
-                // 只有当图片超过最大尺寸时才缩小，保持原始比例
-                if (width > MAX_SIZE || height > MAX_SIZE) {
-                    if (width > height) {
-                        height = Math.round(height * MAX_SIZE / width);
-                        width = MAX_SIZE;
-                    } else {
-                        width = Math.round(width * MAX_SIZE / height);
-                        height = MAX_SIZE;
+                    // 移动端优化：最大尺寸限制为600px，减少数据量
+                    const MAX_SIZE = 600;
+                    
+                    if (width > MAX_SIZE || height > MAX_SIZE) {
+                        if (width > height) {
+                            height = Math.round(height * MAX_SIZE / width);
+                            width = MAX_SIZE;
+                        } else {
+                            width = Math.round(width * MAX_SIZE / height);
+                            height = MAX_SIZE;
+                        }
                     }
-                }
 
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                
-                resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 质量降到0.5，大幅减少数据量
+                    const result = canvas.toDataURL('image/jpeg', 0.5);
+                    resolve(result);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            img.onerror = function(e) {
+                reject(e);
             };
             img.src = base64;
         });
