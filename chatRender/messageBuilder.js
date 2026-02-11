@@ -95,19 +95,27 @@ const MessageBuilder = {
      * @returns {string} - 图片消息HTML
      */
     buildImageMessage: function(params) {
-        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, imageClass } = params;
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, imageClass, avatarTimestampHtml, bubbleTimestampHtml } = params;
+        const ats = avatarTimestampHtml || '';
+        const bts = bubbleTimestampHtml || '';
         
         return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
             checkboxHtml +
-            '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+            '<div class="flex flex-col items-center shrink-0">' +
+                '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200" loading="lazy">' +
+                ats +
+            '</div>' +
             '<div class="max-w-[70%]">' +
-                '<img src="' + msg.content + '" ' +
-                     (deleteMode ? 'onclick="ChatInterface.toggleDeleteSelection(' + index + ')" ' : 'onclick="window.open(this.src)" ') +
-                     'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
-                     'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
-                     'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
-                     'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
-                     'class="' + imageClass + '" loading="lazy">' +
+                '<div class="flex items-end gap-1 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    '<img src="' + msg.content + '" ' +
+                         (deleteMode ? 'onclick="ChatInterface.toggleDeleteSelection(' + index + ')" ' : 'onclick="window.open(this.src)" ') +
+                         'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                         'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                         'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                         'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                         'class="' + imageClass + '" loading="lazy">' +
+                    bts +
+                '</div>' +
             '</div>' +
         '</div>';
     },
@@ -118,22 +126,30 @@ const MessageBuilder = {
      * @returns {string} - 文本消息HTML
      */
     buildTextMessage: function(params) {
-        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, quoteHtml } = params;
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, quoteHtml, avatarTimestampHtml, bubbleTimestampHtml } = params;
+        const ats = avatarTimestampHtml || '';
+        const bts = bubbleTimestampHtml || '';
         
         const contentHtml = msg.content.replace(/\n/g, '<br>');
         const bubbleClass = isMe ? 'bubble bubble-user' : 'bubble bubble-ai';
         
         return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
             checkboxHtml +
-            '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+            '<div class="flex flex-col items-center shrink-0">' +
+                '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200" loading="lazy">' +
+                ats +
+            '</div>' +
             '<div class="max-w-[70%]">' +
-                '<div ' + (deleteMode ? 'onclick="ChatInterface.toggleDeleteSelection(' + index + ')" ' : '') +
-                     'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
-                     'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
-                     'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
-                     'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
-                    'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '">' +
-                    quoteHtml + contentHtml +
+                '<div class="flex items-end gap-1 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    '<div ' + (deleteMode ? 'onclick="ChatInterface.toggleDeleteSelection(' + index + ')" ' : '') +
+                         'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                         'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                         'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                         'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                        'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '">' +
+                        quoteHtml + contentHtml +
+                    '</div>' +
+                    bts +
                 '</div>' +
             '</div>' +
         '</div>';
@@ -145,7 +161,9 @@ const MessageBuilder = {
      * @returns {string} - 语音消息HTML
      */
     buildVoiceMessage: function(params) {
-        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode } = params;
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, avatarTimestampHtml, bubbleTimestampHtml } = params;
+        const ats = avatarTimestampHtml || '';
+        const bts = bubbleTimestampHtml || '';
         
         const voiceData = msg.voiceData || {};
         const duration = voiceData.duration || 0;
@@ -170,19 +188,25 @@ const MessageBuilder = {
         
         return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
             checkboxHtml +
-            '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+            '<div class="flex flex-col items-center shrink-0">' +
+                '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200" loading="lazy">' +
+                ats +
+            '</div>' +
             '<div class="max-w-[70%]">' +
-                '<div onclick="' + (deleteMode ? 'ChatInterface.toggleDeleteSelection(' + index + ')' : 'VoiceHandler.playVoice(' + index + ')') + '" ' +
-                     'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
-                     'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
-                     'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
-                     'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
-                    'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '" ' +
-                    'style="width: ' + bubbleWidth + 'px;">' +
-                    '<div class="flex items-center gap-2 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
-                        '<i class="fa-solid fa-volume-high text-sm ' + (isMe ? 'text-white' : 'text-gray-600') + '"></i>' +
-                        '<span class="text-sm">' + duration + '"</span>' +
+                '<div class="flex items-end gap-1 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    '<div onclick="' + (deleteMode ? 'ChatInterface.toggleDeleteSelection(' + index + ')' : 'VoiceHandler.playVoice(' + index + ')') + '" ' +
+                         'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                         'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                         'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                         'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                        'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '" ' +
+                        'style="width: ' + bubbleWidth + 'px;">' +
+                        '<div class="flex items-center gap-2 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                            '<i class="fa-solid fa-volume-high text-sm ' + (isMe ? 'text-white' : 'text-gray-600') + '"></i>' +
+                            '<span class="text-sm">' + duration + '"</span>' +
+                        '</div>' +
                     '</div>' +
+                    bts +
                 '</div>' +
                 textAreaHtml +
             '</div>' +
@@ -195,7 +219,9 @@ const MessageBuilder = {
      * @returns {string} - 转账卡片HTML
      */
     buildTransferMessage: function(params) {
-        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode } = params;
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, avatarTimestampHtml, bubbleTimestampHtml } = params;
+        const ats = avatarTimestampHtml || '';
+        const bts = bubbleTimestampHtml || '';
         
         const transferData = msg.transferData || {};
         const amount = transferData.amount || 0;
@@ -216,20 +242,49 @@ const MessageBuilder = {
         
         return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
             checkboxHtml +
-            '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+            '<div class="flex flex-col items-center shrink-0">' +
+                '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200" loading="lazy">' +
+                ats +
+            '</div>' +
             '<div class="max-w-[70%]">' +
-                '<div onclick="' + (deleteMode ? 'ChatInterface.toggleDeleteSelection(' + index + ')' : 'TransferHandler.handleTransferClick(' + index + ')') + '" ' +
-                     'class="' + cardClass + ' cursor-pointer">' +
-                    '<div class="transfer-card-header">' +
-                        '<i class="fa-solid fa-money-bill-transfer transfer-card-icon"></i>' +
-                        '<span class="transfer-card-status">' + statusText + '</span>' +
+                '<div class="flex items-end gap-1 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    '<div onclick="' + (deleteMode ? 'ChatInterface.toggleDeleteSelection(' + index + ')' : 'TransferHandler.handleTransferClick(' + index + ')') + '" ' +
+                         'class="' + cardClass + ' cursor-pointer">' +
+                        '<div class="transfer-card-header">' +
+                            '<i class="fa-solid fa-money-bill-transfer transfer-card-icon"></i>' +
+                            '<span class="transfer-card-status">' + statusText + '</span>' +
+                        '</div>' +
+                        '<div class="transfer-card-amount">￥' + amount.toFixed(2) + '</div>' +
+                        (remark ? '<div class="transfer-card-remark">' + remark + '</div>' : '') +
+                        '<div class="transfer-card-footer">转账给' + displayName + '</div>' +
                     '</div>' +
-                    '<div class="transfer-card-amount">￥' + amount.toFixed(2) + '</div>' +
-                    (remark ? '<div class="transfer-card-remark">' + remark + '</div>' : '') +
-                    '<div class="transfer-card-footer">转账给' + displayName + '</div>' +
+                    bts +
                 '</div>' +
             '</div>' +
         '</div>';
+    },
+
+    /**
+     * 构建头像下方时间HTML
+     * @param {number} timestamp - 时间戳
+     * @returns {string} - 时间HTML
+     */
+    buildAvatarTimestamp: function(timestamp) {
+        const date = new Date(timestamp);
+        const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        return '<div class="avatar-timestamp">' + timeStr + '</div>';
+    },
+
+    /**
+     * 构建气泡旁时间HTML
+     * @param {number} timestamp - 时间戳
+     * @param {boolean} isMe - 是否是用户消息
+     * @returns {string} - 时间HTML
+     */
+    buildBubbleTimestamp: function(timestamp, isMe) {
+        const date = new Date(timestamp);
+        const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        return '<span class="bubble-timestamp ' + (isMe ? 'bubble-timestamp-right' : 'bubble-timestamp-left') + '">' + timeStr + '</span>';
     },
 
     /**
@@ -249,6 +304,10 @@ const MessageBuilder = {
         const globalUserAvatar = profile.avatar || 'https://ui-avatars.com/api/?name=Me&background=0D8ABC&color=fff';
         const avatar = isMe ? (perCharUserAvatar || globalUserAvatar) : char.avatar;
         const avatarClass = isMe ? 'user-message-avatar' : 'char-message-avatar';
+        
+        // 时间戳样式设置
+        const showAvatarTimestamp = charSettings.timestampAvatar || false;
+        const showBubbleTimestamp = charSettings.timestampBubble || false;
 
         // 检查是否已撤回
         if (msg.recalled) {
@@ -263,23 +322,28 @@ const MessageBuilder = {
         const isVoice = msg.type === 'voice';
         const isTransfer = msg.type === 'transfer';
         
+        // 头像下方时间戳
+        const avatarTimestampHtml = showAvatarTimestamp ? this.buildAvatarTimestamp(msg.timestamp) : '';
+        // 气泡旁时间戳
+        const bubbleTimestampHtml = showBubbleTimestamp ? this.buildBubbleTimestamp(msg.timestamp, isMe) : '';
+        
         if (isImage) {
             const imageClass = this.getImageClass(isMe, msg);
             return this.buildImageMessage({
-                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, imageClass
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, imageClass, avatarTimestampHtml, bubbleTimestampHtml
             });
         } else if (isVoice) {
             return this.buildVoiceMessage({
-                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, avatarTimestampHtml, bubbleTimestampHtml
             });
         } else if (isTransfer) {
             return this.buildTransferMessage({
-                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, avatarTimestampHtml, bubbleTimestampHtml
             });
         } else {
             const quoteHtml = this.buildQuoteHtml(msg, history, char);
             return this.buildTextMessage({
-                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, quoteHtml
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, quoteHtml, avatarTimestampHtml, bubbleTimestampHtml
             });
         }
     },

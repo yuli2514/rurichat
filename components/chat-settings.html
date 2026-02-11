@@ -89,6 +89,17 @@
                             <label class="block text-xs font-medium text-gray-600 mb-1">系统设定 (Prompt)</label>
                             <textarea id="setting-char-prompt" rows="3" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs resize-none" placeholder="输入角色的系统设定..."></textarea>
                         </div>
+                        <!-- 现实时间感应 -->
+                        <div class="flex items-center justify-between py-2 border-t border-gray-200">
+                            <div>
+                                <span class="text-xs font-medium text-gray-600">现实时间感应</span>
+                                <p class="text-[10px] text-gray-400 mt-0.5">开启后角色将感知当前现实时间</p>
+                            </div>
+                            <div class="relative inline-block w-10 align-middle select-none">
+                                <input type="checkbox" id="setting-realtime-awareness" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="ChatSettings.saveRealtimeAwareness()"/>
+                                <label for="setting-realtime-awareness" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                            </div>
+                        </div>
                         <button onclick="ChatSettings.saveCharInfo()" class="w-full bg-blue-500 text-white font-medium py-1.5 rounded-md text-xs active:scale-95 transition">保存信息</button>
                     </div>
                 </div>
@@ -195,6 +206,17 @@
                         </div>
                         <input type="range" id="setting-css-toolbar" min="16" max="32" step="2" value="20" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="CssManager.updateCssVar('toolbar', this.value)">
                     </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-gray-500">头像圆润度</span>
+                            <span id="val-avatar-radius" class="text-xs text-gray-400 font-mono">50%</span>
+                        </div>
+                        <input type="range" id="setting-css-avatar-radius" min="0" max="50" step="1" value="50" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="CssManager.updateCssVar('avatarRadius', this.value)">
+                        <div class="flex justify-between mt-1">
+                            <span class="text-[10px] text-gray-300">■ 方形</span>
+                            <span class="text-[10px] text-gray-300">● 圆形</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- CSS Editor -->
@@ -209,6 +231,39 @@
                     <textarea id="custom-css-input" rows="6" class="w-full bg-gray-800 text-green-400 font-mono text-[10px] p-2 rounded-lg resize-none focus:outline-none" placeholder="/* 在此输入 CSS 代码 */&#10;.bubble { background: pink; }" oninput="CssManager.applyCustomCss(this.value)"></textarea>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- 时间戳样式 -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('timestamp-style-content').classList.toggle('hidden'); document.getElementById('timestamp-arrow').classList.toggle('rotate-90')">
+                <span class="text-sm font-bold text-gray-700">时间戳样式</span>
+                <i id="timestamp-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+            </div>
+            <div id="timestamp-style-content" class="hidden p-4 bg-gray-50 space-y-3">
+                <!-- 时间戳选项1：头像下方显示时间 -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-medium text-gray-600">头像下方时间</span>
+                        <p class="text-[10px] text-gray-400 mt-0.5">在双方头像下方显示实时时间（如 23:56）</p>
+                    </div>
+                    <div class="relative inline-block w-10 align-middle select-none">
+                        <input type="checkbox" id="setting-timestamp-avatar" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="ChatSettings.saveTimestampStyle()"/>
+                        <label for="setting-timestamp-avatar" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+                <!-- 时间戳选项2：气泡末尾显示时间 -->
+                <div class="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <div>
+                        <span class="text-xs font-medium text-gray-600">气泡旁时间</span>
+                        <p class="text-[10px] text-gray-400 mt-0.5">在每条消息气泡末尾旁显示灰色小时间</p>
+                    </div>
+                    <div class="relative inline-block w-10 align-middle select-none">
+                        <input type="checkbox" id="setting-timestamp-bubble" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="ChatSettings.saveTimestampStyle()"/>
+                        <label for="setting-timestamp-bubble" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-2">可同时开启多种时间戳样式，互不冲突。</p>
             </div>
         </div>
 

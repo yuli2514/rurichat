@@ -108,7 +108,7 @@ const API = {
             return memories;
         },
 
-        generateSummary: async function(charId, charName, history, summaryPrompt) {
+        generateSummary: async function(charId, charName, history, summaryPrompt, summaryFreq) {
             const config = API.Settings.getApiConfig();
             if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
 
@@ -137,8 +137,10 @@ const API = {
             }
 
             // Filter out recalled messages and format history
+            // 使用 summaryFreq 决定总结多少轮的聊天记录，而非固定20条
             const visibleHistory = history.filter(m => !m.recalled);
-            const recentMessages = visibleHistory.slice(-20).map(m =>
+            const msgCount = summaryFreq ? summaryFreq * 2 : visibleHistory.length;
+            const recentMessages = visibleHistory.slice(-msgCount).map(m =>
                 (m.sender === 'user' ? userName : charDisplayName) + ': ' + (m.type === 'image' ? '[发送了一张图片]' : m.content)
             ).join('\n');
 
@@ -404,6 +406,21 @@ const API = {
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
             
+            // 现实时间感应：如果开启，告诉AI当前的现实时间
+            if (settings.realtimeAwareness) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const weekDay = weekDays[now.getDay()];
+                systemPrompt += '\n\n【当前现实时间】';
+                systemPrompt += '\n现在是 ' + year + '年' + month + '月' + day + '日 ' + weekDay + ' ' + hours + ':' + minutes;
+                systemPrompt += '\n你可以根据当前时间做出合理的反应，比如早上打招呼、晚上说晚安等。';
+            }
+            
             systemPrompt += '\n\n【聊天风格要求】';
             systemPrompt += '\n1. 这是线上即时通讯聊天，请像真人发微信/QQ一样说话';
             systemPrompt += '\n2. 每次回复至少说3句话以上，可以分多条消息发送（用换行分隔）';
@@ -626,11 +643,15 @@ const API = {
             
             if (settings.autoSummary) {
                 const history = this.getHistory(charId);
-                if (history.length % (settings.summaryFreq || 10) === 0) {
+                const summaryFreq = settings.summaryFreq || 10;
+                // 只有当消息总数是 summaryFreq 的倍数时才触发总结
+                if (history.length > 0 && history.length % summaryFreq === 0) {
                     try {
-                        const summary = await API.Memory.generateSummary(charId, char.name, history, settings.summaryPrompt);
+                        // 传入最近 summaryFreq 轮的聊天记录进行总结
+                        const recentHistory = history.slice(-summaryFreq);
+                        const summary = await API.Memory.generateSummary(charId, char.name, recentHistory, settings.summaryPrompt, summaryFreq);
                         API.Memory.addMemory(charId, summary, 'auto');
-                        console.log('Auto summary generated for', char.name);
+                        console.log('Auto summary generated for', char.name, '- summarized last', summaryFreq, 'messages');
                     } catch (e) {
                         console.error('Auto summary failed:', e);
                     }

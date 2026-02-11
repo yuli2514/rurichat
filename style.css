@@ -270,6 +270,7 @@
             --chat-bubble-padding-v: 0.625rem;
             --chat-bubble-padding-h: 0.875rem;
             --chat-avatar-size: 2.5rem;
+            --chat-avatar-radius: 50%;
         }
 
         /* 聊天底栏图标大小 CSS 变量 */
@@ -298,6 +299,7 @@
         #chat-messages .char-message-avatar {
             width: var(--chat-avatar-size);
             height: var(--chat-avatar-size);
+            border-radius: var(--chat-avatar-radius) !important;
         }
         .bubble-user {
             background-color: #4A9EFF;
@@ -1058,4 +1060,35 @@
         
         .transfer-card.received .transfer-card-footer {
             border-top-color: #ddd;
+        }
+
+        /* ========== 时间戳样式 ========== */
+        
+        /* 头像下方时间戳 */
+        .avatar-timestamp {
+            font-size: 10px;
+            color: #999;
+            margin-top: 3px;
+            white-space: nowrap;
+            text-align: center;
+            line-height: 1;
+        }
+
+        /* 气泡旁时间戳 */
+        .bubble-timestamp {
+            font-size: 10px;
+            color: #999;
+            white-space: nowrap;
+            align-self: flex-end;
+            flex-shrink: 0;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .bubble-timestamp-left {
+            margin-left: 2px;
+        }
+
+        .bubble-timestamp-right {
+            margin-right: 2px;
         }

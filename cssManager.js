@@ -49,6 +49,15 @@ const CssManager = {
             if (typeof ChatSettings !== 'undefined') {
                 ChatSettings.updateCharSettings({ cssToolbar: value });
             }
+        } else if (type === 'avatarRadius') {
+            const valDisplay = document.getElementById('val-avatar-radius');
+            if (valDisplay) valDisplay.textContent = value + '%';
+            
+            msgArea.style.setProperty('--chat-avatar-radius', value + '%');
+            
+            if (typeof ChatSettings !== 'undefined') {
+                ChatSettings.updateCharSettings({ cssAvatarRadius: value });
+            }
         }
     },
 

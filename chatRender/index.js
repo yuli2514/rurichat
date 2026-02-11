@@ -132,6 +132,7 @@ const ChatInterface = {
                 if (char.settings.cssBubble) CssManager.updateCssVar('bubble', char.settings.cssBubble);
                 if (char.settings.cssFont) CssManager.updateCssVar('font', char.settings.cssFont);
                 if (char.settings.cssAvatar) CssManager.updateCssVar('avatar', char.settings.cssAvatar);
+                if (char.settings.cssAvatarRadius !== undefined) CssManager.updateCssVar('avatarRadius', char.settings.cssAvatarRadius);
             }
 
             this.renderMessages();

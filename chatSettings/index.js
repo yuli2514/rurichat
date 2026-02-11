@@ -100,6 +100,12 @@ const ChatSettings = {
         document.getElementById('setting-char-prompt').value = char.prompt || '';
         document.getElementById('setting-char-remark').value = char.remark || '';
         
+        // 加载现实时间感应设置
+        const realtimeAwareness = document.getElementById('setting-realtime-awareness');
+        if (realtimeAwareness) {
+            realtimeAwareness.checked = settings.realtimeAwareness || false;
+        }
+        
         // 加载角色名字（用于记忆总结）
         const charNameForSummary = document.getElementById('setting-char-name-for-summary');
         if (charNameForSummary) {
@@ -203,6 +209,7 @@ const ChatSettings = {
         const cssFont = settings.cssFont || 16;
         const cssAvatar = settings.cssAvatar || 40;
         const cssToolbar = settings.cssToolbar || 20;
+        const cssAvatarRadius = settings.cssAvatarRadius !== undefined ? settings.cssAvatarRadius : 50;
         const customCss = settings.customCss || '';
 
         const sliderBubble = document.getElementById('setting-css-bubble');
@@ -225,6 +232,11 @@ const ChatSettings = {
         const valToolbar = document.getElementById('val-toolbar-icon');
         if (valToolbar) valToolbar.textContent = cssToolbar + 'px';
 
+        const sliderAvatarRadius = document.getElementById('setting-css-avatar-radius');
+        if (sliderAvatarRadius) sliderAvatarRadius.value = cssAvatarRadius;
+        const valAvatarRadius = document.getElementById('val-avatar-radius');
+        if (valAvatarRadius) valAvatarRadius.textContent = cssAvatarRadius + '%';
+
         const cssInput = document.getElementById('custom-css-input');
         if (cssInput) cssInput.value = customCss;
         
@@ -234,6 +246,7 @@ const ChatSettings = {
             msgArea.style.setProperty('--chat-bubble-padding-h', (14 * cssBubble) + 'px');
             msgArea.style.setProperty('--chat-font-size', cssFont + 'px');
             msgArea.style.setProperty('--chat-avatar-size', cssAvatar + 'px');
+            msgArea.style.setProperty('--chat-avatar-radius', cssAvatarRadius + '%');
         }
 
         const chatInterface = document.getElementById('super-chat-interface');
@@ -250,6 +263,16 @@ const ChatSettings = {
         style.textContent = customCss;
         
         CssManager.renderCssPresets();
+        
+        // 时间戳样式设置
+        const timestampAvatar = document.getElementById('setting-timestamp-avatar');
+        if (timestampAvatar) {
+            timestampAvatar.checked = settings.timestampAvatar || false;
+        }
+        const timestampBubble = document.getElementById('setting-timestamp-bubble');
+        if (timestampBubble) {
+            timestampBubble.checked = settings.timestampBubble || false;
+        }
     },
 
     // ==================== 保存方法 ====================
@@ -344,6 +367,24 @@ const ChatSettings = {
     saveCustomPersona: function() {
         const content = document.getElementById('setting-user-persona-content').value;
         this.updateCharSettings({ customPersonaContent: content });
+    },
+
+    saveRealtimeAwareness: function() {
+        const checked = document.getElementById('setting-realtime-awareness').checked;
+        this.updateCharSettings({ realtimeAwareness: checked });
+    },
+
+    saveTimestampStyle: function() {
+        const timestampAvatar = document.getElementById('setting-timestamp-avatar').checked;
+        const timestampBubble = document.getElementById('setting-timestamp-bubble').checked;
+        this.updateCharSettings({
+            timestampAvatar: timestampAvatar,
+            timestampBubble: timestampBubble
+        });
+        // 立即重新渲染消息以应用时间戳样式
+        if (typeof ChatInterface !== 'undefined') {
+            ChatInterface.renderMessages();
+        }
     },
 
     saveMemory: function() {
