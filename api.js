@@ -921,15 +921,97 @@ const API = {
 
         getSettings: function(charId) {
             try {
-                return JSON.parse(localStorage.getItem('ruri_offline_settings_' + charId) || '{}');
+                const data = localStorage.getItem('ruri_offline_settings_' + charId) || '{}';
+                return JSON.parse(data);
             } catch (e) {
+                console.error('[Offline] Error parsing settings:', e);
                 return {};
             }
         },
 
         saveSettings: function(charId, settings) {
-            const current = this.getSettings(charId);
-            localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify({ ...current, ...settings }));
+            try {
+                const current = this.getSettings(charId);
+                const merged = { ...current, ...settings };
+                
+                // 如果包含大型 wallpaper 数据，分离存储
+                if (merged.wallpaper && merged.wallpaper.length > 100000) {
+                    // 大型图片数据单独存储
+                    const wallpaperData = merged.wallpaper;
+                    const settingsWithoutWallpaper = { ...merged };
+                    delete settingsWithoutWallpaper.wallpaper;
+                    
+                    // 保存设置（不含图片）
+                    localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(settingsWithoutWallpaper));
+                    
+                    // 使用 IndexedDB 存储大型图片
+                    this._saveWallpaperToIndexedDB(charId, wallpaperData);
+                } else {
+                    // 小型数据直接保存到 localStorage
+                    localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(merged));
+                }
+            } catch (e) {
+                console.error('[Offline] Error saving settings:', e);
+                if (e.name === 'QuotaExceededError') {
+                    alert('存储空间不足，请清除一些数据后重试');
+                } else {
+                    alert('保存设置失败: ' + e.message);
+                }
+            }
+        },
+
+        _saveWallpaperToIndexedDB: function(charId, wallpaperData) {
+            const request = indexedDB.open('RuriOfflineDB', 1);
+            
+            request.onerror = () => {
+                console.error('[Offline] IndexedDB open failed');
+            };
+            
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('wallpapers')) {
+                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
+                }
+            };
+            
+            request.onsuccess = (e) => {
+                const db = e.target.result;
+                const transaction = db.transaction(['wallpapers'], 'readwrite');
+                const store = transaction.objectStore('wallpapers');
+                store.put({ charId: charId, data: wallpaperData, timestamp: Date.now() });
+            };
+        },
+
+        _getWallpaperFromIndexedDB: function(charId, callback) {
+            const request = indexedDB.open('RuriOfflineDB', 1);
+            
+            request.onerror = () => {
+                console.error('[Offline] IndexedDB open failed');
+                callback(null);
+            };
+            
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('wallpapers')) {
+                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
+                }
+            };
+            
+            request.onsuccess = (e) => {
+                const db = e.target.result;
+                const transaction = db.transaction(['wallpapers'], 'readonly');
+                const store = transaction.objectStore('wallpapers');
+                const getRequest = store.get(charId);
+                
+                getRequest.onsuccess = () => {
+                    const result = getRequest.result;
+                    callback(result ? result.data : null);
+                };
+                
+                getRequest.onerror = () => {
+                    callback(null);
+                };
+            };
         },
 
         generateReply: async function(charId) {

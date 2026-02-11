@@ -164,6 +164,13 @@ const MediaHandlers = {
                         ChatManager.renderList();
                     }
                     
+                    // 触发 AI 回复
+                    if (typeof AIHandler !== 'undefined' && AIHandler.generateAIReply) {
+                        setTimeout(() => {
+                            AIHandler.generateAIReply(charId);
+                        }, 500);
+                    }
+                    
                     // 清理
                     MediaHandlers._clearPendingCharId();
                     input.value = '';

@@ -512,6 +512,7 @@ const OfflineMode = {
     loadSettings: function() {
          const settings = API.Offline.getSettings(this.currentCharId);
          const interface = document.getElementById('offline-mode-interface');
+         const self = this;
 
          // 确保定位始终保持为 absolute inset-0
          interface.style.position = 'absolute';
@@ -522,13 +523,29 @@ const OfflineMode = {
 
          // 应用壁纸或默认背景
          if (settings.wallpaper) {
+             // 如果 localStorage 中有小型图片，直接使用
              interface.style.backgroundImage = 'url(' + settings.wallpaper + ')';
              interface.style.backgroundSize = 'cover';
              interface.style.backgroundPosition = 'center';
              interface.style.backgroundColor = 'transparent';
          } else {
-             // 默认灰白色背景
-             interface.style.backgroundColor = '#f5f5f5';
+             // 尝试从 IndexedDB 加载大型图片
+             API.Offline._getWallpaperFromIndexedDB(this.currentCharId, function(wallpaperData) {
+                 if (wallpaperData) {
+                     interface.style.backgroundImage = 'url(' + wallpaperData + ')';
+                     interface.style.backgroundSize = 'cover';
+                     interface.style.backgroundPosition = 'center';
+                     interface.style.backgroundColor = 'transparent';
+                 } else {
+                     // 默认灰白色背景
+                     interface.style.backgroundColor = '#f5f5f5';
+                 }
+             });
+             return;
+         }
+         
+         // 默认灰白色背景
+         interface.style.backgroundColor = '#f5f5f5';
              interface.style.backgroundImage = 'none';
          }
 
@@ -584,32 +601,37 @@ const OfflineMode = {
                 const base64 = e.target.result;
                 console.log('[OfflineMode] Wallpaper loaded, size:', base64.length);
                 
-                // 直接保存设置，不通过 updateSetting
-                API.Offline.saveSettings(this.currentCharId, { wallpaper: base64 });
-                console.log('[OfflineMode] Wallpaper saved to settings');
+                // 保存设置（会自动分离大型图片到 IndexedDB）
+                const update = { wallpaper: base64 };
+                API.Offline.saveSettings(self.currentCharId, update);
+                console.log('[OfflineMode] Wallpaper save initiated');
                 
-                // 应用设置
-                self.loadSettings();
-                console.log('[OfflineMode] Settings loaded');
-                
-                // 重新渲染消息
-                self.renderMessages();
-                
-                const wallpaperInput = document.getElementById('offline-wallpaper-input');
-                if (wallpaperInput) {
-                    wallpaperInput.value = '本地图片已上传';
-                }
-                
-                alert('背景已上传并应用');
+                // 延迟应用设置，确保 IndexedDB 写入完成
+                setTimeout(() => {
+                    console.log('[OfflineMode] Loading settings after save...');
+                    self.loadSettings();
+                    
+                    // 再延迟一次确保 IndexedDB 读取完成
+                    setTimeout(() => {
+                        console.log('[OfflineMode] Re-rendering messages');
+                        self.renderMessages();
+                        
+                        const wallpaperInput = document.getElementById('offline-wallpaper-input');
+                        if (wallpaperInput) {
+                            wallpaperInput.value = '本地图片已上传';
+                        }
+                        
+                        alert('背景已上传并应用');
+                    }, 200);
+                }, 300);
             } catch (err) {
                 console.error('[OfflineMode] Error uploading wallpaper:', err);
                 alert('背景上传失败: ' + err.message);
             } finally {
                 // 清空 input 的 value，允许再次上传同一文件
-                // 延迟清空以确保事件完全处理
                 setTimeout(() => {
                     input.value = '';
-                }, 100);
+                }, 200);
             }
         };
         

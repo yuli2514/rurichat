@@ -314,20 +314,26 @@ const VoiceHandler = {
     sendRealVoice: function(duration) {
         if (!ChatInterface.currentCharId) return;
         
+        const self = this;
+        
         // 将音频转为 base64
-        let audioBase64 = null;
         if (this.currentAudioBlob) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                audioBase64 = reader.result;
-                this.createAndSendVoiceMessage(duration, audioBase64, this.recognizedText || '[语音消息]', false);
+                const audioBase64 = reader.result;
+                self.createAndSendVoiceMessage(duration, audioBase64, self.recognizedText || '[语音消息]', false);
+                self.closeVoicePanel();
+            };
+            reader.onerror = () => {
+                console.error('[VoiceHandler] FileReader error');
+                self.createAndSendVoiceMessage(duration, null, self.recognizedText || '[语音消息]', false);
+                self.closeVoicePanel();
             };
             reader.readAsDataURL(this.currentAudioBlob);
         } else {
             this.createAndSendVoiceMessage(duration, null, this.recognizedText || '[语音消息]', false);
+            this.closeVoicePanel();
         }
-        
-        this.closeVoicePanel();
     },
 
     /**
@@ -367,11 +373,19 @@ const VoiceHandler = {
             }
         };
         
-        API.Chat.addMessage(ChatInterface.currentCharId, msg);
+        const charId = ChatInterface.currentCharId;
+        API.Chat.addMessage(charId, msg);
         ChatInterface.renderMessages();
         
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
+        }
+        
+        // 触发 AI 回复
+        if (typeof AIHandler !== 'undefined' && AIHandler.generateAIReply) {
+            setTimeout(() => {
+                AIHandler.generateAIReply(charId);
+            }, 500);
         }
     },
 
