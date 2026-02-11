@@ -28,9 +28,8 @@ const OfflineMode = {
         const char = API.Chat.getChar(charId);
         if (!char) return;
 
-        // 强制重新加载 offline-mode 组件，清除缓存
-        console.log('[OfflineMode] Force reloading offline-mode component to ensure latest HTML');
-        ComponentLoader.clearCache();
+        // 线下模式组件已在初始化时加载到DOM中，无需清除缓存
+        console.log('[OfflineMode] Opening offline mode for charId:', charId);
 
         // 设置顶栏角色名
         const headerName = document.getElementById('offline-header-name');
@@ -511,15 +510,20 @@ const OfflineMode = {
 
     loadSettings: function() {
          const settings = API.Offline.getSettings(this.currentCharId);
-         const interface = document.getElementById('offline-mode-interface');
+         const offlineEl = document.getElementById('offline-mode-interface');
          const self = this;
 
+         if (!offlineEl) {
+             console.error('[OfflineMode] offline-mode-interface element not found');
+             return;
+         }
+
          // 确保定位始终保持为 absolute inset-0
-         interface.style.position = 'absolute';
-         interface.style.top = '0';
-         interface.style.left = '0';
-         interface.style.right = '0';
-         interface.style.bottom = '0';
+         offlineEl.style.position = 'absolute';
+         offlineEl.style.top = '0';
+         offlineEl.style.left = '0';
+         offlineEl.style.right = '0';
+         offlineEl.style.bottom = '0';
 
          // 应用自定义 CSS
          this._applyCss(settings.customCss || '');
@@ -527,22 +531,22 @@ const OfflineMode = {
          // 应用壁纸或默认背景
          if (settings.wallpaper) {
              // 如果 localStorage 中有小型图片，直接使用
-             interface.style.backgroundImage = 'url(' + settings.wallpaper + ')';
-             interface.style.backgroundSize = 'cover';
-             interface.style.backgroundPosition = 'center';
-             interface.style.backgroundColor = 'transparent';
+             offlineEl.style.backgroundImage = 'url(' + settings.wallpaper + ')';
+             offlineEl.style.backgroundSize = 'cover';
+             offlineEl.style.backgroundPosition = 'center';
+             offlineEl.style.backgroundColor = 'transparent';
          } else {
              // 尝试从 IndexedDB 加载大型图片
              API.Offline._getWallpaperFromIndexedDB(this.currentCharId, function(wallpaperData) {
                  if (wallpaperData) {
-                     interface.style.backgroundImage = 'url(' + wallpaperData + ')';
-                     interface.style.backgroundSize = 'cover';
-                     interface.style.backgroundPosition = 'center';
-                     interface.style.backgroundColor = 'transparent';
+                     offlineEl.style.backgroundImage = 'url(' + wallpaperData + ')';
+                     offlineEl.style.backgroundSize = 'cover';
+                     offlineEl.style.backgroundPosition = 'center';
+                     offlineEl.style.backgroundColor = 'transparent';
                  } else {
                      // 默认灰白色背景
-                     interface.style.backgroundColor = '#f5f5f5';
-                     interface.style.backgroundImage = 'none';
+                     offlineEl.style.backgroundColor = '#f5f5f5';
+                     offlineEl.style.backgroundImage = 'none';
                  }
              });
          }
