@@ -36,31 +36,23 @@ const ChatInterface = {
             });
         }
         
-        // 绑定相机输入事件（移动端更可靠）
+        // 绑定相机输入事件
         this._bindCameraInput();
     },
     
     /**
-     * 绑定相机输入事件
-     * 使用多种事件监听确保移动端兼容性
+     * 绑定相机输入事件（只绑定一次）
      */
     _bindCameraInput: function() {
         const cameraInput = document.getElementById('camera-input');
-        if (cameraInput && !cameraInput._boundByInit) {
-            cameraInput._boundByInit = true;
+        if (cameraInput && !cameraInput._bound) {
+            cameraInput._bound = true;
             
-            const handler = async (e) => {
-                console.log('[ChatInterface] Camera event triggered:', e.type);
-                console.log('[ChatInterface] Files:', e.target.files);
+            cameraInput.addEventListener('change', async (e) => {
                 if (e.target.files && e.target.files.length > 0) {
                     await this.handleCameraCapture(e.target);
                 }
-            };
-            
-            // 同时监听 change 和 input 事件，确保移动端兼容
-            cameraInput.addEventListener('change', handler);
-            cameraInput.addEventListener('input', handler);
-            console.log('[ChatInterface] Camera input event listeners bound');
+            });
         }
     },
 
