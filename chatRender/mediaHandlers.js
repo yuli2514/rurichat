@@ -83,55 +83,63 @@ const MediaHandlers = {
     },
 
     /**
-     * 处理相机拍摄的图片
+     * 处理相机拍摄的图片 - 移动端优化版本
      * @param {HTMLInputElement} input - 文件输入元素
      * @param {string} currentCharId - 当前角色ID
      * @param {Function} compressFunc - 图片压缩函数
      * @param {Function} renderCallback - 渲染回调函数
      */
     handleCameraCapture: async function(input, currentCharId, compressFunc, renderCallback) {
-        // 防止重复处理
-        if (this._processingCamera) {
-            return;
-        }
-        
         const file = input && input.files && input.files[0];
         if (!file) {
             return;
         }
-        
-        // 设置处理标志
-        this._processingCamera = true;
 
         // 获取有效的角色ID
         const charId = this._getValidCharId(currentCharId);
         if (!charId) {
-            this._processingCamera = false;
             input.value = '';
             return;
         }
 
         try {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
+            // 使用 createObjectURL 代替 FileReader，更快更省内存
+            const objectUrl = URL.createObjectURL(file);
+            
+            // 创建图片对象
+            const img = new Image();
+            
+            img.onload = async () => {
                 try {
-                    const base64Data = e.target.result;
+                    // 压缩图片
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
                     
-                    // 压缩图片（质量0.5）
-                    let compressedBase64;
-                    try {
-                        if (compressFunc) {
-                            compressedBase64 = await compressFunc(base64Data);
-                        } else if (typeof ChatRenderUtils !== 'undefined') {
-                            compressedBase64 = await ChatRenderUtils.compressImageForChat(base64Data);
+                    // 移动端优化：最大600px，质量0.5
+                    const MAX_SIZE = 600;
+                    if (width > MAX_SIZE || height > MAX_SIZE) {
+                        if (width > height) {
+                            height = Math.round(height * MAX_SIZE / width);
+                            width = MAX_SIZE;
                         } else {
-                            compressedBase64 = base64Data;
+                            width = Math.round(width * MAX_SIZE / height);
+                            height = MAX_SIZE;
                         }
-                    } catch (compressError) {
-                        compressedBase64 = base64Data;
                     }
                     
-                    // 发送图片消息
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 质量0.5，大幅减少数据量
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
+                    
+                    // 释放 objectUrl
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    // 先发送消息，再关闭界面
                     const msg = {
                         id: Date.now(),
                         sender: 'user',
@@ -140,6 +148,8 @@ const MediaHandlers = {
                         timestamp: Date.now(),
                         isVisionImage: true
                     };
+                    
+                    // 添加消息
                     API.Chat.addMessage(charId, msg);
                     
                     // 渲染消息
@@ -156,20 +166,22 @@ const MediaHandlers = {
                     
                     // 清理
                     MediaHandlers._clearPendingCharId();
-                } finally {
-                    this._processingCamera = false;
+                    input.value = '';
+                    
+                } catch (e) {
+                    URL.revokeObjectURL(objectUrl);
                     input.value = '';
                 }
             };
             
-            reader.onerror = () => {
-                this._processingCamera = false;
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
                 input.value = '';
             };
             
-            reader.readAsDataURL(file);
+            img.src = objectUrl;
+            
         } catch (error) {
-            this._processingCamera = false;
             input.value = '';
         }
     },
