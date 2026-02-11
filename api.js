@@ -118,8 +118,9 @@ const API = {
             const char = API.Chat.getChar(charId);
             const settings = char && char.settings ? char.settings : {};
             
-            // 角色名称：使用角色的 name 字段（角色人设中的名字）
-            const charDisplayName = char ? (char.name || charName) : charName;
+            // 角色名称：优先使用角色设置中的 charNameForSummary（用户在角色信息中填写的"角色名字"）
+            // 如果没有设置，则使用角色的 name 字段，最后使用传入的 charName
+            const charDisplayName = settings.charNameForSummary || (char ? char.name : null) || charName;
             const charPrompt = char && char.prompt ? char.prompt : '';
             
             // 用户名称：优先使用角色设置中保存的 userName（添加角色时填写的"你的称呼"）
@@ -509,6 +510,21 @@ const API = {
                     if (emojiMap[imgUrl]) {
                         // 匹配到表情包，显示含义
                         content = '[发送了表情包：' + emojiMap[imgUrl] + ']';
+                    } else if (msg.isVisionImage && msg.content && msg.content.startsWith('data:image/')) {
+                        // 用户发送的真实图片，使用Vision API格式让AI识别
+                        content = [
+                            {
+                                type: 'text',
+                                text: '[用户发送了一张图片，请描述你看到的内容并做出回应]'
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: msg.content,
+                                    detail: 'low'  // 使用low以节省token
+                                }
+                            }
+                        ];
                     } else {
                         content = '[发送了一张图片]';
                     }

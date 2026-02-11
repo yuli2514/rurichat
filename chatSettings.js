@@ -84,6 +84,12 @@ const ChatSettings = {
         document.getElementById('setting-char-prompt').value = char.prompt || '';
         document.getElementById('setting-char-remark').value = char.remark || '';
         
+        // 加载角色名字（用于记忆总结）
+        const charNameForSummary = document.getElementById('setting-char-name-for-summary');
+        if (charNameForSummary) {
+            charNameForSummary.value = settings.charNameForSummary || char.name || '';
+        }
+        
         // 加载用户称呼（用于记忆总结）
         const userNameForSummary = document.getElementById('setting-user-name-for-summary');
         if (userNameForSummary) {
@@ -270,13 +276,17 @@ const ChatSettings = {
         const charId = ChatInterface.currentCharId;
         if (!charId) return;
 
+        const charNameForSummary = document.getElementById('setting-char-name-for-summary').value.trim();
         const remark = document.getElementById('setting-char-remark').value;
         const prompt = document.getElementById('setting-char-prompt').value;
         const userNameForSummary = document.getElementById('setting-user-name-for-summary').value.trim();
         
         API.Chat.updateChar(charId, { remark: remark, prompt: prompt });
-        // 保存用户称呼到角色设置中
-        this.updateCharSettings({ userName: userNameForSummary || '用户' });
+        // 保存角色名字和用户称呼到角色设置中（用于记忆总结）
+        this.updateCharSettings({
+            charNameForSummary: charNameForSummary || '',
+            userName: userNameForSummary || '用户'
+        });
         document.getElementById('chat-header-name').textContent = remark;
         alert('角色信息已保存');
     },
@@ -343,13 +353,42 @@ const ChatSettings = {
         const file = input.files[0];
         if (!file) return;
 
+        // 自动压缩角色头像
         const reader = new FileReader();
         reader.onload = (e) => {
-            const charId = ChatInterface.currentCharId;
-            API.Chat.updateChar(charId, { avatar: e.target.result });
-            
-            document.getElementById('setting-char-avatar').src = e.target.result;
-            ChatManager.renderList();
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                
+                const MAX_SIZE = 300;
+                if (width > height) {
+                    if (width > MAX_SIZE) {
+                        height *= MAX_SIZE / width;
+                        width = MAX_SIZE;
+                    }
+                } else {
+                    if (height > MAX_SIZE) {
+                        width *= MAX_SIZE / height;
+                        height = MAX_SIZE;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                
+                const charId = ChatInterface.currentCharId;
+                API.Chat.updateChar(charId, { avatar: dataUrl });
+                
+                document.getElementById('setting-char-avatar').src = dataUrl;
+                ChatManager.renderList();
+            };
+            img.src = e.target.result;
         };
         reader.readAsDataURL(file);
     },
@@ -358,11 +397,7 @@ const ChatSettings = {
         const file = input.files[0];
         if (!file) return;
 
-        if (file.size > 2 * 1024 * 1024) {
-            alert('图片大小不能超过 2MB');
-            return;
-        }
-
+        // 移除文件大小限制，改为自动压缩
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();

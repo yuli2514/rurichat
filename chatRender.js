@@ -82,6 +82,8 @@ const ChatInterface = {
     currentCharId: null,
     deleteMode: false,
     selectedForDelete: new Set(),
+    loadedMessageCount: 80, // 默认加载最近80条消息
+    messageLoadStep: 80, // 每次加载更多时增加的消息数量
     
     init: function() {
         const input = document.getElementById('chat-input');
@@ -95,9 +97,150 @@ const ChatInterface = {
         }
     },
 
+    // 加载更多历史消息
+    loadMoreMessages: function() {
+        const container = document.getElementById('chat-messages');
+        const scrollHeightBefore = container.scrollHeight;
+        
+        // 增加加载的消息数量
+        this.loadedMessageCount += this.messageLoadStep;
+        
+        // 重新渲染消息（不滚动到底部）
+        this.renderMessagesKeepPosition(scrollHeightBefore);
+    },
+
+    // 渲染消息并保持滚动位置（用于加载更多）
+    renderMessagesKeepPosition: function(scrollHeightBefore) {
+        const container = document.getElementById('chat-messages');
+        const history = API.Chat.getHistory(this.currentCharId);
+        const char = API.Chat.getChar(this.currentCharId);
+        
+        if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        
+        this._renderRAF = requestAnimationFrame(() => {
+            const maxMessages = this.loadedMessageCount;
+            const startIndex = Math.max(0, history.length - maxMessages);
+            const renderedHistory = history.slice(startIndex);
+            
+            let html = '';
+            if (startIndex > 0) {
+                html += '<div class="text-center py-3">' +
+                    '<button onclick="ChatInterface.loadMoreMessages()" class="px-4 py-2 bg-white text-gray-600 text-xs font-medium rounded-full shadow-sm border border-gray-200 hover:bg-gray-50 active:scale-95 transition">' +
+                    '<i class="fa-solid fa-clock-rotate-left mr-1"></i>加载更多消息 (' + startIndex + '条)' +
+                    '</button>' +
+                '</div>';
+            }
+
+            let lastTimestamp = 0;
+            
+            renderedHistory.forEach((msg, i) => {
+                const index = startIndex + i;
+                const timeDiff = (msg.timestamp - lastTimestamp) / 1000 / 60;
+                
+                if (i === 0 || timeDiff > 3) {
+                    const date = new Date(msg.timestamp);
+                    const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                    html += '<div class="chat-timestamp">' + timeStr + '</div>';
+                }
+                
+                const isMe = msg.sender === 'user';
+                
+                const charSettings = char.settings || {};
+                const perCharUserAvatar = charSettings.userAvatar || null;
+                const profile = API.Profile.getProfile();
+                const globalUserAvatar = profile.avatar || 'https://ui-avatars.com/api/?name=Me&background=0D8ABC&color=fff';
+                const avatar = isMe ? (perCharUserAvatar || globalUserAvatar) : char.avatar;
+                const avatarClass = isMe ? 'user-message-avatar' : 'char-message-avatar';
+
+                if (msg.recalled) {
+                    const recallText = isMe ? '你撤回了一条消息' : (char.remark + ' 撤回了一条消息');
+                    html += '<div class="text-center text-xs text-gray-400 py-2 italic">' + recallText + '</div>';
+                    lastTimestamp = msg.timestamp;
+                    return;
+                }
+
+                const isSelected = this.deleteMode && this.selectedForDelete.has(index);
+                const checkboxHtml = this.deleteMode ?
+                    '<div onclick="ChatInterface.toggleDeleteSelection(' + index + ')" class="flex items-center justify-center w-6 h-6 shrink-0 cursor-pointer">' +
+                        '<div class="w-5 h-5 rounded-full border-2 ' + (isSelected ? 'bg-red-500 border-red-500' : 'border-gray-300') + ' flex items-center justify-center">' +
+                            (isSelected ? '<i class="fa-solid fa-check text-white text-xs"></i>' : '') +
+                        '</div>' +
+                    '</div>' : '';
+
+                const isImage = msg.type === 'image';
+                const isAiImage = !isMe && msg.content && msg.content.startsWith('data:image/');
+                const isUserTextDrawing = isMe && msg.textDrawingDesc;
+                const isUserPhoto = isMe && msg.isVisionImage;
+                
+                let imageClass = 'sent-emoji';
+                if (isAiImage || isUserTextDrawing) {
+                    imageClass = 'sent-emoji ai-image-card';
+                } else if (isUserPhoto) {
+                    imageClass = 'sent-emoji user-photo';
+                }
+                
+                if (isImage) {
+                    html += '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                        checkboxHtml +
+                        '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+                        '<div class="max-w-[70%]">' +
+                            '<img src="' + msg.content + '" ' +
+                                 (this.deleteMode ? 'onclick="ChatInterface.toggleDeleteSelection(' + index + ')" ' : 'onclick="window.open(this.src)" ') +
+                                 'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                                 'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                                 'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                                 'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                                 'class="' + imageClass + '" loading="lazy">' +
+                        '</div>' +
+                    '</div>';
+                } else {
+                    let quoteHtml = '';
+                    if (msg.quote) {
+                        const quotedMsg = history.find(h => h.id === msg.quote.id);
+                        if (quotedMsg && !quotedMsg.recalled) {
+                            const authorName = quotedMsg.sender === 'user' ? '我' : char.remark;
+                            const quoteContent = quotedMsg.type === 'image' ? '[图片]' : quotedMsg.content.substring(0, 40) + (quotedMsg.content.length > 40 ? '...' : '');
+                            quoteHtml = '<div class="quote-in-bubble"><span class="quote-author">' + authorName + ':</span><span>' + quoteContent + '</span></div>';
+                        } else if (quotedMsg && quotedMsg.recalled) {
+                            quoteHtml = '<div class="quote-in-bubble"><span class="text-gray-400 italic">引用的消息已撤回</span></div>';
+                        }
+                    }
+
+                    let contentHtml = msg.content.replace(/\n/g, '<br>');
+                    const bubbleClass = isMe ? 'bubble bubble-user' : 'bubble bubble-ai';
+                    
+                    html += '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                        checkboxHtml +
+                        '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+                        '<div class="max-w-[70%]">' +
+                            '<div ' + (this.deleteMode ? 'onclick="ChatInterface.toggleDeleteSelection(' + index + ')" ' : '') +
+                                 'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                                 'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                                 'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                                 'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                                'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '">' +
+                                quoteHtml + contentHtml +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                }
+                
+                lastTimestamp = msg.timestamp;
+            });
+            
+            container.innerHTML = html;
+            
+            // 保持滚动位置：新内容加载后，滚动到之前的相对位置
+            const scrollHeightAfter = container.scrollHeight;
+            container.scrollTop = scrollHeightAfter - scrollHeightBefore;
+        });
+    },
+
     open: function(charId) {
         try {
             this.currentCharId = charId;
+            // 重置加载的消息数量
+            this.loadedMessageCount = 80;
             const char = API.Chat.getChar(charId);
             if (!char) {
                 console.error('Character not found');
@@ -171,15 +314,19 @@ const ChatInterface = {
         if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
         
         this._renderRAF = requestAnimationFrame(() => {
-            // Optimization: Only render last 30 messages on mobile for better performance
-            const isMobile = window.innerWidth < 768;
-            const maxMessages = isMobile ? 30 : 50;
+            // 使用 loadedMessageCount 控制显示的消息数量
+            const maxMessages = this.loadedMessageCount;
             const startIndex = Math.max(0, history.length - maxMessages);
             const renderedHistory = history.slice(startIndex);
             
             let html = '';
+            // 如果还有更多历史消息，显示"加载更多"按钮
             if (startIndex > 0) {
-                html += '<div class="text-center text-xs text-gray-400 py-2">... 更多历史消息 ...</div>';
+                html += '<div class="text-center py-3">' +
+                    '<button onclick="ChatInterface.loadMoreMessages()" class="px-4 py-2 bg-white text-gray-600 text-xs font-medium rounded-full shadow-sm border border-gray-200 hover:bg-gray-50 active:scale-95 transition">' +
+                    '<i class="fa-solid fa-clock-rotate-left mr-1"></i>加载更多消息 (' + startIndex + '条)' +
+                    '</button>' +
+                '</div>';
             }
 
             let lastTimestamp = 0;
@@ -224,7 +371,15 @@ const ChatInterface = {
                 // AI意念图（AI发的data:image/开头）或用户文字描述图（有textDrawingDesc标记）使用更大的样式
                 const isAiImage = !isMe && msg.content && msg.content.startsWith('data:image/');
                 const isUserTextDrawing = isMe && msg.textDrawingDesc; // 用户发的文字描述图
-                const imageClass = (isAiImage || isUserTextDrawing) ? 'sent-emoji ai-image-card' : 'sent-emoji';
+                const isUserPhoto = isMe && msg.isVisionImage; // 用户拍照/相册发送的真实图片
+                
+                // 根据图片类型选择不同的CSS类
+                let imageClass = 'sent-emoji';
+                if (isAiImage || isUserTextDrawing) {
+                    imageClass = 'sent-emoji ai-image-card';
+                } else if (isUserPhoto) {
+                    imageClass = 'sent-emoji user-photo';
+                }
                 
                 if (isImage) {
                     html += '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
@@ -256,7 +411,7 @@ const ChatInterface = {
                     let contentHtml = msg.content.replace(/\n/g, '<br>');
                     const bubbleClass = isMe ? 'bubble bubble-user' : 'bubble bubble-ai';
                     
-                    html += '<div class="flex gap-2 items-center ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    html += '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
                         checkboxHtml +
                         '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
                         '<div class="max-w-[70%]">' +
@@ -340,10 +495,18 @@ const ChatInterface = {
                 // AI意念图（AI发的data:image/开头）或用户文字描述图（有textDrawingDesc标记）使用更大的样式
                 const isAiImage = !isMe && msg.content && msg.content.startsWith('data:image/');
                 const isUserTextDrawing = isMe && msg.textDrawingDesc; // 用户发的文字描述图
-                const imageClass = (isAiImage || isUserTextDrawing) ? 'sent-emoji ai-image-card' : 'sent-emoji';
+                const isUserPhoto = isMe && msg.isVisionImage; // 用户拍照/相册发送的真实图片
+                
+                // 根据图片类型选择不同的CSS类
+                let imageClass = 'sent-emoji';
+                if (isAiImage || isUserTextDrawing) {
+                    imageClass = 'sent-emoji ai-image-card';
+                } else if (isUserPhoto) {
+                    imageClass = 'sent-emoji user-photo';
+                }
                 
                 if (isImage) {
-                    html += '<div class="flex gap-2 items-center ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    html += '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
                         checkboxHtml +
                         '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
                         '<div class="max-w-[70%]">' +
@@ -372,7 +535,7 @@ const ChatInterface = {
                     let contentHtml = msg.content.replace(/\n/g, '<br>');
                     const bubbleClass = isMe ? 'bubble bubble-user' : 'bubble bubble-ai';
                     
-                    html += '<div class="flex gap-2 items-center ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    html += '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
                         checkboxHtml +
                         '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
                         '<div class="max-w-[70%]">' +
@@ -673,6 +836,10 @@ const ChatInterface = {
 
         API.Chat.addMessage(this.currentCharId, msg);
         this.renderMessages();
+        // 实时更新角色列表的最后一条消息
+        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+            ChatManager.renderList();
+        }
         
         input.value = '';
         input.style.height = 'auto';
@@ -705,7 +872,7 @@ const ChatInterface = {
 
     renderEmojiGridById: function(groupId) {
         if (this.renderTask) cancelAnimationFrame(this.renderTask);
-        if (!groupId) groupId = 'bound';
+        if (!groupId) groupId = 'recent';
         this.currentEmojiGroupId = groupId;
 
         const allGroups = API.Emoji.getGroups();
@@ -720,16 +887,14 @@ const ChatInterface = {
         const bar = document.getElementById('emoji-group-bar');
         let barHtml = '';
         
-        const isBoundActive = groupId === 'bound';
+        const isRecentActive = groupId === 'recent';
 
-        // 绑定的表情包按钮（显示多选数量）
-        const boundButtonClass = isBoundActive ? 'text-blue-500 border-blue-500 bg-blue-50' : 'text-gray-500 border-transparent hover:bg-gray-50';
-        const boundButtonText = boundGroups.length > 0 ? `★ 已绑定(${boundGroups.length})` : '默认';
-        barHtml += `<button onclick="ChatInterface.renderEmojiGridById('bound')" class="px-4 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${boundButtonClass}">${boundButtonText}</button>`;
+        // ★ 最近使用的表情包按钮
+        const recentButtonClass = isRecentActive ? 'text-blue-500 border-blue-500 bg-blue-50' : 'text-gray-500 border-transparent hover:bg-gray-50';
+        barHtml += `<button onclick="ChatInterface.renderEmojiGridById('recent')" class="px-4 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${recentButtonClass}">★</button>`;
 
+        // 显示所有表情包分组（恢复原样，不显示绑定标记）
         allGroups.forEach(g => {
-            // 跳过已绑定的分组（它们会在"已绑定"中显示）
-            if (boundGroupIds.includes(g.id)) return;
             const isActive = groupId === g.id;
             const buttonClass = isActive ? 'text-blue-500 border-blue-500 bg-blue-50' : 'text-gray-500 border-transparent hover:bg-gray-50';
             barHtml += `<button onclick="ChatInterface.renderEmojiGridById('${g.id}')" class="px-4 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${buttonClass}">${g.name}</button>`;
@@ -743,13 +908,9 @@ const ChatInterface = {
         const grid = document.getElementById('emoji-grid');
         let emojis = [];
 
-        if (groupId === 'bound') {
-            // 合并所有绑定分组的表情包
-            boundGroups.forEach(g => {
-                if (g.emojis) {
-                    emojis = emojis.concat(g.emojis);
-                }
-            });
+        if (groupId === 'recent') {
+            // 显示最近使用的表情包（最多15个）
+            emojis = this.getRecentEmojis();
         } else {
             const group = allGroups.find(g => g.id === groupId);
             if (group) emojis = group.emojis;
@@ -807,10 +968,39 @@ const ChatInterface = {
     },
     
     renderEmojiGrid: function() {
-        this.renderEmojiGridById('bound');
+        this.renderEmojiGridById('recent');
+    },
+
+    // 获取最近使用的表情包（最多15个）
+    getRecentEmojis: function() {
+        try {
+            const recent = JSON.parse(localStorage.getItem('recent_emojis') || '[]');
+            return recent.slice(0, 15);
+        } catch (e) {
+            return [];
+        }
+    },
+
+    // 保存最近使用的表情包
+    saveRecentEmoji: function(emojiUrl) {
+        try {
+            let recent = JSON.parse(localStorage.getItem('recent_emojis') || '[]');
+            // 移除已存在的相同表情包（避免重复）
+            recent = recent.filter(e => e.url !== emojiUrl);
+            // 添加到最前面
+            recent.unshift({ url: emojiUrl, meaning: '最近使用' });
+            // 只保留最近15个
+            recent = recent.slice(0, 15);
+            localStorage.setItem('recent_emojis', JSON.stringify(recent));
+        } catch (e) {
+            console.error('保存最近使用表情包失败:', e);
+        }
     },
 
     sendEmoji: function(emojiUrl) {
+        // 保存到最近使用
+        this.saveRecentEmoji(emojiUrl);
+        
         const msg = {
             id: Date.now(),
             sender: 'user',
@@ -820,6 +1010,10 @@ const ChatInterface = {
         };
         API.Chat.addMessage(this.currentCharId, msg);
         this.renderMessages();
+        // 实时更新角色列表
+        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+            ChatManager.renderList();
+        }
         document.getElementById('panel-container').classList.add('hidden');
     },
 
@@ -955,6 +1149,10 @@ const ChatInterface = {
                 };
                 API.Chat.addMessage(this.currentCharId, msg);
                 this.renderMessages();
+                // 实时更新角色列表
+                if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                    ChatManager.renderList();
+                }
                 
                 // If this message should be recalled, wait 2 seconds then recall it
                 if (isRecall) {
@@ -1050,6 +1248,10 @@ const ChatInterface = {
             };
             API.Chat.addMessage(this.currentCharId, msg);
             this.renderMessages();
+            // 实时更新角色列表
+            if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                ChatManager.renderList();
+            }
             
             // 不再自动调用AI，用户需要手动点击发送按钮
         };
@@ -1057,7 +1259,7 @@ const ChatInterface = {
         input.value = ''; // 重置input
     },
 
-    // 聊天图片压缩 - 比表情包大一点，不限制长宽比
+    // 聊天图片压缩 - 保持原始尺寸比例，只在过大时压缩
     compressImageForChat: function(base64) {
         return new Promise((resolve) => {
             const img = new Image();
@@ -1066,38 +1268,26 @@ const ChatInterface = {
                 let width = img.width;
                 let height = img.height;
 
-                // 最小尺寸150px，最大尺寸400px（比表情包80px大，但不会太大）
-                const MIN_SIZE = 150;
-                const MAX_SIZE = 400;
+                // 最大尺寸限制为800px（保持较大尺寸以保证清晰度）
+                const MAX_SIZE = 800;
                 
-                // 获取较长边
-                const maxDim = Math.max(width, height);
-                const minDim = Math.min(width, height);
-                
-                // 如果太小，放大到最小尺寸
-                if (minDim < MIN_SIZE) {
-                    const scale = MIN_SIZE / minDim;
-                    width *= scale;
-                    height *= scale;
-                }
-                
-                // 如果太大，缩小到最大尺寸
-                if (Math.max(width, height) > MAX_SIZE) {
+                // 只有当图片超过最大尺寸时才缩小，保持原始比例
+                if (width > MAX_SIZE || height > MAX_SIZE) {
                     if (width > height) {
-                        height *= MAX_SIZE / width;
+                        height = Math.round(height * MAX_SIZE / width);
                         width = MAX_SIZE;
                     } else {
-                        width *= MAX_SIZE / height;
+                        width = Math.round(width * MAX_SIZE / height);
                         height = MAX_SIZE;
                     }
                 }
 
-                canvas.width = Math.round(width);
-                canvas.height = Math.round(height);
+                canvas.width = width;
+                canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, width, height);
                 
-                resolve(canvas.toDataURL('image/jpeg', 0.85));
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
             };
             img.src = base64;
         });
@@ -1186,11 +1376,14 @@ const ChatInterface = {
         };
         API.Chat.addMessage(this.currentCharId, msg);
         this.renderMessages();
+        // 实时更新角色列表
+        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+            ChatManager.renderList();
+        }
 
-        // 关闭弹窗
-        this.closeTextDrawing();
-        
-        // 不再自动触发AI，用户需要手动点击发送按钮
+        // 清空输入框但不关闭弹窗，让用户可以继续编辑或发送更多文字图
+        input.value = '';
+        input.focus();
     },
 
     // 从相册选择
@@ -1222,6 +1415,10 @@ const ChatInterface = {
             };
             API.Chat.addMessage(this.currentCharId, msg);
             this.renderMessages();
+            // 实时更新角色列表
+            if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                ChatManager.renderList();
+            }
             
             // 不再自动调用AI，用户需要手动点击发送按钮
         };
