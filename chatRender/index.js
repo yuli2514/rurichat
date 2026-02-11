@@ -1,0 +1,442 @@
+/**
+ * chatRender/index.js
+ * 聊天渲染模块 - 核心入口
+ * 
+ * 整合所有子模块，提供统一的 ChatInterface 对外接口
+ * 保持与原 chatRender.js 完全兼容的API
+ * 
+ * 子模块：
+ * - utils.js: 工具函数（图片生成、压缩、滚动）
+ * - messageBuilder.js: 消息HTML构建
+ * - eventHandlers.js: 事件处理（触摸、右键菜单、删除模式）
+ * - emojiPanel.js: 表情包面板
+ * - mediaHandlers.js: 媒体处理（拍照、相册）
+ * - aiHandler.js: AI交互处理
+ */
+
+const ChatInterface = {
+    // ==================== 状态变量 ====================
+    currentCharId: null,
+    deleteMode: false,
+    selectedForDelete: new Set(),
+    loadedMessageCount: 80,
+    messageLoadStep: 80,
+    _renderRAF: null,
+    currentQuote: null,
+
+    // ==================== 初始化 ====================
+    init: function() {
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendUserMessage();
+                }
+            });
+        }
+    },
+
+    // ==================== 工具函数代理 ====================
+    generateTextImageCard: function(text) {
+        return ChatRenderUtils.generateTextImageCard(text);
+    },
+
+    scrollToBottom: function() {
+        ChatRenderUtils.scrollToBottom();
+    },
+
+    compressImageForChat: function(base64) {
+        return ChatRenderUtils.compressImageForChat(base64);
+    },
+
+    compressImage: function(base64, maxSize, quality) {
+        return ChatRenderUtils.compressImage(base64, maxSize, quality);
+    },
+
+    // ==================== 聊天界面控制 ====================
+    open: function(charId) {
+        try {
+            this.currentCharId = charId;
+            this.loadedMessageCount = 80;
+            const char = API.Chat.getChar(charId);
+            if (!char) {
+                console.error('Character not found');
+                return;
+            }
+
+            // 更新聊天界面顶栏
+            const headerAvatar = document.getElementById('chat-header-avatar');
+            if (headerAvatar) headerAvatar.src = char.avatar;
+            
+            const headerName = document.getElementById('chat-header-name');
+            if (headerName) headerName.textContent = char.remark;
+
+            // 关闭Chat App，显示聊天界面
+            const chatApp = document.getElementById('chat-app');
+            const superInterface = document.getElementById('super-chat-interface');
+            
+            if (chatApp) chatApp.classList.add('hidden');
+            if (superInterface) superInterface.classList.remove('hidden');
+
+            // 应用壁纸
+            const messagesArea = document.getElementById('chat-messages');
+            if (char.settings && char.settings.wallpaper) {
+                messagesArea.style.backgroundImage = 'url(' + char.settings.wallpaper + ')';
+                messagesArea.style.backgroundSize = 'cover';
+                messagesArea.style.backgroundPosition = 'center';
+            } else {
+                messagesArea.style.backgroundImage = '';
+            }
+
+            // 应用自定义CSS
+            if (char.settings && char.settings.customCss) {
+                CssManager.applyCustomCss(char.settings.customCss);
+            } else {
+                CssManager.applyCustomCss('');
+            }
+            
+            // 应用CSS变量
+            if (char.settings) {
+                if (char.settings.cssBubble) CssManager.updateCssVar('bubble', char.settings.cssBubble);
+                if (char.settings.cssFont) CssManager.updateCssVar('font', char.settings.cssFont);
+                if (char.settings.cssAvatar) CssManager.updateCssVar('avatar', char.settings.cssAvatar);
+            }
+
+            this.renderMessages();
+            this.renderEmojiGrid();
+        } catch (e) {
+            console.error('Error opening chat:', e);
+            alert('打开聊天失败: ' + e.message);
+        }
+    },
+
+    closeToList: function() {
+        document.getElementById('super-chat-interface').classList.add('hidden');
+        document.getElementById('chat-app').classList.remove('hidden');
+    },
+
+    close: function() {
+        document.getElementById('super-chat-interface').classList.add('hidden');
+        this.currentCharId = null;
+    },
+
+    // ==================== 消息渲染 ====================
+    loadMoreMessages: function() {
+        const container = document.getElementById('chat-messages');
+        const scrollHeightBefore = container.scrollHeight;
+        this.loadedMessageCount += this.messageLoadStep;
+        this.renderMessagesKeepPosition(scrollHeightBefore);
+    },
+
+    renderMessagesKeepPosition: function(scrollHeightBefore) {
+        const container = document.getElementById('chat-messages');
+        const history = API.Chat.getHistory(this.currentCharId);
+        const char = API.Chat.getChar(this.currentCharId);
+        
+        if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        
+        this._renderRAF = requestAnimationFrame(() => {
+            const html = this._buildMessagesHtml(history, char);
+            container.innerHTML = html;
+            
+            // 保持滚动位置
+            const scrollHeightAfter = container.scrollHeight;
+            container.scrollTop = scrollHeightAfter - scrollHeightBefore;
+        });
+    },
+
+    renderMessages: function() {
+        const container = document.getElementById('chat-messages');
+        const history = API.Chat.getHistory(this.currentCharId);
+        const char = API.Chat.getChar(this.currentCharId);
+        
+        if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        
+        this._renderRAF = requestAnimationFrame(() => {
+            const html = this._buildMessagesHtml(history, char);
+            container.innerHTML = html;
+            this.scrollToBottom();
+        });
+    },
+
+    renderMessagesNoScroll: function() {
+        const container = document.getElementById('chat-messages');
+        const history = API.Chat.getHistory(this.currentCharId);
+        const char = API.Chat.getChar(this.currentCharId);
+        const scrollTop = container.scrollTop;
+        
+        if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        
+        this._renderRAF = requestAnimationFrame(() => {
+            const html = this._buildMessagesHtml(history, char);
+            container.innerHTML = html;
+            container.scrollTop = scrollTop;
+        });
+    },
+
+    /**
+     * 内部方法：构建消息列表HTML
+     */
+    _buildMessagesHtml: function(history, char) {
+        const maxMessages = this.loadedMessageCount;
+        const startIndex = Math.max(0, history.length - maxMessages);
+        const renderedHistory = history.slice(startIndex);
+        
+        let html = '';
+        
+        // 加载更多按钮
+        if (startIndex > 0) {
+            html += MessageBuilder.buildLoadMoreButton(startIndex);
+        }
+
+        let lastTimestamp = 0;
+        
+        renderedHistory.forEach((msg, i) => {
+            const index = startIndex + i;
+            const timeDiff = (msg.timestamp - lastTimestamp) / 1000 / 60;
+            
+            // 时间戳
+            if (i === 0 || timeDiff > 3) {
+                html += MessageBuilder.buildTimestamp(msg.timestamp);
+            }
+            
+            // 消息内容
+            html += MessageBuilder.buildMessage({
+                msg,
+                index,
+                char,
+                history,
+                deleteMode: this.deleteMode,
+                selectedForDelete: this.selectedForDelete
+            });
+            
+            lastTimestamp = msg.timestamp;
+        });
+        
+        return html;
+    },
+
+    // ==================== 事件处理代理 ====================
+    handleTouchStart: function(event, index) {
+        ChatEventHandlers.handleTouchStart(event, index);
+    },
+
+    handleTouchMove: function(event) {
+        ChatEventHandlers.handleTouchMove(event);
+    },
+
+    handleTouchEnd: function(event) {
+        ChatEventHandlers.handleTouchEnd(event);
+    },
+
+    showContextMenu: function(event, index, x, y) {
+        ChatEventHandlers.showContextMenu(event, index, x, y);
+    },
+
+    closeContextMenu: function() {
+        ChatEventHandlers.closeContextMenu();
+    },
+
+    handleContextAction: function(action) {
+        ChatEventHandlers.handleContextAction(action, this);
+    },
+
+    // ==================== 删除模式代理 ====================
+    enterDeleteMode: function(initialIndex) {
+        ChatEventHandlers.enterDeleteMode(initialIndex, this);
+    },
+
+    toggleDeleteSelection: function(index) {
+        ChatEventHandlers.toggleDeleteSelection(index, this);
+    },
+
+    confirmDelete: function() {
+        ChatEventHandlers.confirmDelete(this);
+    },
+
+    exitDeleteMode: function() {
+        ChatEventHandlers.exitDeleteMode(this);
+    },
+
+    // ==================== 消息发送 ====================
+    sendUserMessage: function() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const msg = {
+            id: Date.now(),
+            sender: 'user',
+            content: text,
+            type: 'text',
+            timestamp: Date.now(),
+            quote: this.currentQuote
+        };
+        this.cancelQuote();
+
+        API.Chat.addMessage(this.currentCharId, msg);
+        this.renderMessages();
+        
+        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+            ChatManager.renderList();
+        }
+        
+        input.value = '';
+        input.style.height = 'auto';
+    },
+
+    // ==================== 面板控制 ====================
+    togglePanel: function(panelName) {
+        const container = document.getElementById('panel-container');
+        const panels = ['emoji', 'expand'];
+        const currentPanel = document.getElementById('panel-' + panelName);
+        
+        if (!currentPanel.classList.contains('hidden') && !container.classList.contains('hidden')) {
+            container.classList.add('hidden');
+            return;
+        }
+
+        panels.forEach(p => document.getElementById('panel-' + p).classList.add('hidden'));
+        
+        currentPanel.classList.remove('hidden');
+        container.classList.remove('hidden');
+        
+        if (panelName === 'emoji') {
+            this.renderEmojiGrid();
+        }
+        
+        this.scrollToBottom();
+    },
+
+    // ==================== 表情包代理 ====================
+    get currentEmojiGroupId() {
+        return EmojiPanel.currentEmojiGroupId;
+    },
+
+    set currentEmojiGroupId(value) {
+        EmojiPanel.currentEmojiGroupId = value;
+    },
+
+    renderEmojiGridById: function(groupId) {
+        EmojiPanel.renderEmojiGridById(groupId, this.currentCharId);
+    },
+
+    renderEmojiGrid: function() {
+        EmojiPanel.renderEmojiGrid(this.currentCharId);
+    },
+
+    getRecentEmojis: function() {
+        return EmojiPanel.getRecentEmojis();
+    },
+
+    saveRecentEmoji: function(emojiUrl) {
+        EmojiPanel.saveRecentEmoji(emojiUrl);
+    },
+
+    sendEmoji: function(emojiUrl) {
+        EmojiPanel.sendEmoji(emojiUrl, this.currentCharId);
+        this.renderMessages();
+        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+            ChatManager.renderList();
+        }
+    },
+
+    // ==================== 引用功能 ====================
+    startQuote: function(index) {
+        const history = API.Chat.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg) return;
+        
+        this.currentQuote = {
+            id: msg.id,
+            sender: msg.sender,
+            content: msg.content,
+            type: msg.type
+        };
+
+        const preview = document.getElementById('quote-preview');
+        const text = document.getElementById('quote-content-text');
+        preview.classList.remove('hidden');
+        
+        const char = API.Chat.getChar(this.currentCharId);
+        const authorName = msg.sender === 'user' ? '我' : (char ? char.remark : '');
+        
+        text.textContent = `回复 ${authorName}: ${msg.type === 'image' ? '[图片]' : msg.content}`;
+        document.getElementById('chat-input').focus();
+    },
+
+    cancelQuote: function() {
+        this.currentQuote = null;
+        document.getElementById('quote-preview').classList.add('hidden');
+    },
+
+    addCustomEmoji: function() {
+        EmojiManager.openModal();
+    },
+
+    // ==================== AI交互代理 ====================
+    triggerAI: async function() {
+        await AIHandler.triggerAI(this);
+    },
+
+    regenerateLastAI: async function() {
+        await AIHandler.regenerateLastAI(this);
+    },
+
+    // ==================== 媒体处理代理 ====================
+    openCamera: function() {
+        MediaHandlers.openCamera();
+    },
+
+    handleCameraCapture: async function(input) {
+        await MediaHandlers.handleCameraCapture(
+            input,
+            this.currentCharId,
+            this.compressImageForChat.bind(this),
+            this.renderMessages.bind(this)
+        );
+    },
+
+    openGalleryMenu: function() {
+        MediaHandlers.openGalleryMenu();
+    },
+
+    closeGalleryMenu: function() {
+        MediaHandlers.closeGalleryMenu();
+    },
+
+    openTextDrawing: function() {
+        MediaHandlers.openTextDrawing();
+    },
+
+    closeTextDrawing: function() {
+        MediaHandlers.closeTextDrawing();
+    },
+
+    sendTextDrawing: function() {
+        MediaHandlers.sendTextDrawing(
+            this.currentCharId,
+            this.generateTextImageCard.bind(this),
+            this.renderMessages.bind(this)
+        );
+    },
+
+    openGalleryPicker: function() {
+        MediaHandlers.openGalleryPicker();
+    },
+
+    handleGallerySelect: async function(input) {
+        await MediaHandlers.handleGallerySelect(
+            input,
+            this.currentCharId,
+            this.compressImageForChat.bind(this),
+            this.renderMessages.bind(this)
+        );
+    }
+};
+
+// 导出模块
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ChatInterface;
+}

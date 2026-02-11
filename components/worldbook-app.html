@@ -1,0 +1,39 @@
+<!-- ==================== WORLD BOOK APP ==================== -->
+<div id="worldbook-app" class="absolute inset-0 z-50 flex flex-col hidden pt-0 overflow-hidden bg-[#F2F2F7]">
+    <!-- Header -->
+    <div class="h-24 bg-[#F7F7F7] px-6 pt-10 flex justify-between items-center shrink-0 border-b border-[#E5E5E5]">
+        <button id="close-worldbook-btn" class="text-black"><i class="fa-solid fa-chevron-left text-lg"></i></button>
+        <h1 class="text-black font-bold text-xl tracking-wide">世界书</h1>
+        <button onclick="WorldBookManager.openEditModal()" class="text-black"><i class="fa-solid fa-plus text-lg"></i></button>
+    </div>
+    
+    <!-- List -->
+    <div id="worldbook-list" class="flex-1 overflow-y-auto p-4 space-y-3 pb-8">
+        <!-- Items injected by JS -->
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="worldbook-modal" class="absolute inset-0 bg-white z-50 hidden flex flex-col">
+        <div class="h-16 border-b border-gray-200 flex justify-between items-center px-4 bg-gray-50">
+            <button onclick="WorldBookManager.closeEditModal()" class="text-gray-500">取消</button>
+            <span class="font-bold text-gray-800">编辑设定</span>
+            <button onclick="WorldBookManager.saveWorldBook()" class="text-indigo-600 font-bold">保存</button>
+        </div>
+        <div class="flex-1 p-4 overflow-y-auto space-y-4">
+            <input type="hidden" id="wb-id">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">书名 / Title</label>
+                <input type="text" id="wb-title" class="w-full bg-gray-100 rounded-lg p-3 font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">分类 / Category</label>
+                <input type="text" id="wb-category" class="w-full bg-gray-100 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="例如：世界观、魔法体系...">
+            </div>
+            <div class="flex-1 h-full">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">详细设定 / Content</label>
+                <textarea id="wb-content" class="w-full h-64 bg-gray-100 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed resize-none" placeholder="输入详细的世界观设定..."></textarea>
+            </div>
+            <button onclick="WorldBookManager.deleteWorldBook()" id="wb-delete-btn" class="w-full py-3 text-red-500 font-bold bg-red-50 rounded-xl hidden">删除此设定</button>
+        </div>
+    </div>
+</div>

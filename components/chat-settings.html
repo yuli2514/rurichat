@@ -1,0 +1,269 @@
+<!-- ==================== CHAT SETTINGS PANEL ==================== -->
+<div id="chat-settings-panel" class="absolute inset-0 z-[70] flex flex-col hidden bg-gray-100 transform translate-x-full transition-transform duration-300">
+    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 shadow-sm">
+        <button onclick="ChatSettings.close()" class="text-gray-800"><i class="fa-solid fa-chevron-left text-lg"></i></button>
+        <h2 class="font-bold text-lg">聊天信息</h2>
+        <div class="w-6"></div>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto p-4 space-y-6">
+        <!-- Avatar & Name - 整个设置面板背景 -->
+        <div id="setting-panel-header" class="relative bg-white min-h-[200px] rounded-xl shadow-sm overflow-hidden" style="background-size: cover; background-position: center;">
+            <!-- 全面板背景 -->
+            <div id="setting-panel-bg-preview" class="absolute inset-0 bg-cover bg-center opacity-0 transition-opacity duration-300" style="background-size: cover; background-position: center;"></div>
+            <label for="setting-panel-bg-upload" class="absolute inset-0 w-full h-full cursor-pointer z-50 opacity-0 hover:opacity-100 transition pointer-events-none"></label>
+            <input type="file" id="setting-panel-bg-upload" class="hidden absolute inset-0 w-full h-full cursor-pointer z-40 opacity-0" accept="image/*" onchange="ChatSettings.updatePanelBackground(this)">
+            
+            <!-- 小相机按钮 - 右上角 -->
+            <label for="setting-panel-bg-upload" class="absolute top-4 right-4 z-40 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white cursor-pointer hover:bg-white transition group pointer-events-auto">
+                <i class="fa-solid fa-camera text-gray-600 text-sm group-hover:text-blue-500 transition-colors"></i>
+            </label>
+            
+            <!-- Header 内容区域 -->
+            <div class="relative z-30 pt-20 pb-12 px-6">
+                <!-- 头像行 -->
+                <div class="flex items-center justify-center gap-6 mb-6 relative">
+                    <!-- Character Avatar -->
+                    <div class="relative">
+                        <div class="cursor-pointer" onclick="event.stopPropagation(); document.getElementById('setting-char-upload').click()">
+                            <img id="setting-char-avatar" src="" class="vinyl-record w-16 h-16 rounded-full object-cover shadow-2xl bg-gray-200">
+                            <input type="file" id="setting-char-upload" class="hidden" accept="image/*" onchange="ChatSettings.updateAvatar(this)">
+                        </div>
+                        <!-- AI小字 - 正上方居中，可点击编辑像打字 -->
+                        <div class="absolute -top-7 left-1/2 transform -translate-x-1/2 text-center w-24 z-20">
+                            <span id="setting-char-name-display" class="text-xs text-gray-500 font-medium block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveCharNameEdit(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveCharNameEdit(this); }">AI名</span>
+                        </div>
+                        <!-- AI英文小字 - 正下方居中 -->
+                        <div class="absolute -bottom-7 left-1/2 transform -translate-x-1/2 text-center w-32 z-20">
+                            <span id="setting-char-en-text" class="text-[10px] text-gray-500 italic font-serif block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveCharEnText(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveCharEnText(this); }">Character</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 可自定义emoji - 直接点击编辑文字/上传图片，删除直接用退格键 -->
+                    <div class="relative flex items-center justify-center group cursor-pointer" onclick="event.stopPropagation()">
+                        <span id="setting-music-emoji-text" class="text-[24px] text-gray-600 font-normal cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveMusicEmojiText(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveMusicEmojiText(this); }">🎵</span>
+                        <input type="file" id="setting-music-upload" class="hidden absolute inset-0 opacity-0 cursor-pointer z-20" accept="image/*" onchange="ChatSettings.updateMusicEmoji(this)">
+                        <!-- 点击提示 -->
+                        <div class="absolute -top-10 text-xs text-gray-500 bg-white/90 backdrop-blur rounded px-2 py-1 shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-30">点击编辑表情符号</div>
+                    </div>
+                    
+                    <!-- User Avatar -->
+                    <div class="relative">
+                        <div class="cursor-pointer" onclick="event.stopPropagation(); document.getElementById('setting-user-upload').click()">
+                            <img id="setting-user-avatar" src="" class="vinyl-record w-16 h-16 rounded-full object-cover shadow-2xl bg-gray-200">
+                            <input type="file" id="setting-user-upload" class="hidden" accept="image/*" onchange="ChatSettings.updateUserAvatar(this)">
+                        </div>
+                        <!-- 用户小字 - 正上方居中，可直接编辑 -->
+                        <div class="absolute -top-7 left-1/2 transform -translate-x-1/2 text-center w-24 z-20">
+                            <span id="setting-user-name-display" class="text-xs text-gray-500 font-medium block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveUserName(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveUserName(this); }">用户</span>
+                        </div>
+                        <!-- 用户英文小字 - 正下方居中 -->
+                        <div class="absolute -bottom-7 left-1/2 transform -translate-x-1/2 text-center w-32 z-20">
+                            <span id="setting-user-en-text" class="text-[10px] text-gray-500 italic font-serif block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveUserEnText(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveUserEnText(this); }">User</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+                <!-- Edit Character Info (包含备注) - 可折叠 -->
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('char-info-content').classList.toggle('hidden'); document.getElementById('char-info-arrow').classList.toggle('rotate-90')">
+                        <span class="text-sm font-bold text-gray-700">角色信息</span>
+                        <i id="char-info-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+                    </div>
+                    <div id="char-info-content" class="p-4 bg-gray-50 space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">角色名字 (用于记忆总结)</label>
+                            <input type="text" id="setting-char-name-for-summary" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs" placeholder="AI总结记忆时使用的角色名字">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">显示备注</label>
+                            <input type="text" id="setting-char-remark" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs" placeholder="聊天列表和标题显示的备注">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">你的称呼 (用于记忆总结)</label>
+                            <input type="text" id="setting-user-name-for-summary" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs" placeholder="AI总结记忆时使用的你的名字">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">系统设定 (Prompt)</label>
+                            <textarea id="setting-char-prompt" rows="3" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs resize-none" placeholder="输入角色的系统设定..."></textarea>
+                        </div>
+                        <button onclick="ChatSettings.saveCharInfo()" class="w-full bg-blue-500 text-white font-medium py-1.5 rounded-md text-xs active:scale-95 transition">保存信息</button>
+                    </div>
+                </div>
+
+        <!-- World Book Binding - 可折叠，按目录展示 -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('worldbook-binding-content').classList.toggle('hidden'); document.getElementById('worldbook-arrow').classList.toggle('rotate-90')">
+                <span class="text-sm font-bold text-gray-700">世界书绑定</span>
+                <i id="worldbook-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+            </div>
+            <div id="worldbook-binding-content" class="hidden p-4 bg-gray-50">
+                <!-- 世界书目录树 -->
+                <div id="worldbook-tree-container" class="space-y-2 max-h-64 overflow-y-auto">
+                    <!-- 目录和世界书将由JS注入 -->
+                </div>
+                <p class="text-[10px] text-gray-400 mt-3">勾选后，AI 将读取该世界书的设定作为背景知识。支持多选。</p>
+            </div>
+        </div>
+
+        <!-- User Persona Section -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('user-persona-content').classList.toggle('hidden'); document.getElementById('persona-arrow').classList.toggle('rotate-90')">
+                <span class="text-sm font-bold text-gray-700">用户人设</span>
+                <i id="persona-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+            </div>
+            <div id="user-persona-content" class="hidden p-4 bg-gray-50 space-y-3">
+                <!-- Persona Preset Select -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">选择预设</label>
+                    <div class="flex gap-2">
+                        <select id="setting-user-persona-select" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="ChatSettings.saveUserPersona()">
+                            <option value="">(默认用户)</option>
+                            <!-- Options injected -->
+                        </select>
+                        <button onclick="ChatSettings.openPersonaManager()" class="bg-gray-200 text-gray-600 px-3 rounded-lg text-sm hover:bg-gray-300 transition">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Current Persona Content (Read-only preview) -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">当前人设内容</label>
+                    <textarea id="setting-user-persona-content" rows="4" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs resize-none" placeholder="选择预设后显示人设内容，或直接输入临时人设..." oninput="ChatSettings.saveCustomPersona()"></textarea>
+                </div>
+                
+                <p class="text-[10px] text-gray-400">AI 将明确知道对面聊天的人是用户，并根据此人设理解用户身份。</p>
+            </div>
+        </div>
+
+        <!-- Chat Wallpaper -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                <span class="text-sm font-bold text-gray-700">聊天背景</span>
+                <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+            </div>
+            <div class="p-4 bg-gray-50 flex flex-col gap-3">
+                 <div class="relative w-full h-32 bg-gray-200 rounded-lg overflow-hidden border border-gray-300 group cursor-pointer">
+                    <img id="setting-chat-bg-preview" class="w-full h-full object-cover hidden">
+                    <div class="absolute inset-0 flex items-center justify-center text-gray-400 font-medium text-xs bg-gray-100/50 group-hover:bg-gray-100/30 transition">
+                        <span id="setting-chat-bg-placeholder">点击上传壁纸</span>
+                    </div>
+                    <input type="file" id="setting-chat-bg-upload" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onchange="ChatSettings.updateChatWallpaper(this)">
+                </div>
+                <button onclick="ChatSettings.clearChatWallpaper()" class="text-red-500 text-xs font-bold text-right">恢复默认</button>
+            </div>
+        </div>
+
+        <!-- Custom CSS & UI Settings -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('css-settings-content').classList.toggle('hidden'); document.getElementById('css-arrow').classList.toggle('rotate-90')">
+                <span class="text-sm font-bold text-gray-700">界面样式 (CSS)</span>
+                <i id="css-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+            </div>
+            <div id="css-settings-content" class="hidden p-4 bg-gray-50 space-y-4">
+                
+                <!-- Sliders -->
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-gray-500">气泡大小</span>
+                            <span id="val-bubble-size" class="text-xs text-gray-400 font-mono">1.0</span>
+                        </div>
+                        <input type="range" id="setting-css-bubble" min="0.8" max="1.5" step="0.05" value="1.0" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="CssManager.updateCssVar('bubble', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-gray-500">字体大小</span>
+                            <span id="val-font-size" class="text-xs text-gray-400 font-mono">16px</span>
+                        </div>
+                        <input type="range" id="setting-css-font" min="12" max="24" step="1" value="16" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="CssManager.updateCssVar('font', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-gray-500">头像大小</span>
+                            <span id="val-avatar-size" class="text-xs text-gray-400 font-mono">40px</span>
+                        </div>
+                        <input type="range" id="setting-css-avatar" min="30" max="60" step="2" value="40" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="CssManager.updateCssVar('avatar', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-gray-500">底栏图标大小</span>
+                            <span id="val-toolbar-icon" class="text-xs text-gray-400 font-mono">20px</span>
+                        </div>
+                        <input type="range" id="setting-css-toolbar" min="16" max="32" step="2" value="20" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="CssManager.updateCssVar('toolbar', this.value)">
+                    </div>
+                </div>
+
+                <!-- CSS Editor -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-gray-500 uppercase">自定义 CSS</span>
+                        <div class="flex gap-2">
+                            <button onclick="CssManager.openPresetModal()" class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-bold">选择预设</button>
+                            <button onclick="CssManager.saveCssPreset()" class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold">保存预设</button>
+                        </div>
+                    </div>
+                    <textarea id="custom-css-input" rows="6" class="w-full bg-gray-800 text-green-400 font-mono text-[10px] p-2 rounded-lg resize-none focus:outline-none" placeholder="/* 在此输入 CSS 代码 */&#10;.bubble { background: pink; }" oninput="CssManager.applyCustomCss(this.value)"></textarea>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Emoji Pack Binding - 可折叠，支持多选 -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('emoji-binding-content').classList.toggle('hidden'); document.getElementById('emoji-arrow').classList.toggle('rotate-90')">
+                <span class="text-sm font-bold text-gray-700">表情包绑定</span>
+                <i id="emoji-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+            </div>
+            <div id="emoji-binding-content" class="hidden p-4 bg-gray-50">
+                <!-- 表情包多选列表 -->
+                <div id="emoji-multi-select-container" class="space-y-2 max-h-48 overflow-y-auto">
+                    <!-- 表情包分组将由JS注入 -->
+                </div>
+                <p class="text-[10px] text-gray-400 mt-3">勾选后，AI 可能会根据对话内容发送该分组中的表情包。支持多选或不选。</p>
+            </div>
+        </div>
+
+         <!-- Memory System -->
+         <div class="bg-white rounded-xl overflow-hidden shadow-sm p-4 space-y-4">
+            <h3 class="text-sm font-bold text-gray-700">记忆与上下文</h3>
+            
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-600">上下文轮数</span>
+                <input type="number" id="setting-ctx-length" class="w-16 bg-gray-100 rounded p-1 text-center text-xs font-bold" value="20" onchange="ChatSettings.saveMemory()">
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span class="text-xs text-gray-600">自动总结 (Auto Summary)</span>
+                <div class="relative inline-block w-10 align-middle select-none">
+                    <input type="checkbox" id="setting-auto-summary" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="ChatSettings.saveMemory()"/>
+                    <label for="setting-auto-summary" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                </div>
+            </div>
+            
+            <div id="summary-options" class="hidden space-y-3 pt-2">
+                <div>
+                    <span class="text-[10px] text-gray-400 uppercase font-bold">总结频率 (每 N 轮)</span>
+                    <input type="number" id="setting-summary-freq" class="w-full mt-1 bg-gray-100 rounded p-2 text-xs" value="10" onchange="ChatSettings.saveMemory()">
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-400 uppercase font-bold">总结提示词</span>
+                    <textarea id="setting-summary-prompt" rows="3" class="w-full mt-1 bg-white border border-gray-300 rounded-lg p-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请总结以下对话的关键信息..." onchange="ChatSettings.saveSummaryPrompt()"></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Danger Zone -->
+        <div class="space-y-3">
+            <button onclick="ChatSettings.clearHistory()" class="w-full py-3 bg-white text-orange-500 font-medium rounded-xl shadow-sm active:bg-orange-50 transition border border-orange-100">
+                <i class="fa-regular fa-trash-can mr-2"></i>删除聊天记录
+            </button>
+            <button onclick="ChatSettings.deleteChar()" class="w-full py-3 bg-white text-red-500 font-bold rounded-xl shadow-sm active:bg-red-50 transition border border-red-100">
+                删除角色
+            </button>
+        </div>
+    </div>
+</div>

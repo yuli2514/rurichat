@@ -1,0 +1,169 @@
+<!-- ==================== SUPER CHAT INTERFACE ==================== -->
+<div id="super-chat-interface" class="absolute inset-0 z-[60] flex flex-col hidden bg-[#f5f5f5]">
+     <!-- Chat Header (WeChat Style) -->
+     <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
+        <button onclick="ChatInterface.closeToList()" class="text-[#333333] text-lg w-10 flex justify-start">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <h1 id="chat-header-name" class="font-bold text-base text-gray-900">角色名</h1>
+        <button onclick="ChatSettings.open()" class="text-[#333333] w-10 flex justify-end">
+            <i class="fa-solid fa-ellipsis text-xl"></i>
+        </button>
+    </div>
+
+    <!-- Messages Area -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f5f5f5] scroll-smooth relative">
+        <!-- Messages injected here -->
+    </div>
+
+    <!-- Context Menu for Chat Bubbles -->
+    <div id="chat-context-menu" class="absolute hidden bg-white/95 backdrop-blur-md rounded-xl shadow-xl overflow-hidden transform transition-all duration-200 origin-top-left w-36" style="z-index: 9999;">
+        <div class="flex flex-col py-1" onclick="event.stopPropagation()">
+            <button onpointerup="ChatInterface.handleContextAction('copy')" class="context-menu-btn px-4 py-3 text-left text-sm text-gray-800 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
+                <i class="fa-regular fa-copy text-xs"></i> <span>复制</span>
+            </button>
+            <button onpointerup="ChatInterface.handleContextAction('quote')" class="context-menu-btn px-4 py-3 text-left text-sm text-gray-800 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
+                <i class="fa-solid fa-quote-left text-xs"></i> <span>引用</span>
+            </button>
+            <button onpointerup="ChatInterface.handleContextAction('edit')" class="context-menu-btn px-4 py-3 text-left text-sm text-gray-800 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
+                <i class="fa-solid fa-pen text-xs"></i> <span>编辑</span>
+            </button>
+            <button onpointerup="ChatInterface.handleContextAction('recall')" class="context-menu-btn px-4 py-3 text-left text-sm text-orange-500 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
+                <i class="fa-solid fa-rotate-left text-xs"></i> <span>撤回</span>
+            </button>
+            <button onpointerup="ChatInterface.handleContextAction('delete')" class="context-menu-btn px-4 py-3 text-left text-sm text-red-500 active:bg-gray-100 flex items-center gap-3">
+                <i class="fa-regular fa-trash-can text-xs"></i> <span>删除</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="bg-[#f7f7f7] border-t border-gray-300 min-h-[50px] shrink-0 z-20">
+
+        <div class="flex items-end gap-2 p-2 relative">
+             <!-- Expand Btn - 透明底普通加号黑色 -->
+            <button onclick="ChatInterface.togglePanel('expand')" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-full hover:bg-gray-200 transition active:scale-90 mb-1">
+                 <i class="fa-solid fa-plus text-xl text-black"></i>
+            </button>
+            
+            <!-- Input Container with Quote Preview -->
+            <div class="flex-1 flex flex-col">
+                <!-- Quote Preview Bar (WeChat Style) - 只在输入框上方 -->
+                <div id="quote-preview" class="hidden mb-1 px-2 py-1.5 bg-[#e8e8e8] rounded-t-xl flex justify-between items-center text-xs text-gray-600 border-l-2 border-[#95ec69]">
+                    <div class="flex items-center gap-1.5 truncate max-w-[85%]">
+                        <span id="quote-content-text" class="truncate text-[11px]">引用内容...</span>
+                    </div>
+                    <button onclick="ChatInterface.cancelQuote()" class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                </div>
+                <!-- Input -->
+                <textarea id="chat-input" rows="1" class="w-full bg-white rounded-xl px-3 py-2.5 text-base max-h-32 focus:outline-none border-none resize-none m-0 shadow-sm leading-5" placeholder=""></textarea>
+            </div>
+            
+            <!-- Emoji Btn - 黑色 -->
+            <button onclick="ChatInterface.togglePanel('emoji')" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-full hover:bg-gray-200 transition mb-1">
+                <i class="fa-regular fa-face-smile text-2xl text-black"></i>
+            </button>
+            
+            <!-- AI Reply Btn (Send) - 透明底发送箭头黑色 -->
+            <div class="flex gap-1 shrink-0 mb-1">
+                 <!-- Manual Send (Enter) logic is hidden, this button triggers AI -->
+                <button onclick="ChatInterface.triggerAI()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 active:scale-90 transition">
+                    <i class="fa-solid fa-paper-plane text-xl text-black"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Panels -->
+        <div id="panel-container" class="hidden overflow-hidden transition-all duration-300 bg-[#f7f7f7]">
+            
+            <!-- Emoji Panel -->
+            <div id="panel-emoji" class="hidden h-64 flex flex-col">
+                <!-- Group Selector Bar -->
+                <div id="emoji-group-bar" class="flex overflow-x-auto border-b border-gray-200 bg-white no-scrollbar shrink-0">
+                    <!-- Injected Groups -->
+                    <button class="px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap border-b-2 border-transparent">默认</button>
+                </div>
+                
+                <div id="emoji-grid" class="flex-1 overflow-y-auto p-4" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; align-content: start;">
+                    <!-- Emoji Items -->
+                </div>
+            </div>
+
+            <!-- Expand Panel -->
+            <div id="panel-expand" class="hidden h-64 p-6">
+                <div class="grid grid-cols-4 gap-6">
+                    <!-- 第一排：重回、拍照、照片、语音 -->
+                    <div onclick="ChatInterface.regenerateLastAI()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-rotate text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">重回</span>
+                    </div>
+                    <div onclick="ChatInterface.openCamera()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-camera text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">拍照</span>
+                    </div>
+                    <div onclick="ChatInterface.openGalleryMenu()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-regular fa-image text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">照片</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-microphone text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">语音</span>
+                    </div>
+                    <!-- 第二排：转账、语音通话、视频通话、线下模式 -->
+                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-money-bill-transfer text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">转账</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-phone text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">语音通话</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-video text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">视频通话</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-plane-slash text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">线下模式</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gallery Sub-Menu Modal -->
+            <div id="gallery-submenu" class="hidden absolute bottom-72 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-4 z-50 w-64">
+                <div class="flex flex-col gap-3">
+                    <button onclick="ChatInterface.openTextDrawing()" class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 active:scale-95 transition">
+                        <i class="fa-solid fa-pen-fancy text-blue-500 text-lg w-6"></i>
+                        <span class="text-sm font-medium text-gray-700">文字描述画图</span>
+                    </button>
+                    <button onclick="ChatInterface.openGalleryPicker()" class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 active:scale-95 transition">
+                        <i class="fa-regular fa-images text-green-500 text-lg w-6"></i>
+                        <span class="text-sm font-medium text-gray-700">从相册选择</span>
+                    </button>
+                </div>
+                <button onclick="ChatInterface.closeGalleryMenu()" class="absolute -top-2 -right-2 w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-300">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Hidden file inputs for camera and gallery -->
+            <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment" onchange="ChatInterface.handleCameraCapture(this)">
+            <input type="file" id="gallery-input" class="hidden" accept="image/*" onchange="ChatInterface.handleGallerySelect(this)">
+
+        </div>
+        <!-- Bottom Spacer for Safe Area -->
+        <div class="h-5 w-full shrink-0 bg-[#f7f7f7]"></div>
+    </div>
+    
+    <!-- Text Drawing Modal - 放在 panel-container 外面，确保始终可见 -->
+    <div id="text-drawing-modal" class="hidden absolute inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div class="bg-white rounded-2xl p-5 w-[85%] max-w-[300px] shadow-2xl">
+            <h3 class="font-bold text-lg text-gray-800 mb-3">文字描述画图</h3>
+            <textarea id="text-drawing-input" rows="4" class="w-full bg-gray-100 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="描述你想要的图片内容..."></textarea>
+            <div class="flex gap-2 mt-4">
+                <button onclick="ChatInterface.closeTextDrawing()" class="flex-1 py-2 bg-gray-200 text-gray-700 rounded-xl font-medium active:scale-95 transition">取消</button>
+                <button onclick="ChatInterface.sendTextDrawing()" class="flex-1 py-2 bg-blue-500 text-white rounded-xl font-medium active:scale-95 transition">发送</button>
+            </div>
+        </div>
+    </div>
+</div>

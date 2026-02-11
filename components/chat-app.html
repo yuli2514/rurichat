@@ -1,0 +1,100 @@
+<!-- ==================== CHAT APP ==================== -->
+<div id="chat-app" class="absolute inset-0 z-50 flex flex-col hidden pt-0 overflow-hidden bg-[#f5f5f5]">
+    
+    <!-- Chat Status Bar Spacer (Uses Global Status Bar) -->
+    <div class="h-12 w-full bg-[#f5f5f5] shrink-0"></div>
+
+    <!-- Chat Header -->
+    <div class="h-10 px-4 bg-[#f5f5f5] flex items-center justify-between shrink-0 border-b border-gray-200/50 sticky top-0 z-10 relative">
+        <button id="close-chat-btn" class="text-black active:text-gray-600 transition"><i class="fa-solid fa-chevron-left text-lg"></i></button>
+        <span class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">RuriChat</span>
+        <button onclick="ChatManager.openAddModal()" class="text-black active:text-gray-600 transition p-1">
+            <i class="fa-solid fa-user-plus text-lg"></i>
+        </button>
+    </div>
+
+    <!-- Chat List Content -->
+    <div id="chat-list-container" class="flex-1 overflow-y-auto no-scrollbar">
+        <!-- List Items will be injected here -->
+        <div class="flex flex-col items-center justify-center h-48 text-gray-400 mt-10">
+            <i class="fa-regular fa-comment-dots text-4xl mb-2 opacity-50"></i>
+            <p class="text-xs">暂无聊天</p>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="chat-bottom-nav h-[84px] w-full flex justify-around items-start pt-2 pb-8 shrink-0 relative z-20">
+        <div class="flex flex-col items-center gap-0.5 w-16 cursor-pointer text-[#2c2c2e]">
+            <i class="fa-solid fa-comment text-xl"></i>
+            <span class="text-[10px] font-medium">聊天</span>
+        </div>
+        <div class="flex flex-col items-center gap-0.5 w-16 cursor-pointer text-gray-400 hover:text-[#2c2c2e] transition">
+            <i class="fa-regular fa-compass text-xl"></i>
+            <span class="text-[10px] font-medium">动态</span>
+        </div>
+        <div onclick="ProfileManager.open()" class="flex flex-col items-center gap-0.5 w-16 cursor-pointer text-gray-400 hover:text-[#2c2c2e] transition">
+            <i class="fa-regular fa-user text-xl"></i>
+            <span class="text-[10px] font-medium">我</span>
+        </div>
+    </div>
+
+    <!-- Character Long Press Menu -->
+    <div id="char-context-menu" class="absolute z-[60] hidden">
+        <div class="bg-white rounded-xl shadow-2xl overflow-hidden min-w-[120px] border border-gray-100">
+            <button id="char-menu-pin" class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 flex items-center gap-2 border-b border-gray-100">
+                <i class="fa-solid fa-thumbtack text-gray-400"></i>
+                <span>置顶</span>
+            </button>
+            <button id="char-menu-delete" class="w-full px-4 py-3 text-left text-sm font-medium text-red-500 hover:bg-red-50 active:bg-red-100 flex items-center gap-2">
+                <i class="fa-solid fa-trash"></i>
+                <span>删除</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Character Modal -->
+    <div id="add-char-modal" class="absolute inset-0 bg-black/40 z-50 hidden flex items-center justify-center backdrop-blur-sm transition-all duration-200">
+        <div id="add-char-modal-content" class="bg-white w-[85%] max-w-[320px] rounded-2xl p-5 shadow-2xl transform transition-all duration-200 scale-95 opacity-0">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg text-gray-800">添加新角色</h3>
+                <button onclick="ChatManager.closeAddModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- Avatar Section -->
+                <div class="flex items-center gap-4">
+                    <div class="relative w-16 h-16 shrink-0">
+                        <img id="new-char-avatar-preview" src="https://ui-avatars.com/api/?name=New" class="w-full h-full rounded-full object-cover border border-gray-200 bg-gray-50">
+                        <label for="new-char-file" class="absolute bottom-[-4px] right-[-4px] w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm border border-white">
+                            <i class="fa-solid fa-camera text-[10px]"></i>
+                        </label>
+                        <input type="file" id="new-char-file" class="hidden" accept="image/*" onchange="ChatManager.handleAvatarFile(this)">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-[10px] text-gray-400 font-bold uppercase mb-1 block">网络图片 URL (可选)</label>
+                        <input type="text" id="new-char-url" class="w-full bg-gray-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." oninput="ChatManager.handleAvatarUrl(this)">
+                    </div>
+                </div>
+
+                <!-- Info Inputs -->
+                <div class="space-y-2">
+                    <div>
+                        <input type="text" id="new-char-name" class="w-full bg-gray-100 rounded-lg p-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400" placeholder="角色姓名 (Name)">
+                    </div>
+                    <div>
+                        <input type="text" id="new-char-remark" class="w-full bg-gray-100 rounded-lg p-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400" placeholder="备注 (Remark) - 显示在列表">
+                    </div>
+                    <div>
+                        <input type="text" id="new-char-user-name" class="w-full bg-gray-100 rounded-lg p-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400" placeholder="你的称呼 (用于记忆总结)">
+                    </div>
+                    <div>
+                        <textarea id="new-char-prompt" rows="3" class="w-full bg-gray-100 rounded-lg p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 resize-none" placeholder="填写角色人设"></textarea>
+                    </div>
+                </div>
+
+                <button onclick="ChatManager.saveCharacter()" class="w-full bg-gray-700 text-white font-bold py-3 rounded-xl shadow-md active:scale-95 transition hover:bg-gray-600">添加角色</button>
+            </div>
+        </div>
+    </div>
+
+</div>

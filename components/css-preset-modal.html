@@ -1,0 +1,22 @@
+<!-- CSS Preset Modal - 弹出选择预设 -->
+<div id="css-preset-modal" class="absolute inset-0 bg-black/40 z-[90] hidden flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white w-[85%] max-w-[300px] rounded-2xl shadow-2xl max-h-[60%] flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+            <h3 class="font-bold text-base">选择CSS预设</h3>
+            <button onclick="CssManager.closePresetModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-3">
+            <div id="css-preset-modal-list" class="space-y-2">
+                <!-- Presets will be injected here -->
+                <span class="text-xs text-gray-400 block text-center py-4">暂无预设</span>
+            </div>
+        </div>
+
+        <div class="p-3 border-t border-gray-200 shrink-0">
+            <button onclick="CssManager.clearCurrentCss()" class="w-full bg-gray-100 text-gray-600 font-medium py-2 rounded-xl text-sm active:scale-95 transition">
+                清除当前CSS
+            </button>
+        </div>
+    </div>
+</div>

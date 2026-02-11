@@ -1,0 +1,159 @@
+<!-- 主屏幕内容 (包含滑动区域和Dock) -->
+<div id="home-screen" class="flex-1 flex flex-col w-full h-full overflow-hidden absolute top-0 left-0 pt-12 z-10 bg-gray-100 bg-cover bg-center">
+     <!-- 滑动区域 -->
+    <div id="swipe-container" class="flex-1 overflow-hidden relative w-full cursor-grab active:cursor-grabbing">
+        <div id="slider-track" class="w-[200%] h-full flex transition-transform duration-300 ease-out">
+            
+            <!-- =============== PAGE 1 =============== -->
+            <div class="w-1/2 h-full flex flex-col px-6 pt-2 pb-2">
+                
+                <!-- [区域1] 个人信息 -->
+                <div class="flex flex-col mb-4 shrink-0 py-2 mt-4">
+                    <div class="flex items-center gap-5">
+                        <div class="relative group shrink-0">
+                            <label for="upload-avatar-top" class="cursor-pointer relative w-24 h-24 rounded-full border-4 border-white shadow-xl bg-gray-200 flex items-center justify-center overflow-hidden active:scale-95 transition">
+                                <span id="avatar-top-text" class="text-gray-400 text-xs font-bold">上传</span>
+                                <img id="avatar-top-preview" class="absolute inset-0 w-full h-full object-cover hidden bg-white">
+                            </label>
+                            <input type="file" id="upload-avatar-top" class="hidden" accept="image/*">
+                        </div>
+                        
+                        <div class="flex-1 flex flex-col justify-center min-w-0 space-y-1">
+                            <h1 id="home-user-name" contenteditable="true" class="text-3xl font-black text-gray-900 leading-none tracking-tight truncate">Admin User</h1>
+                            <p id="home-user-id" contenteditable="true" class="text-base text-gray-600 font-medium leading-tight">ID: 9527001</p>
+                            <p id="home-user-location" contenteditable="true" class="flex items-center gap-1.5 text-gray-500 text-sm font-medium leading-tight">
+                                <i class="fa-solid fa-location-dot text-[12px]"></i> Shanghai, China
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-2 w-[85%] ml-6">
+                        <p id="home-user-bio" contenteditable="true" class="text-[10px] text-gray-400 italic leading-tight break-words font-light">
+                            "Stay hungry, stay foolish. Design is not just what it looks like and feels like."
+                        </p>
+                    </div>
+                </div>
+
+                <!-- [区域2] 时间 & APP -->
+                <div class="flex items-center gap-4 shrink-0 mb-3 px-1">
+                    <div class="flex gap-5 shrink-0">
+                        <div id="chat-app-icon" class="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition">
+                            <div class="w-12 h-12 glass-morphism rounded-2xl flex items-center justify-center text-gray-600 shadow-sm"><i class="fa-solid fa-comment-dots text-lg"></i></div>
+                            <span class="text-xs text-gray-500 font-medium">Chat</span>
+                        </div>
+                        <div id="worldbook-app-icon" class="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition">
+                            <div class="w-12 h-12 glass-morphism rounded-2xl flex items-center justify-center text-gray-600 shadow-sm"><i class="fa-solid fa-book-atlas text-lg"></i></div>
+                            <span class="text-xs text-gray-500 font-medium">世界书</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 flex flex-col justify-center items-center">
+                        <div id="live-time" class="text-6xl font-light text-gray-800 leading-[0.8] tracking-tighter">14:00</div>
+                        <div id="live-date" class="text-xs text-gray-400 font-medium uppercase tracking-wide mt-2">Mon, 23 Oct</div>
+                    </div>
+                </div>
+
+                <!-- [区域3] 今日心情卡片 -->
+                <div class="w-full h-28 shrink-0 z-10">
+                    <div class="w-full h-full bg-white/90 backdrop-blur rounded-3xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+                        <div class="h-6 px-4 flex items-center border-b border-gray-100 bg-gray-50/50 shrink-0">
+                            <span class="text-[9px] text-gray-400 font-semibold tracking-wider w-full outline-none">每日推荐 · DAILY PICK</span>
+                        </div>
+                        <div class="flex-1 px-4 py-1.5 flex items-center gap-3 overflow-hidden">
+                            <div class="shrink-0 self-center">
+                                <label for="upload-avatar-card" class="cursor-pointer relative block w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden group">
+                                    <span id="avatar-card-text" class="text-gray-400 text-[8px] font-bold">上传</span>
+                                    <img id="avatar-card-preview" class="absolute inset-0 w-full h-full object-cover hidden bg-white">
+                                    <input type="file" id="upload-avatar-card" class="hidden" accept="image/*">
+                                </label>
+                            </div>
+                            <div class="flex-1 overflow-hidden flex flex-col justify-center">
+                                <p id="home-mood-title" contenteditable="true" class="text-xs font-bold text-gray-800 mb-0.5 outline-none">今日心情</p>
+                                <p id="home-mood-content" contenteditable="true" class="text-[9px] text-gray-500 leading-relaxed outline-none break-words font-medium">点击这里编辑... 这里的文字现在变小了，更精致。</p>
+                            </div>
+                        </div>
+                        <div class="h-7 flex border-t border-gray-100 shrink-0">
+                            <button class="flex-1 flex items-center justify-center gap-1.5 text-gray-500 hover:text-red-500 transition text-[10px] font-semibold border-r border-gray-200">
+                                <i class="fa-regular fa-heart"></i><span>点赞</span>
+                            </button>
+                            <button class="flex-1 flex items-center justify-center gap-1.5 text-gray-500 hover:text-yellow-500 transition text-[10px] font-semibold border-r border-gray-200">
+                                <i class="fa-regular fa-star"></i><span>收藏</span>
+                            </button>
+                            <button class="flex-1 flex items-center justify-center gap-1.5 text-gray-500 hover:text-blue-500 transition text-[10px] font-semibold">
+                                <i class="fa-solid fa-share"></i><span>转发</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- [区域4] 底部功能区 -->
+                <div class="mt-3 grid grid-cols-2 gap-2 h-36 shrink-0">
+                    <!-- 左侧上传图片区 -->
+                    <div class="relative w-full h-full bg-gray-200/80 backdrop-blur rounded-2xl overflow-hidden border-2 border-dashed border-gray-300 hover:border-blue-400 transition group">
+                        <img id="image-preview-rect" src="" class="absolute inset-0 w-full h-full object-cover hidden z-10 pointer-events-none bg-white">
+                        <label for="upload-rect" class="absolute inset-0 flex flex-col items-center justify-center cursor-pointer z-20">
+                            <div id="upload-placeholder" class="text-gray-400 group-hover:text-blue-500 flex flex-col items-center">
+                                <i class="fa-solid fa-cloud-arrow-up text-2xl mb-1"></i>
+                                <span class="text-[10px] font-bold">上传图片</span>
+                            </div>
+                        </label>
+                        <input type="file" id="upload-rect" accept="image/*" class="hidden">
+                    </div>
+                    
+                    <!-- 右侧4个功能图标区 -->
+                    <div class="grid grid-cols-2 grid-rows-2 gap-2 content-center">
+                        <div class="flex flex-col items-center justify-center gap-1">
+                            <div class="w-12 h-12 bg-white/90 backdrop-blur rounded-xl shadow-sm flex items-center justify-center cursor-pointer active:scale-95 transition hover:shadow-md">
+                                <i class="fa-solid fa-wand-magic-sparkles text-gray-600 text-xl"></i>
+                            </div>
+                            <span class="text-[10px] text-gray-500 font-medium">美化</span>
+                        </div>
+                        <div class="flex flex-col items-center justify-center gap-1">
+                            <div class="w-12 h-12 bg-white/90 backdrop-blur rounded-xl shadow-sm flex items-center justify-center cursor-pointer active:scale-95 transition hover:shadow-md">
+                                <i class="fa-solid fa-brain text-gray-600 text-xl"></i>
+                            </div>
+                            <span class="text-[10px] text-gray-500 font-medium">记忆</span>
+                        </div>
+                        <div class="flex flex-col items-center justify-center gap-1">
+                            <div class="w-12 h-12 bg-white/90 backdrop-blur rounded-xl shadow-sm flex items-center justify-center cursor-pointer active:scale-95 transition hover:shadow-md">
+                                <i class="fa-solid fa-calendar-days text-gray-600 text-xl"></i>
+                            </div>
+                            <span class="text-[10px] text-gray-500 font-medium">纪念日</span>
+                        </div>
+                        <div class="flex flex-col items-center justify-center gap-1">
+                            <div class="w-12 h-12 bg-white/90 backdrop-blur rounded-xl shadow-sm flex items-center justify-center cursor-pointer active:scale-95 transition hover:shadow-md">
+                                <i class="fa-solid fa-users text-gray-600 text-xl"></i>
+                            </div>
+                            <span class="text-[10px] text-gray-500 font-medium">论坛</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- PAGE 2 -->
+            <div class="w-1/2 h-full flex flex-col items-center justify-center p-8 text-gray-400" style="touch-action: pan-x; min-height: 100%;">
+                <div class="text-center space-y-4 opacity-50 pointer-events-none">
+                    <i class="fa-solid fa-plus-circle text-6xl text-gray-300"></i>
+                    <p class="text-sm font-medium">第二页空间</p>
+                    <p class="text-xs">← 向右滑动返回</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Dock -->
+    <div class="w-full flex justify-center gap-2 mb-2 z-50 pointer-events-none">
+        <div id="dot-1" class="w-2 h-2 rounded-full bg-gray-800 transition-colors"></div>
+        <div id="dot-2" class="w-2 h-2 rounded-full bg-gray-300 transition-colors"></div>
+    </div>
+
+    <div class="w-full h-24 px-4 flex items-start justify-center shrink-0 z-50">
+        <div class="w-full h-20 glass-morphism rounded-[35px] flex items-center justify-around px-6">
+            <div class="cursor-pointer active:scale-90 transition"><div class="w-12 h-12 glass-morphism rounded-2xl flex items-center justify-center text-gray-600 text-xl shadow-sm"><i class="fa-solid fa-comment"></i></div></div>
+            <div class="cursor-pointer active:scale-90 transition"><div class="w-12 h-12 glass-morphism rounded-2xl flex items-center justify-center text-gray-600 text-xl shadow-sm"><i class="fa-solid fa-phone"></i></div></div>
+            <!-- Settings Icon -->
+            <div id="settings-icon" class="cursor-pointer active:scale-90 transition"><div class="w-12 h-12 glass-morphism rounded-2xl flex items-center justify-center text-gray-600 text-xl shadow-sm"><i class="fa-solid fa-gear"></i></div></div>
+        </div>
+    </div>
+</div>

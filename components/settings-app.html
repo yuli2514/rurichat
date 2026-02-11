@@ -1,0 +1,279 @@
+<!-- ==================== SETTINGS APP ==================== -->
+<div id="settings-app" class="absolute inset-0 z-50 flex flex-col hidden overflow-hidden">
+    
+    <!-- Level 1: Main Settings List -->
+    <div id="settings-main" class="flex flex-col h-full w-full">
+        <!-- Header -->
+        <div class="settings-header h-24 px-4 pt-10 flex items-center justify-between shrink-0">
+            <button id="close-settings-btn" class="text-blue-500 text-sm font-medium flex items-center gap-1">
+                <i class="fa-solid fa-chevron-left text-xs"></i> 主屏幕
+            </button>
+            <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">设置</h1>
+            <div class="w-12"></div> <!-- Spacer for centering -->
+        </div>
+
+        <!-- List Content -->
+        <div class="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar pb-8">
+            
+            <div class="settings-section">
+                <div class="settings-list-item" onclick="SettingsManager.openPage('page-api')">
+                    <span class="text-sm font-medium"><i class="fa-solid fa-server w-6 text-blue-500"></i> API 配置</span>
+                    <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                </div>
+                <div class="settings-list-item" onclick="SettingsManager.openPage('page-display')">
+                    <span class="text-sm font-medium"><i class="fa-solid fa-font w-6 text-purple-500"></i> 字体与显示</span>
+                    <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                </div>
+                <div class="settings-list-item" onclick="SettingsManager.openPage('page-wallpaper')">
+                    <span class="text-sm font-medium"><i class="fa-regular fa-image w-6 text-green-500"></i> 壁纸设置</span>
+                    <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                </div>
+                <div class="settings-list-item" onclick="SettingsManager.openPage('page-screen')">
+                    <span class="text-sm font-medium"><i class="fa-solid fa-mobile-screen w-6 text-orange-500"></i> 屏幕与框架</span>
+                    <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                </div>
+                <div class="settings-list-item" onclick="SettingsManager.openPage('page-backup')">
+                    <span class="text-sm font-medium"><i class="fa-solid fa-floppy-disk w-6 text-gray-500"></i> 数据备份</span>
+                    <i class="fa-solid fa-chevron-right text-gray-300 text-xs"></i>
+                </div>
+            </div>
+
+            <div class="text-center mt-8 text-gray-400 text-xs">
+                <p>RuriChat v2.1</p>
+                <p>Created with <i class="fa-solid fa-heart text-red-300"></i> by Code</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Level 2: Sub Pages -->
+    
+    <!-- Page A: API Configuration -->
+    <div id="page-api" class="settings-page">
+        <div class="settings-header h-24 px-4 pt-10 flex items-center justify-between shrink-0 bg-[#f2f2f7] border-b border-[#c6c6c8]">
+            <button class="text-blue-500 text-sm font-medium flex items-center gap-1" onclick="SettingsManager.closePage('page-api')">
+                <i class="fa-solid fa-chevron-left text-xs"></i> 设置
+            </button>
+            <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">API 配置</h1>
+            <div class="w-12"></div>
+        </div>
+        <div class="p-4 space-y-4 overflow-y-auto">
+            <div class="bg-white rounded-xl overflow-hidden p-4 space-y-3 shadow-sm">
+                <div>
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-1">API Endpoint</label>
+                    <input type="text" id="api-endpoint" class="w-full bg-gray-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="https://api.openai.com/v1">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-1">API Key</label>
+                    <input type="password" id="api-key" class="w-full bg-gray-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="sk-...">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-1">Model Name</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="api-model" class="flex-1 bg-gray-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="gpt-3.5-turbo">
+                        <button onclick="SettingsManager.fetchModels()" class="bg-blue-100 text-blue-600 px-3 py-2 rounded-lg text-sm font-medium active:bg-blue-200 transition">
+                            <i class="fa-solid fa-cloud-arrow-down"></i>
+                        </button>
+                    </div>
+                    <!-- Model Select (Hidden by default) -->
+                    <select id="model-select" class="w-full mt-2 bg-gray-100 rounded-lg p-2 text-sm hidden" onchange="document.getElementById('api-model').value = this.value">
+                        <option value="">选择模型...</option>
+                    </select>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-gray-500 uppercase font-bold">Temperature (温度)</label>
+                        <span id="api-temp-val" class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded">0.8</span>
+                    </div>
+                    <input type="range" id="api-temperature" min="0" max="2" step="0.1" value="0.8" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="document.getElementById('api-temp-val').textContent = this.value">
+                    <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                        <span>0 (稳定精确)</span>
+                        <span>1 (平衡)</span>
+                        <span>2 (创意多变)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="SettingsManager.saveApiPreset()" class="w-full bg-white text-blue-500 font-semibold py-3 rounded-xl shadow-sm active:bg-gray-50 transition">保存为预设</button>
+            <button onclick="SettingsManager.saveApiSettings()" class="w-full bg-blue-500 text-white font-bold py-3 rounded-xl shadow-md active:scale-95 transition">应用配置</button>
+            
+            <div id="api-presets-list" class="space-y-2 mt-4">
+                <!-- Presets will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Page B: Display & Text -->
+    <div id="page-display" class="settings-page">
+        <div class="settings-header h-24 px-4 pt-10 flex items-center justify-between shrink-0 bg-[#f2f2f7] border-b border-[#c6c6c8]">
+            <button class="text-blue-500 text-sm font-medium flex items-center gap-1" onclick="SettingsManager.closePage('page-display')">
+                <i class="fa-solid fa-chevron-left text-xs"></i> 设置
+            </button>
+            <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">字体与显示</h1>
+            <div class="w-12"></div>
+        </div>
+        <div class="p-4 space-y-6 overflow-y-auto flex-1">
+            <!-- Font URL -->
+            <div class="bg-white rounded-xl p-4 shadow-sm">
+                <label class="block text-xs text-gray-500 uppercase font-bold mb-2">自定义字体 URL</label>
+                <div class="flex gap-2">
+                    <input type="text" id="font-url" class="flex-1 bg-gray-100 rounded-lg p-2 text-sm focus:outline-none" placeholder="https://example.com/font.woff">
+                    <button onclick="SettingsManager.applyFont()" class="bg-blue-500 text-white px-4 rounded-lg text-sm font-bold">应用</button>
+                </div>
+                <div class="flex justify-between items-center mt-2">
+                    <p class="text-[10px] text-gray-400">支持 .ttf 或 .woff 格式的网络字体链接。</p>
+                    <button onclick="SettingsManager.saveFontPreset()" class="text-[10px] text-blue-500 font-bold">保存预设</button>
+                </div>
+            </div>
+
+            <!-- Font Presets -->
+            <div class="bg-white rounded-xl p-4 shadow-sm">
+                <label class="block text-xs text-gray-500 uppercase font-bold mb-3">字体预设</label>
+                <div id="font-presets-list" class="space-y-2">
+                    <p class="text-gray-400 text-center text-[10px] py-2">暂无字体预设</p>
+                </div>
+            </div>
+
+            <!-- Font Size Slider -->
+            <div class="bg-white rounded-xl p-4 shadow-sm">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-xs text-gray-500 uppercase font-bold">全局字号</label>
+                    <span id="font-size-val" class="text-xs font-mono text-gray-600">16px</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs">A</span>
+                    <input type="range" id="font-slider" min="12" max="24" value="16" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="SettingsManager.updateFontSize(this.value)">
+                    <span class="text-xl">A</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page C: Wallpaper -->
+    <div id="page-wallpaper" class="settings-page">
+        <div class="settings-header h-24 px-4 pt-10 flex items-center justify-between shrink-0 bg-[#f2f2f7] border-b border-[#c6c6c8]">
+            <button class="text-blue-500 text-sm font-medium flex items-center gap-1" onclick="SettingsManager.closePage('page-wallpaper')">
+                <i class="fa-solid fa-chevron-left text-xs"></i> 设置
+            </button>
+            <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">壁纸设置</h1>
+            <div class="w-12"></div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="p-4">
+            <div class="flex bg-gray-200 p-1 rounded-lg mb-4">
+                <button class="flex-1 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm transition" id="tab-net" onclick="SettingsManager.switchTab('net')">网络图片</button>
+                <button class="flex-1 py-1.5 text-sm font-medium rounded-md text-gray-500 transition" id="tab-local" onclick="SettingsManager.switchTab('local')">本地上传</button>
+            </div>
+
+            <!-- Network Tab -->
+            <div id="content-net" class="space-y-4">
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-2">图片链接</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="wallpaper-url" class="flex-1 bg-gray-100 rounded-lg p-2 text-sm focus:outline-none" placeholder="https://...">
+                        <button onclick="SettingsManager.setWallpaperFromUrl()" class="bg-blue-500 text-white px-4 rounded-lg text-sm font-bold">应用</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Local Tab -->
+            <div id="content-local" class="hidden space-y-4">
+                <div class="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center border-2 border-dashed border-gray-200 h-40 relative group cursor-pointer">
+                    <input type="file" id="wallpaper-upload" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onchange="SettingsManager.handleWallpaperUpload(this)">
+                    <i class="fa-solid fa-image text-3xl text-gray-300 group-hover:text-blue-500 transition mb-2"></i>
+                    <span class="text-sm text-gray-500 font-medium group-hover:text-blue-500 transition">点击选择图片</span>
+                </div>
+                <p class="text-[10px] text-gray-400 text-center">图片将转换为 Base64 存储在本地，请勿上传过大的图片。</p>
+            </div>
+
+            <!-- Preview -->
+            <div class="mt-6">
+                <p class="text-xs text-gray-500 uppercase font-bold mb-2 ml-1">当前壁纸预览</p>
+                <div class="w-full h-48 rounded-xl bg-gray-200 overflow-hidden bg-cover bg-center border border-gray-300" id="wallpaper-preview"></div>
+                <button onclick="SettingsManager.clearWallpaper()" class="w-full mt-2 text-red-500 text-sm py-2">清除壁纸 (恢复默认)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page D: Screen & Frame -->
+    <div id="page-screen" class="settings-page">
+        <div class="settings-header h-24 px-4 pt-10 flex items-center justify-between shrink-0 bg-[#f2f2f7] border-b border-[#c6c6c8]">
+            <button class="text-blue-500 text-sm font-medium flex items-center gap-1" onclick="SettingsManager.closePage('page-screen')">
+                <i class="fa-solid fa-chevron-left text-xs"></i> 设置
+            </button>
+            <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">屏幕与框架</h1>
+            <div class="w-12"></div>
+        </div>
+        <div class="p-4 space-y-6">
+            
+            <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                <!-- Notch Toggle -->
+                <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                    <span class="text-sm font-medium">显示刘海</span>
+                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="toggle-notch" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300" onchange="SettingsManager.toggleNotch()"/>
+                        <label for="toggle-notch" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+
+                <!-- Immersive Toggle -->
+                <div class="flex items-center justify-between p-4">
+                    <span class="text-sm font-medium">沉浸式全屏 (移除外壳)</span>
+                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="toggle-immersive" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300" onchange="SettingsManager.toggleImmersive()"/>
+                        <label for="toggle-immersive" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Size -->
+            <div class="bg-white rounded-xl p-4 shadow-sm">
+                <label class="block text-xs text-gray-500 uppercase font-bold mb-3">自定义尺寸 (px)</label>
+                <div class="flex gap-4 items-center">
+                    <div class="flex-1">
+                        <span class="text-xs text-gray-400 mb-1 block">宽度</span>
+                        <input type="number" id="screen-width" class="w-full bg-gray-100 rounded-lg p-2 text-sm" value="375" onchange="SettingsManager.updateDimensions()">
+                    </div>
+                    <span class="text-gray-300 pt-4">×</span>
+                    <div class="flex-1">
+                        <span class="text-xs text-gray-400 mb-1 block">高度</span>
+                        <input type="number" id="screen-height" class="w-full bg-gray-100 rounded-lg p-2 text-sm" value="812" onchange="SettingsManager.updateDimensions()">
+                    </div>
+                </div>
+                <button onclick="SettingsManager.resetDimensions()" class="mt-3 text-blue-500 text-xs font-medium">重置默认尺寸</button>
+            </div>
+
+        </div>
+    </div>
+
+     <!-- Page E: Backup -->
+     <div id="page-backup" class="settings-page">
+        <div class="settings-header h-24 px-4 pt-10 flex items-center justify-between shrink-0 bg-[#f2f2f7] border-b border-[#c6c6c8]">
+            <button class="text-blue-500 text-sm font-medium flex items-center gap-1" onclick="SettingsManager.closePage('page-backup')">
+                <i class="fa-solid fa-chevron-left text-xs"></i> 设置
+            </button>
+            <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">数据备份</h1>
+            <div class="w-12"></div>
+        </div>
+        <div class="p-8 flex flex-col gap-4 justify-center h-[calc(100%-3rem)]">
+            
+            <div class="text-center mb-8">
+                <i class="fa-solid fa-cloud-arrow-down text-5xl text-blue-500 mb-4"></i>
+                <h2 class="text-xl font-bold text-gray-800">备份与恢复</h2>
+                <p class="text-sm text-gray-500 mt-2">将您的所有设置、壁纸和数据导出为 JSON 文件，或从文件恢复。</p>
+            </div>
+
+            <button onclick="SettingsManager.exportData()" class="w-full bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-3">
+                <i class="fa-solid fa-download"></i> 导出数据
+            </button>
+
+            <label class="w-full bg-white text-gray-800 border border-gray-300 font-bold py-4 rounded-xl shadow-sm active:bg-gray-50 transition flex items-center justify-center gap-3 cursor-pointer">
+                <i class="fa-solid fa-upload text-gray-500"></i> 导入数据
+                <input type="file" class="hidden" accept=".json" onchange="SettingsManager.importData(this)">
+            </label>
+
+        </div>
+    </div>
+
+</div>

@@ -16,7 +16,11 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * 核心初始化函数 - 初始化所有 Manager 和 UI 组件
+ * 可被 DOMContentLoaded 或组件加载完成后调用
+ */
+function initializeApp() {
     try {
         console.log('Initializing RuriChat...');
 
@@ -43,13 +47,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. Initialize Managers
         // These managers are defined in ui.js and rely on api.js
         const managers = [
-            { name: 'EmojiManager', obj: EmojiManager },
-            { name: 'MemoryApp', obj: MemoryApp },
-            { name: 'SettingsManager', obj: SettingsManager },
-            { name: 'WorldBookManager', obj: WorldBookManager },
-            { name: 'ChatManager', obj: ChatManager },
-            { name: 'ChatInterface', obj: ChatInterface },
-            { name: 'HomeManager', obj: HomeManager }
+            { name: 'EmojiManager', obj: typeof EmojiManager !== 'undefined' ? EmojiManager : null },
+            { name: 'MemoryApp', obj: typeof MemoryApp !== 'undefined' ? MemoryApp : null },
+            { name: 'SettingsManager', obj: typeof SettingsManager !== 'undefined' ? SettingsManager : null },
+            { name: 'WorldBookManager', obj: typeof WorldBookManager !== 'undefined' ? WorldBookManager : null },
+            { name: 'ChatManager', obj: typeof ChatManager !== 'undefined' ? ChatManager : null },
+            { name: 'ChatInterface', obj: typeof ChatInterface !== 'undefined' ? ChatInterface : null },
+            { name: 'HomeManager', obj: typeof HomeManager !== 'undefined' ? HomeManager : null }
         ];
 
         managers.forEach(m => {
@@ -73,5 +77,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } catch (e) {
         console.error('Initialization Error:', e);
+    }
+}
+
+// 检测是否使用组件化加载模式
+document.addEventListener('DOMContentLoaded', () => {
+    // 如果存在 ComponentLoader（组件化模式），等待组件加载完成
+    if (typeof ComponentLoader !== 'undefined' && typeof AppEvents !== 'undefined') {
+        console.log('[main.js] Component mode detected, waiting for components...');
+        AppEvents.on('app:ready', () => {
+            console.log('[main.js] Components ready, initializing app...');
+            initializeApp();
+        });
+    } else {
+        // 传统模式：HTML 已在页面中，直接初始化
+        console.log('[main.js] Traditional mode, initializing directly...');
+        initializeApp();
     }
 });
