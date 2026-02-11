@@ -90,42 +90,42 @@
             </div>
 
             <!-- Expand Panel -->
-            <div id="panel-expand" class="hidden h-64 p-6">
+            <div id="panel-expand" class="hidden h-64 p-6 overflow-y-auto">
                 <div class="grid grid-cols-4 gap-6">
                     <!-- 第一排：重回、拍照、照片、语音 -->
-                    <div onclick="ChatInterface.regenerateLastAI()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                    <button type="button" onclick="ChatInterface.regenerateLastAI()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-rotate text-2xl text-gray-600"></i></div>
                         <span class="text-xs">重回</span>
-                    </div>
-                    <div onclick="ChatInterface.openCamera()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                    </button>
+                    <button type="button" onclick="ChatInterface.openCamera()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-camera text-2xl text-gray-600"></i></div>
                         <span class="text-xs">拍照</span>
-                    </div>
-                    <div onclick="ChatInterface.openGalleryMenu()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                    </button>
+                    <button type="button" onclick="ChatInterface.openGalleryMenu()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-regular fa-image text-2xl text-gray-600"></i></div>
                         <span class="text-xs">照片</span>
-                    </div>
-                    <div onclick="VoiceHandler.openVoicePanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
+                    </button>
+                    <button type="button" onclick="VoiceHandler.openVoicePanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-microphone text-2xl text-gray-600"></i></div>
                         <span class="text-xs">语音</span>
-                    </div>
+                    </button>
                     <!-- 第二排：转账、语音通话、视频通话、线下模式 -->
-                    <div onpointerup="TransferHandler.openTransferPanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200 pointer-events-none"><i class="fa-solid fa-money-bill-transfer text-2xl text-gray-600 pointer-events-none"></i></div>
-                        <span class="text-xs pointer-events-none">转账</span>
-                    </div>
-                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                    <button type="button" onclick="TransferHandler.openTransferPanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-money-bill-transfer text-2xl text-gray-600"></i></div>
+                        <span class="text-xs">转账</span>
+                    </button>
+                    <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-phone text-2xl text-gray-600"></i></div>
                         <span class="text-xs">语音通话</span>
-                    </div>
-                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                    </button>
+                    <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-video text-2xl text-gray-600"></i></div>
                         <span class="text-xs">视频通话</span>
-                    </div>
-                    <div class="flex flex-col items-center gap-2 text-gray-500">
+                    </button>
+                    <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-plane-slash text-2xl text-gray-600"></i></div>
                         <span class="text-xs">线下模式</span>
-                    </div>
+                    </button>
                 </div>
             </div>
 

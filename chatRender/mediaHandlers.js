@@ -18,6 +18,8 @@ const MediaHandlers = {
      * @param {string} currentCharId - 当前角色ID（可选，用于保存）
      */
     openCamera: function(currentCharId) {
+        console.log('[MediaHandlers] openCamera called, charId:', currentCharId);
+        
         // 保存当前角色ID到临时变量和sessionStorage（防止页面刷新丢失）
         if (currentCharId) {
             this._pendingCharId = currentCharId;
@@ -27,8 +29,19 @@ const MediaHandlers = {
                 console.warn('[MediaHandlers] Failed to save charId to sessionStorage:', e);
             }
         }
-        document.getElementById('panel-container').classList.add('hidden');
-        document.getElementById('camera-input').click();
+        
+        const panelContainer = document.getElementById('panel-container');
+        if (panelContainer) {
+            panelContainer.classList.add('hidden');
+        }
+        
+        const cameraInput = document.getElementById('camera-input');
+        console.log('[MediaHandlers] camera-input element:', cameraInput);
+        if (cameraInput) {
+            cameraInput.click();
+        } else {
+            console.error('[MediaHandlers] camera-input not found!');
+        }
     },
 
     /**

@@ -386,6 +386,7 @@ const ChatInterface = {
 
     // ==================== 媒体处理代理 ====================
     openCamera: function() {
+        console.log('[ChatInterface] openCamera called, charId:', this.currentCharId);
         MediaHandlers.openCamera(this.currentCharId);
     },
 

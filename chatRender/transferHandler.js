@@ -24,10 +24,13 @@ const TransferHandler = {
      * 打开转账界面
      */
     openTransferPanel: function() {
+        console.log('[TransferHandler] openTransferPanel called');
+        
         this.currentAmount = '';
         this.currentRemark = '';
         
         const charId = ChatInterface.currentCharId;
+        console.log('[TransferHandler] charId:', charId);
         const char = API.Chat.getChar(charId);
         const charName = char ? char.remark : '对方';
         
