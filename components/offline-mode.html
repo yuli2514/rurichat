@@ -1,0 +1,137 @@
+<!-- ==================== OFFLINE MODE INTERFACE ==================== -->
+<div id="offline-mode-interface" class="absolute inset-0 z-[100] flex flex-col hidden" style="background: #f5f5f5;">
+    
+    <!-- Top Bar -->
+    <div class="h-24 px-4 pt-10 flex items-center shrink-0 z-20 relative" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0,0,0,0.05);">
+        <!-- Left: Back -->
+        <div class="absolute left-4 bottom-4 z-30">
+            <button onclick="OfflineMode.close()" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 active:scale-95 transition">
+                <i class="fa-solid fa-chevron-left text-gray-700"></i>
+            </button>
+        </div>
+
+        <!-- Center: Name -->
+        <div class="flex-1 flex justify-center items-center h-10 mb-1">
+            <h1 id="offline-header-name" class="font-bold text-base text-gray-900">角色名</h1>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="absolute right-4 bottom-4 z-30 flex items-center gap-1">
+            <button onclick="OfflineMode.openPresetModal()" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 active:scale-95 transition">
+                <i class="fa-solid fa-sliders text-gray-700 text-sm"></i>
+            </button>
+            <button onclick="OfflineMode.openSettings()" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 active:scale-95 transition">
+                <i class="fa-solid fa-gear text-gray-700 text-sm"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div id="offline-messages" class="flex-1 overflow-y-auto px-4 py-6 scroll-smooth" style="scroll-behavior: smooth;">
+        <!-- Messages injected here -->
+    </div>
+
+    <!-- Bottom Input Area -->
+    <div class="shrink-0 flex items-center justify-center pb-8 pt-3 px-4">
+        <div class="flex items-center gap-3" style="width: 90%;">
+            <!-- Regenerate Button -->
+            <button onclick="OfflineMode.regenerate()" class="w-10 h-10 shrink-0 flex items-center justify-center rounded-full" style="background: rgba(255,255,255,0.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <i class="fa-solid fa-rotate text-black text-sm"></i>
+            </button>
+            
+            <!-- Input -->
+            <div class="flex-1 rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <textarea id="offline-input" rows="1" class="w-full bg-transparent px-4 py-2.5 text-sm max-h-24 focus:outline-none border-none resize-none m-0 leading-5" placeholder="输入剧情或消息..."></textarea>
+            </div>
+            
+            <!-- Send Button -->
+            <button onclick="OfflineMode.sendMessage()" class="w-10 h-10 shrink-0 flex items-center justify-center rounded-full" style="background: rgba(255,255,255,0.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <i class="fa-solid fa-arrow-up text-black text-sm"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Preset Modal -->
+    <div id="offline-preset-modal" class="hidden absolute inset-0 bg-black/40 z-[100] flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white w-[90%] max-w-[360px] rounded-2xl shadow-2xl p-5 max-h-[85%] overflow-y-auto">
+            <h3 class="font-bold text-lg text-gray-800 mb-4">线下模式预设</h3>
+            
+            <!-- 预设列表 -->
+            <div id="offline-preset-list" class="space-y-2 mb-4 max-h-64 overflow-y-auto">
+                <!-- 预设项目将动态注入 -->
+            </div>
+            
+            <!-- 新增预设表单 -->
+            <div class="border-t border-gray-200 pt-4 space-y-3">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase block mb-1">预设名称</label>
+                    <input type="text" id="offline-preset-name" class="w-full bg-gray-100 rounded-lg p-2 text-sm border-none focus:ring-1 focus:ring-blue-500" placeholder="例如：优美文风">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase block mb-1">预设内容</label>
+                    <textarea id="offline-preset-input" rows="4" class="w-full bg-gray-100 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="输入线下模式的写作要求..."></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="OfflineMode.closePresetModal()" class="flex-1 py-2 bg-gray-200 text-gray-700 rounded-xl font-medium active:scale-95 transition">取消</button>
+                    <button onclick="OfflineMode.savePreset()" class="flex-1 py-2 bg-blue-500 text-white rounded-xl font-medium active:scale-95 transition">保存预设</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="offline-settings-modal" class="hidden absolute inset-0 bg-black/40 z-[100] flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white w-[90%] max-w-[340px] rounded-2xl shadow-2xl p-5 max-h-[85%] overflow-y-auto">
+            <h3 class="font-bold text-lg text-gray-800 mb-4">线下模式设置</h3>
+            
+            <div class="space-y-5">
+                <!-- 背景设置 -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase">背景设置</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="offline-wallpaper-input" class="flex-1 bg-gray-100 rounded-lg p-2 text-xs border-none focus:ring-1 focus:ring-blue-500" placeholder="图片 URL">
+                        <button onclick="document.getElementById('offline-wallpaper-file').click()" class="px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-bold">上传</button>
+                    </div>
+                    <input type="file" id="offline-wallpaper-file" class="hidden" accept="image/*" onchange="OfflineMode.handleWallpaperUpload(this)">
+                </div>
+
+                <!-- 头像大小 -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-gray-500 uppercase">头像大小</label>
+                        <span id="val-offline-avatar-size" class="text-xs text-blue-500 font-bold">32px</span>
+                    </div>
+                    <input type="range" min="20" max="80" value="32" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="OfflineMode.updateSetting('avatarSize', this.value)">
+                </div>
+
+                <!-- 文字大小 -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-gray-500 uppercase">文字大小</label>
+                        <span id="val-offline-font-size" class="text-xs text-blue-500 font-bold">14px</span>
+                    </div>
+                    <input type="range" min="10" max="30" value="14" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="OfflineMode.updateSetting('fontSize', this.value)">
+                </div>
+
+                <!-- 自定义 CSS -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase">自定义 CSS (仅限线下界面)</label>
+                    <textarea id="offline-custom-css" rows="5" class="w-full bg-gray-100 rounded-xl p-3 text-xs border-none focus:ring-1 focus:ring-blue-500 resize-none font-mono" placeholder=".offline-bubble { ... }"></textarea>
+                    <div class="flex gap-2">
+                        <button onclick="OfflineMode.applyCustomCss()" class="flex-1 py-2 bg-blue-500 text-white rounded-lg text-xs font-bold">应用 CSS</button>
+                        <button onclick="OfflineMode.clearCustomCss()" class="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold">清除</button>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-100">
+                    <button onclick="OfflineMode.clearHistory()" class="w-full py-3 bg-red-50 text-red-500 rounded-xl font-medium active:scale-95 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-trash text-sm"></i>
+                        <span>清空线下对话记录</span>
+                    </button>
+                </div>
+            </div>
+            
+            <button onclick="OfflineMode.closeSettings()" class="w-full mt-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold active:scale-95 transition">关闭</button>
+        </div>
+    </div>
+</div>

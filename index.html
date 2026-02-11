@@ -79,13 +79,21 @@
                     console.log('[App] All components loaded, app ready');
                 } else {
                     console.error('[App] Failed to load some components');
-                    // 显示错误提示
+                    // 获取失败的组件列表
+                    const failedList = (ComponentLoader._failedComponents || [])
+                        .map(f => `${f.name}: ${f.error}`).join('\n');
+                    console.error('[App] Failed components:\n' + failedList);
+                    // 显示错误提示（包含具体失败信息）
                     const loader = document.getElementById('loading-indicator');
                     if (loader) {
+                        const failedNames = (ComponentLoader._failedComponents || [])
+                            .map(f => `<div class="text-left text-xs text-red-400 mt-1">• ${f.name}: ${f.error}</div>`).join('');
                         loader.innerHTML = `
                             <i class="fa-solid fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-                            <p class="text-red-500 text-sm">组件加载失败</p>
+                            <p class="text-red-500 text-sm font-bold">组件加载失败</p>
+                            <div class="mt-2 max-h-40 overflow-y-auto px-4">${failedNames || '<div class="text-xs text-gray-400">未知错误</div>'}</div>
                             <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm">重试</button>
+                            <button onclick="navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).then(()=>location.reload())" class="mt-2 px-4 py-2 bg-gray-500 text-white rounded-lg text-sm">清除缓存重试</button>
                         `;
                     }
                 }

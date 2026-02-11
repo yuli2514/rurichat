@@ -123,7 +123,7 @@ const OfflineMode = {
                 html += '</div>';
             } else {
                 html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs">';
-                html += '<div class="text-gray-800 leading-relaxed whitespace-pre-wrap text-center" style="font-size:' + fontSize + 'px;">' + this._formatContent(msg.content) + '</div>';
+                html += '<div class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._formatContent(msg.content) + '</div>';
                 html += '</div>';
             }
             html += '</div>';
@@ -528,17 +528,44 @@ const OfflineMode = {
     },
 
     /**
-     * 格式化AI回复内容（保留段落格式）
+     * 格式化AI回复内容（保留段落格式，移除非剧情内容）
      */
     _formatContent: function(content) {
         if (!content) return '';
+        
         // 先转义HTML
         let text = this._escapeHtml(content);
+        
+        // 移除常见的格式标记和非剧情内容
+        // 移除【】括号内的内容（如【系统】、【旁白】等）
+        text = text.replace(/【[^】]*】/g, '');
+        
+        // 移除*号标记（如*动作*、*表情*等）
+        text = text.replace(/\*[^*]*\*/g, '');
+        
+        // 移除(括号)内的舞台指示
+        text = text.replace(/\([^)]*\)/g, '');
+        
+        // 移除---分隔线
+        text = text.replace(/---+/g, '');
+        
+        // 移除===分隔线
+        text = text.replace(/===+/g, '');
+        
+        // 清理多余空行（保留段落分隔）
+        text = text.replace(/\n\n\n+/g, '\n\n');
+        
         // 将连续换行转为段落分隔
         text = text.replace(/\n\n+/g, '</p><p class="mt-4">');
         text = '<p>' + text + '</p>';
+        
         // 单个换行转为<br>
         text = text.replace(/\n/g, '<br>');
+        
+        // 清理空的段落标签
+        text = text.replace(/<p>\s*<\/p>/g, '');
+        text = text.replace(/<p class="mt-4">\s*<\/p>/g, '');
+        
         return text;
     }
 };
