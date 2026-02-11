@@ -95,18 +95,10 @@ const MediaHandlers = {
             return;
         }
 
-        // 防止重复处理：检查是否已经在处理这个文件
-        if (this._processingCameraFile) {
-            console.warn('[MediaHandlers] Camera file already being processed, ignoring duplicate');
-            return;
-        }
-        this._processingCameraFile = true;
-
         // 获取有效的角色ID
         const charId = this._getValidCharId(currentCharId);
         if (!charId) {
             input.value = '';
-            this._processingCameraFile = false;
             return;
         }
 
@@ -175,26 +167,22 @@ const MediaHandlers = {
                     // 清理
                     MediaHandlers._clearPendingCharId();
                     input.value = '';
-                    this._processingCameraFile = false;
                     
                 } catch (e) {
                     URL.revokeObjectURL(objectUrl);
                     input.value = '';
-                    this._processingCameraFile = false;
                 }
             };
             
             img.onerror = () => {
                 URL.revokeObjectURL(objectUrl);
                 input.value = '';
-                this._processingCameraFile = false;
             };
             
             img.src = objectUrl;
             
         } catch (error) {
             input.value = '';
-            this._processingCameraFile = false;
         }
     },
 

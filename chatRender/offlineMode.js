@@ -582,8 +582,18 @@ const OfflineMode = {
         reader.onload = (e) => {
             try {
                 const base64 = e.target.result;
-                self.updateSetting('wallpaper', base64);
+                console.log('[OfflineMode] Wallpaper loaded, size:', base64.length);
+                
+                // 直接保存设置，不通过 updateSetting
+                API.Offline.saveSettings(this.currentCharId, { wallpaper: base64 });
+                console.log('[OfflineMode] Wallpaper saved to settings');
+                
+                // 应用设置
                 self.loadSettings();
+                console.log('[OfflineMode] Settings loaded');
+                
+                // 重新渲染消息
+                self.renderMessages();
                 
                 const wallpaperInput = document.getElementById('offline-wallpaper-input');
                 if (wallpaperInput) {
@@ -593,7 +603,7 @@ const OfflineMode = {
                 alert('背景已上传并应用');
             } catch (err) {
                 console.error('[OfflineMode] Error uploading wallpaper:', err);
-                alert('背景上传失败，请重试');
+                alert('背景上传失败: ' + err.message);
             } finally {
                 // 清空 input 的 value，允许再次上传同一文件
                 // 延迟清空以确保事件完全处理

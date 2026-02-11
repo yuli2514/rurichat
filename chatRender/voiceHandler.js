@@ -165,6 +165,15 @@ const VoiceHandler = {
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // 检查浏览器是否支持 MediaRecorder
+            if (typeof MediaRecorder === 'undefined') {
+                console.warn('[VoiceHandler] MediaRecorder not supported, using fallback');
+                stream.getTracks().forEach(track => track.stop());
+                alert('您的浏览器不支持录音功能，请使用伪造语音');
+                return;
+            }
+            
             this.mediaRecorder = new MediaRecorder(stream);
             this.audioChunks = [];
             this.recognizedText = '';
@@ -212,7 +221,7 @@ const VoiceHandler = {
             
         } catch (err) {
             console.error('录音启动失败:', err);
-            alert('无法访问麦克风，请检查权限设置');
+            alert('无法访问麦克风，请检查权限设置。移动端建议使用伪造语音功能。');
             this.resetState();
         }
     },
