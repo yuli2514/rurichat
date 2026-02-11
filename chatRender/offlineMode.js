@@ -118,11 +118,11 @@ const OfflineMode = {
             // 消息气泡
             html += '<div class="w-full flex justify-center">';
             if (isUser) {
-                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '" oncontextmenu="OfflineMode.handleBubbleContextMenu(event, ' + index + ')" ontouchstart="OfflineMode.handleTouchStart(event, ' + index + ')" onmousedown="OfflineMode.handleMouseDown(event, ' + index + ')">';
+                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '">';
                 html += '<p class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._escapeHtml(msg.content) + '</p>';
                 html += '</div>';
             } else {
-                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '" oncontextmenu="OfflineMode.handleBubbleContextMenu(event, ' + index + ')" ontouchstart="OfflineMode.handleTouchStart(event, ' + index + ')" onmousedown="OfflineMode.handleMouseDown(event, ' + index + ')">';
+                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '">';
                 html += '<div class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._formatContent(msg.content) + '</div>';
                 html += '</div>';
             }
@@ -132,11 +132,19 @@ const OfflineMode = {
 
         container.innerHTML = html;
         
-        // 为所有气泡添加触摸事件监听
+        // 为所有气泡添加事件监听
         const bubbles = container.querySelectorAll('.offline-bubble');
-        bubbles.forEach((bubble, index) => {
+        bubbles.forEach((bubble) => {
+            const index = parseInt(bubble.getAttribute('data-msg-index'));
+            
+            // 触摸事件
+            bubble.addEventListener('touchstart', (e) => this.handleTouchStart(e, index), { passive: true });
             bubble.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: true });
             bubble.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: true });
+            
+            // 鼠标事件
+            bubble.addEventListener('mousedown', (e) => this.handleMouseDown(e, index));
+            bubble.addEventListener('contextmenu', (e) => this.handleBubbleContextMenu(e, index));
         });
         
         this._scrollToBottom();
