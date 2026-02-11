@@ -385,10 +385,42 @@ const VoiceHandler = {
         
         // 如果有真实音频，播放它
         if (voiceData.audioBase64 && !voiceData.isFake) {
-            const audio = new Audio(voiceData.audioBase64);
-            audio.play().catch(err => {
-                console.error('音频播放失败:', err);
-            });
+            try {
+                const audio = new Audio();
+                audio.src = voiceData.audioBase64;
+                audio.play().catch(err => {
+                    console.error('音频播放失败:', err);
+                    alert('音频播放失败，请检查浏览器设置');
+                });
+            } catch (err) {
+                console.error('创建音频对象失败:', err);
+            }
+        } else if (voiceData.isFake) {
+            // 伪造语音：生成合成音频
+            this.playFakeSynthesizedVoice(voiceData.transcription || '[语音消息]', voiceData.duration || 1);
+        }
+    },
+
+    /**
+     * 播放伪造的合成语音
+     */
+    playFakeSynthesizedVoice: function(text, duration) {
+        try {
+            // 使用 Web Speech API 的 SpeechSynthesis 接口
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            // 设置语速使得总时长接近指定的 duration
+            const estimatedRate = Math.max(0.5, Math.min(2.0, text.length / (duration * 3)));
+            utterance.rate = estimatedRate;
+            
+            window.speechSynthesis.cancel(); // 取消之前的播放
+            window.speechSynthesis.speak(utterance);
+        } catch (err) {
+            console.error('合成语音播放失败:', err);
         }
     }
 };

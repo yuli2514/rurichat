@@ -57,10 +57,9 @@ const ChatInterface = {
                 }
             };
             
-            // 同时监听 change 和 input 事件，确保移动端兼容
-            cameraInput.addEventListener('change', handler);
-            cameraInput.addEventListener('input', handler);
-            console.log('[ChatInterface] Camera input event listeners bound');
+            // 只监听 change 事件一次
+            cameraInput.addEventListener('change', handler, { once: false });
+            console.log('[ChatInterface] Camera input event listener bound');
         }
     },
 

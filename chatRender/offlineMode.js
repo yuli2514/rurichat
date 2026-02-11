@@ -28,6 +28,10 @@ const OfflineMode = {
         const char = API.Chat.getChar(charId);
         if (!char) return;
 
+        // 强制重新加载 offline-mode 组件，清除缓存
+        console.log('[OfflineMode] Force reloading offline-mode component to ensure latest HTML');
+        ComponentLoader.clearCache();
+
         // 设置顶栏角色名
         const headerName = document.getElementById('offline-header-name');
         if (headerName) headerName.textContent = char.remark || char.name;
@@ -558,9 +562,10 @@ const OfflineMode = {
       * 清除背景，恢复默认灰白色
       */
     clearWallpaper: function() {
-         this.updateSetting('wallpaper', '');
+         API.Offline.saveSettings(this.currentCharId, { wallpaper: '' });
          this.loadSettings();
          document.getElementById('offline-wallpaper-input').value = '';
+         this.renderMessages();
          alert('背景已清除，恢复默认灰白色');
      },
 

@@ -187,6 +187,23 @@ const ComponentLoader = {
      */
     clearCache() {
         this.cache = {};
+    },
+    
+    /**
+     * 重新加载特定组件（清除缓存并重新加载）
+     * @param {string} name - 组件名称
+     * @param {string} containerId - 容器元素ID
+     * @param {string} insertPosition - 插入位置
+     */
+    async reload(name, containerId, insertPosition = 'append') {
+        // 清除该组件的缓存
+        delete this.cache[name];
+        this.loaded.delete(name);
+        
+        console.log(`[ComponentLoader] Reloading component: ${name}`);
+        
+        // 重新加载
+        return this.load(name, containerId, insertPosition);
     }
 };
 
