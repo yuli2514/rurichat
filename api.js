@@ -60,6 +60,32 @@ const API = {
             groups = groups.filter(g => g.id !== groupId);
             this.saveGroups(groups);
             return groups;
+        },
+
+        deleteEmoji: function(groupId, emojiIndex) {
+            let groups = this.getGroups();
+            const group = groups.find(g => g.id === groupId);
+            if (group && group.emojis[emojiIndex] !== undefined) {
+                group.emojis.splice(emojiIndex, 1);
+                this.saveGroups(groups);
+            }
+            return groups;
+        },
+
+        deleteEmojis: function(groupId, emojiIndices) {
+            let groups = this.getGroups();
+            const group = groups.find(g => g.id === groupId);
+            if (group) {
+                // 从大到小排序索引，避免删除时索引偏移
+                const sorted = [...emojiIndices].sort((a, b) => b - a);
+                sorted.forEach(idx => {
+                    if (group.emojis[idx] !== undefined) {
+                        group.emojis.splice(idx, 1);
+                    }
+                });
+                this.saveGroups(groups);
+            }
+            return groups;
         }
     },
 
@@ -368,7 +394,15 @@ const API = {
             localStorage.setItem('ruri_chat_history_' + charId, JSON.stringify(history));
             
             // Update last message in char list
-            const lastMsg = history[history.length - 1];
+            // 过滤掉线下消息，只取最后一条线上消息作为列表预览
+            const onlineHistory = history.filter(m => m.mode !== 'offline');
+            const lastMsg = onlineHistory[onlineHistory.length - 1];
+            
+            // 强制重新渲染角色列表以确保预览更新
+            if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                setTimeout(() => ChatManager.renderList(), 0);
+            }
+
             if (lastMsg) {
                 let chars = this.getChars();
                 const idx = chars.findIndex(c => c.id === charId);
@@ -400,11 +434,22 @@ const API = {
             const settings = char.settings || {};
             const ctxLength = settings.contextLength || 20;
             
+            // 获取线下历史记录用于上下文互通
+            const offlineHistory = API.Offline.getHistory(charId);
+            
             // 构建线上聊天系统提示词
-            let systemPrompt = '【角色扮演设定】';
-            systemPrompt += '\n你正在扮演一个角色进行线上聊天。';
+            let systemPrompt = '【核心规则 - 必须严格遵守】';
+            systemPrompt += '\n你是"' + char.name + '"，你必须始终以这个角色的身份说话和思考。';
+            systemPrompt += '\n★ 绝对禁止OOC（Out of Character）：不允许以任何形式跳出角色，不允许以AI/助手的身份说话。';
+            systemPrompt += '\n★ 严格遵循人设：你的一切言行必须符合角色设定中的性格、语气、习惯。';
+            systemPrompt += '\n★ 禁止说教：不要教育用户、不要讲大道理、不要给用户上课。';
+            systemPrompt += '\n★ 性格温和：即使角色设定中有强势的一面，也不要对用户表现得急躁、凶狠或不耐烦。对用户保持耐心和温柔。';
+            systemPrompt += '\n★ 不要过度关心：不要反复追问用户"你怎么了"、"你还好吗"，自然地聊天即可。';
+            
+            systemPrompt += '\n\n【角色设定】';
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
+            systemPrompt += '\n请深入理解以上角色设定，将其内化为你自己的性格和说话方式。';
             
             // 现实时间感应：如果开启，告诉AI当前的现实时间
             if (settings.realtimeAwareness) {
@@ -429,11 +474,15 @@ const API = {
             systemPrompt += '\n5. 可以使用表情符号emoji来表达情绪，比如😊😂🤔😅等';
             systemPrompt += '\n6. 说话要自然口语化，可以用语气词如"嗯"、"啊"、"哈哈"、"emmm"等';
             systemPrompt += '\n7. 可以发多条消息，每条消息用换行符分隔，模拟真实聊天节奏';
+            systemPrompt += '\n8. 不要急躁，不要凶用户，不要说教，保持角色该有的温度';
+            systemPrompt += '\n9. 永远不要说"我是AI"、"我是语言模型"之类的话，你就是角色本人';
             
             systemPrompt += '\n\n【错误示范 - 不要这样写】';
             systemPrompt += '\n❌ *微微一笑* 好的呀~ （这种带动作描写的不行）';
             systemPrompt += '\n❌ 「好开心」她说道。（这种带叙述的不行）';
             systemPrompt += '\n❌ (内心很高兴) 好啊！（这种带心理描写的不行）';
+            systemPrompt += '\n❌ 你不应该这样做！你要好好反省！（这种说教语气不行）';
+            systemPrompt += '\n❌ 你怎么又这样？！（这种急躁凶狠的语气不行）';
             
             systemPrompt += '\n\n【正确示范 - 应该这样写】';
             systemPrompt += '\n✅ 好的呀~';
@@ -537,7 +586,11 @@ const API = {
             const fullHistory = this.getHistory(charId);
             // Filter out recalled messages so AI doesn't see them
             const visibleHistory = fullHistory.filter(msg => !msg.recalled);
-            const recentHistory = visibleHistory.slice(-ctxLength).map(msg => {
+            
+            // 合并线上和线下历史记录，按时间排序，确保剧情互通
+            const combinedHistory = [...visibleHistory, ...offlineHistory].sort((a, b) => a.timestamp - b.timestamp);
+            
+            const recentHistory = combinedHistory.slice(-ctxLength).map(msg => {
                 let content = '';
                 
                 // 处理语音消息 - 将语音内容作为文字传递给AI
@@ -686,6 +739,339 @@ const API = {
 
         savePersonas: function(personas) {
             localStorage.setItem('user_persona_presets', JSON.stringify(personas));
+        }
+    },
+
+    // ==================== OFFLINE MODE DATA & LOGIC ====================
+    Offline: {
+        getHistory: function(charId) {
+            if (!charId) return [];
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_history_' + charId) || '[]');
+            } catch (e) {
+                console.error('Error parsing offline history:', e);
+                return [];
+            }
+        },
+
+        saveHistory: function(charId, history) {
+            if (!charId) return;
+            localStorage.setItem('ruri_offline_history_' + charId, JSON.stringify(history));
+        },
+
+        addMessage: function(charId, msg) {
+            const history = this.getHistory(charId);
+            history.push(msg);
+            this.saveHistory(charId, history);
+            return history;
+        },
+
+        getPreset: function(charId) {
+            try {
+                return localStorage.getItem('ruri_offline_preset_' + charId) || '';
+            } catch (e) {
+                return '';
+            }
+        },
+
+        savePreset: function(charId, preset) {
+            localStorage.setItem('ruri_offline_preset_' + charId, preset);
+        },
+
+        // 新增：获取预设列表（支持多预设）
+        getPresets: function(charId) {
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_presets_' + charId) || '[]');
+            } catch (e) {
+                return [];
+            }
+        },
+
+        // 新增：保存预设列表
+        savePresets: function(charId, presets) {
+            localStorage.setItem('ruri_offline_presets_' + charId, JSON.stringify(presets));
+        },
+
+        // 新增：添加单个预设
+        addPreset: function(charId, preset) {
+            const presets = this.getPresets(charId);
+            presets.push({
+                id: Date.now(),
+                name: preset.name || '未命名预设',
+                content: preset.content || '',
+                enabled: preset.enabled !== false
+            });
+            this.savePresets(charId, presets);
+        },
+
+        // 新增：更新预设
+        updatePreset: function(charId, presetId, preset) {
+            const presets = this.getPresets(charId);
+            const index = presets.findIndex(p => p.id === presetId);
+            if (index !== -1) {
+                presets[index] = { ...presets[index], ...preset };
+                this.savePresets(charId, presets);
+            }
+        },
+
+        // 新增：删除预设
+        deletePreset: function(charId, presetId) {
+            const presets = this.getPresets(charId);
+            const filtered = presets.filter(p => p.id !== presetId);
+            this.savePresets(charId, filtered);
+        },
+
+        // 新增：切换预设启用状态
+        togglePreset: function(charId, presetId) {
+            const presets = this.getPresets(charId);
+            const preset = presets.find(p => p.id === presetId);
+            if (preset) {
+                preset.enabled = !preset.enabled;
+                this.savePresets(charId, presets);
+            }
+        },
+
+        // 新增：获取线下聊天总结列表
+        getOfflineSummaries: function(charId) {
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_summaries_' + charId) || '[]');
+            } catch (e) {
+                return [];
+            }
+        },
+
+        // 新增：保存线下聊天总结
+        saveOfflineSummary: function(charId, summary) {
+            const summaries = this.getOfflineSummaries(charId);
+            summaries.push({
+                id: Date.now(),
+                content: summary,
+                timestamp: Date.now()
+            });
+            localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(summaries));
+        },
+
+        // 新增：删除线下聊天总结
+        deleteOfflineSummary: function(charId, summaryId) {
+            const summaries = this.getOfflineSummaries(charId);
+            const filtered = summaries.filter(s => s.id !== summaryId);
+            localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(filtered));
+        },
+
+        // 新增：更新线下聊天总结
+        updateOfflineSummary: function(charId, summaryId, content) {
+            const summaries = this.getOfflineSummaries(charId);
+            const summary = summaries.find(s => s.id === summaryId);
+            if (summary) {
+                summary.content = content;
+                localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(summaries));
+            }
+        },
+
+        // 新增：自动总结线下聊天
+        autoSummarizeOfflineChat: async function(charId) {
+            const config = API.Settings.getApiConfig();
+            if (!config.endpoint || !config.key) return;
+
+            const char = API.Chat.getChar(charId);
+            if (!char) return;
+
+            const settings = char.settings || {};
+            if (!settings.autoSummarize) return; // 只有启用自动总结才执行
+
+            const history = this.getHistory(charId);
+            if (history.length < 5) return; // 少于5条消息不总结
+
+            // 获取最近的消息进行总结
+            const recentHistory = history.slice(-10);
+            const historyText = recentHistory.map(msg => {
+                const sender = msg.sender === 'user' ? '用户' : char.name;
+                return sender + ': ' + msg.content;
+            }).join('\n');
+
+            const summaryPrompt = '请用简洁的语言总结以下对话内容，保留关键情节和人物互动信息：\n\n' + historyText;
+
+            try {
+                const response = await fetch(config.endpoint + '/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + config.key
+                    },
+                    body: JSON.stringify({
+                        model: config.model || 'gpt-3.5-turbo',
+                        messages: [
+                            { role: 'system', content: '你是一个专业的对话总结助手。' },
+                            { role: 'user', content: summaryPrompt }
+                        ],
+                        temperature: 0.5,
+                        max_tokens: 500
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const summary = data.choices[0].message.content;
+                    this.saveOfflineSummary(charId, summary);
+                }
+            } catch (e) {
+                console.error('自动总结失败:', e);
+            }
+        },
+
+        getSettings: function(charId) {
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_settings_' + charId) || '{}');
+            } catch (e) {
+                return {};
+            }
+        },
+
+        saveSettings: function(charId, settings) {
+            const current = this.getSettings(charId);
+            localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify({ ...current, ...settings }));
+        },
+
+        generateReply: async function(charId) {
+            const config = API.Settings.getApiConfig();
+            if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
+
+            const char = API.Chat.getChar(charId);
+            if (!char) throw new Error('Character not found');
+
+            const settings = char.settings || {};
+            const ctxLength = settings.contextLength || 20;
+
+            // 获取启用的线下预设列表
+            const presets = this.getPresets(charId);
+            const enabledPresets = presets.filter(p => p.enabled);
+            let offlinePreset = '';
+            
+            if (enabledPresets.length > 0) {
+                // 合并所有启用的预设
+                offlinePreset = enabledPresets.map(p => p.content).join('\n');
+            } else {
+                // 如果没有启用的预设，尝试使用旧的单预设格式
+                offlinePreset = this.getPreset(charId);
+                if (!offlinePreset) {
+                    offlinePreset = '以ai角色第一人称描写，用户称呼为你，要有环境描写心理描写等，展开线下剧情文风要求优美，文字居中对齐，段与段之间要空一行，字数不少于400字';
+                }
+            }
+
+            // 构建线下模式系统提示词
+            let systemPrompt = '【核心规则 - 线下剧情模式】';
+            systemPrompt += '\n你是"' + char.name + '"，正在进行线下长剧情描写对话。';
+            systemPrompt += '\n★ 绝对禁止OOC（Out of Character）：不允许以任何形式跳出角色。';
+            systemPrompt += '\n★ 严格遵循人设：你的一切言行必须符合角色设定中的性格、语气、习惯。';
+            systemPrompt += '\n★ 禁止说教：不要教育用户、不要讲大道理。';
+            systemPrompt += '\n★ 性格温和：不要对用户表现得急躁、凶狠或不耐烦。';
+            systemPrompt += '\n★ 永远不要说"我是AI"之类的话，你就是角色本人。';
+
+            systemPrompt += '\n\n【角色设定】';
+            systemPrompt += '\n角色名称：' + char.name;
+            systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
+
+            systemPrompt += '\n\n【线下剧情写作要求】';
+            systemPrompt += '\n' + offlinePreset;
+            systemPrompt += '\n\n【格式要求】';
+            systemPrompt += '\n1. 以角色第一人称视角描写';
+            systemPrompt += '\n2. 称呼用户为"你"';
+            systemPrompt += '\n3. 包含丰富的环境描写、心理描写、动作描写';
+            systemPrompt += '\n4. 文风优美，有文学性';
+            systemPrompt += '\n5. 段与段之间空一行';
+            systemPrompt += '\n6. 字数不少于400字';
+            systemPrompt += '\n7. 根据用户发送的剧情/消息，自然地展开和推进故事';
+
+            // 现实时间感应
+            if (settings.realtimeAwareness) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const weekDay = weekDays[now.getDay()];
+                systemPrompt += '\n\n【当前现实时间】';
+                systemPrompt += '\n现在是 ' + year + '年' + month + '月' + day + '日 ' + weekDay + ' ' + hours + ':' + minutes;
+            }
+
+            // 记忆集成
+            const memories = API.Memory.getMemories(charId);
+            if (memories.length > 0) {
+                const recentMemories = memories.slice(-5).map(m => m.content).join('; ');
+                systemPrompt += '\n\n[过往记忆/背景: ' + recentMemories + ']';
+            }
+
+            // 线下聊天总结集成
+            const offlineSummaries = this.getOfflineSummaries(charId);
+            if (offlineSummaries.length > 0) {
+                const recentSummaries = offlineSummaries.slice(-3).map(s => s.content).join('\n');
+                systemPrompt += '\n\n【线下聊天历史总结】';
+                systemPrompt += '\n' + recentSummaries;
+            }
+
+            // 世界书集成
+            const worldBookIds = settings.worldBookIds || (settings.worldBookId ? [settings.worldBookId] : []);
+            if (worldBookIds.length > 0) {
+                const books = API.WorldBook.getBooks();
+                const selectedBooks = books.filter(b => worldBookIds.includes(b.id));
+                if (selectedBooks.length > 0) {
+                    systemPrompt += '\n\n【世界背景设定】';
+                    selectedBooks.forEach(wb => {
+                        systemPrompt += '\n[' + wb.title + ']: ' + wb.content;
+                    });
+                }
+            }
+
+            // 用户人设集成
+            if (settings.userPersonaId) {
+                const personas = API.Profile.getPersonas();
+                const persona = personas.find(p => p.id === settings.userPersonaId);
+                if (persona) {
+                    systemPrompt += '\n\n[用户人设信息: ' + persona.content + ']';
+                }
+            }
+
+            // 构建历史消息（线上+线下共享）
+            const onlineHistory = API.Chat.getHistory(charId).filter(msg => !msg.recalled);
+            const offlineHistory = this.getHistory(charId);
+            
+            // 合并历史并按时间排序，取最近的上下文，确保剧情互通
+            const allHistory = [...onlineHistory, ...offlineHistory].sort((a, b) => a.timestamp - b.timestamp);
+            const recentHistory = allHistory.slice(-ctxLength).map(msg => {
+                let content = msg.content;
+                if (msg.type === 'image') content = '[发送了一张图片]';
+                if (msg.type === 'voice') content = msg.voiceData ? msg.voiceData.transcription : '[语音消息]';
+                
+                return {
+                    role: (msg.sender === 'user') ? 'user' : 'assistant',
+                    content: content
+                };
+            });
+
+            const messages = [
+                { role: 'system', content: systemPrompt }
+            ].concat(recentHistory);
+
+            const response = await fetch(config.endpoint + '/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + config.key
+                },
+                body: JSON.stringify({
+                    model: config.model || 'gpt-3.5-turbo',
+                    messages: messages,
+                    temperature: config.temperature !== undefined ? config.temperature : 0.8,
+                    max_tokens: 4096
+                })
+            });
+
+            if (!response.ok) throw new Error('API Request Failed');
+            
+            const data = await response.json();
+            return data.choices[0].message.content;
         }
     },
 

@@ -212,8 +212,10 @@ const ChatInterface = {
      */
     _buildMessagesHtml: function(history, char) {
         const maxMessages = this.loadedMessageCount;
-        const startIndex = Math.max(0, history.length - maxMessages);
-        const renderedHistory = history.slice(startIndex);
+        // 过滤掉线下模式的消息，线上聊天界面不显示线下文字
+        const onlineOnlyHistory = history.filter(msg => msg.mode !== 'offline');
+        const startIndex = Math.max(0, onlineOnlyHistory.length - maxMessages);
+        const renderedHistory = onlineOnlyHistory.slice(startIndex);
         
         let html = '';
         
@@ -272,6 +274,91 @@ const ChatInterface = {
 
     handleContextAction: function(action) {
         ChatEventHandlers.handleContextAction(action, this);
+    },
+
+    handleBubbleContextMenu: function(event, index) {
+        // 桌面端右键菜单，移动端长按菜单
+        if (event.type === 'contextmenu') {
+            // 桌面端右键菜单
+            this.showContextMenu(event, index);
+        } else {
+            // 移动端长按菜单
+            this.showLongPressMenu(event, index);
+        }
+    },
+
+    showLongPressMenu: function(event, index) {
+        ChatEventHandlers.showLongPressMenu(event, index);
+    },
+
+    closeLongPressMenu: function() {
+        ChatEventHandlers.closeLongPressMenu();
+    },
+
+    handleLongPressAction: function(action) {
+        const index = ChatEventHandlers.currentContextMenuMsgIndex;
+        if (index === null) return;
+        
+        const history = API.Chat.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg) return;
+
+        this.closeLongPressMenu();
+
+        if (action === 'edit') {
+            this.openEditMessage(index);
+        } else if (action === 'delete') {
+            this.enterDeleteMode(index);
+        }
+    },
+
+    openEditMessage: function(index) {
+        const history = API.Chat.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg || msg.type !== 'text') return;
+
+        this._editingMessageIndex = index;
+        const modal = document.getElementById('edit-message-modal');
+        const input = document.getElementById('edit-message-input');
+        
+        input.value = msg.content;
+        modal.classList.remove('hidden');
+        input.focus();
+    },
+
+    cancelEditMessage: function() {
+        const modal = document.getElementById('edit-message-modal');
+        modal.classList.add('hidden');
+        this._editingMessageIndex = null;
+    },
+
+    confirmEditMessage: function() {
+        const index = this._editingMessageIndex;
+        if (index === null) return;
+
+        const input = document.getElementById('edit-message-input');
+        const newText = input.value.trim();
+
+        if (!newText) {
+            alert('消息内容不能为空');
+            return;
+        }
+
+        const history = API.Chat.getHistory(this.currentCharId);
+        const msg = history[index];
+        if (!msg) return;
+
+        msg.content = newText;
+        msg.edited = true;
+        msg.editedAt = Date.now();
+        
+        API.Chat.saveHistory(this.currentCharId, history);
+        this.renderMessages();
+        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+            ChatManager.renderList();
+        }
+
+        this.cancelEditMessage();
     },
 
     // ==================== 删除模式代理 ====================

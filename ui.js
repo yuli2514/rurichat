@@ -501,7 +501,8 @@ const ChatManager = {
                     // Find the last non-recalled message
                     let lastMsg = null;
                     for (let i = history.length - 1; i >= 0; i--) {
-                        if (!history[i].recalled) {
+                        // 排除已撤回的消息和线下模式的消息
+                        if (!history[i].recalled && history[i].mode !== 'offline') {
                             lastMsg = history[i];
                             break;
                         }

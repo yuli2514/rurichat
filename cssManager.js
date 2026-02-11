@@ -68,7 +68,18 @@ const CssManager = {
             style.id = 'char-custom-css';
             document.head.appendChild(style);
         }
-        style.textContent = css;
+        
+        if (css.trim()) {
+            // 限制 CSS 作用域到线上聊天界面
+            const scopedCss = css.split('}').map(rule => {
+                if (!rule.trim()) return '';
+                return '#super-chat-interface ' + rule.trim() + '}';
+            }).join('\n');
+            style.textContent = scopedCss;
+        } else {
+            style.textContent = '';
+        }
+        
         ChatSettings.updateCharSettings({ customCss: css });
     },
 

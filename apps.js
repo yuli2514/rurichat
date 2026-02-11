@@ -5,17 +5,29 @@
 
 // ==================== EMOJI MANAGER UI ====================
 const EmojiManager = {
+    // 当前展开的分组ID
+    expandedGroupId: null,
+    // 多选模式
+    selectMode: false,
+    selectedIndices: new Set(),
+
     init: function() {
         this.renderGroups();
     },
 
     openModal: function() {
+        this.expandedGroupId = null;
+        this.selectMode = false;
+        this.selectedIndices.clear();
         document.getElementById('emoji-manager-modal').classList.remove('hidden');
         this.renderGroups();
     },
 
     closeModal: function() {
         document.getElementById('emoji-manager-modal').classList.add('hidden');
+        this.expandedGroupId = null;
+        this.selectMode = false;
+        this.selectedIndices.clear();
     },
 
     batchImport: function() {
@@ -46,20 +58,158 @@ const EmojiManager = {
             return;
         }
 
-        list.innerHTML = groups.map(g => `
-            <div class="bg-white rounded-lg p-3 border border-gray-200">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="font-bold text-sm">${g.name}</span>
-                    <button onclick="EmojiManager.deleteGroup('${g.id}')" class="text-red-500 text-xs">删除</button>
-                </div>
-                <p class="text-xs text-gray-500">共 ${g.emojis.length} 个表情</p>
-            </div>
-        `).join('');
+        list.innerHTML = groups.map(g => {
+            const isExpanded = this.expandedGroupId === g.id;
+            let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
+            html += '<div class="flex justify-between items-center p-3">';
+            html += '<div class="flex items-center gap-2 flex-1 cursor-pointer" onclick="EmojiManager.toggleGroup(\'' + g.id + '\')">';
+            html += '<i class="fa-solid fa-chevron-' + (isExpanded ? 'down' : 'right') + ' text-gray-400 text-xs transition-transform"></i>';
+            html += '<span class="font-bold text-sm">' + g.name + '</span>';
+            html += '<span class="text-xs text-gray-400">(' + g.emojis.length + ')</span>';
+            html += '</div>';
+            html += '<button onclick="EmojiManager.deleteGroup(\'' + g.id + '\')" class="text-red-500 text-xs px-2">删除分组</button>';
+            html += '</div>';
+            
+            if (isExpanded) {
+                html += this._renderGroupEmojis(g);
+            }
+            
+            html += '</div>';
+            return html;
+        }).join('');
+    },
+
+    _renderGroupEmojis: function(group) {
+        if (!group.emojis || group.emojis.length === 0) {
+            return '<div class="px-3 pb-3 text-xs text-gray-400 text-center">此分组没有表情包</div>';
+        }
+
+        let html = '<div class="px-3 pb-2">';
+        // 操作栏：多选模式切换 + 批量删除
+        html += '<div class="flex justify-between items-center mb-2 pb-2 border-t border-gray-100 pt-2">';
+        if (this.selectMode) {
+            html += '<span class="text-xs text-blue-500">已选 ' + this.selectedIndices.size + ' 个</span>';
+            html += '<div class="flex gap-2">';
+            html += '<button onclick="EmojiManager.selectAllEmojis(\'' + group.id + '\')" class="text-xs text-blue-500 px-2 py-1 bg-blue-50 rounded-lg">全选</button>';
+            html += '<button onclick="EmojiManager.deleteSelectedEmojis(\'' + group.id + '\')" class="text-xs text-red-500 px-2 py-1 bg-red-50 rounded-lg' + (this.selectedIndices.size === 0 ? ' opacity-50' : '') + '">删除所选</button>';
+            html += '<button onclick="EmojiManager.exitSelectMode()" class="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-lg">取消</button>';
+            html += '</div>';
+        } else {
+            html += '<span class="text-xs text-gray-400">长按或点击管理表情</span>';
+            html += '<button onclick="EmojiManager.enterSelectMode()" class="text-xs text-blue-500 px-2 py-1 bg-blue-50 rounded-lg">多选</button>';
+        }
+        html += '</div>';
+
+        // 表情包网格
+        html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+        group.emojis.forEach((e, idx) => {
+            const isSelected = this.selectedIndices.has(idx);
+            const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(e.url) || e.url.startsWith('data:image');
+            
+            html += '<div class="relative aspect-square rounded-lg overflow-hidden border ' + (isSelected ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200') + ' cursor-pointer group" ';
+            
+            if (this.selectMode) {
+                html += 'onclick="EmojiManager.toggleEmojiSelect(' + idx + ')"';
+            }
+            html += '>';
+            
+            if (isImage) {
+                html += '<img src="' + e.url + '" class="w-full h-full object-cover" loading="lazy" onerror="this.src=\'https://placehold.co/80x80?text=Err\'">';
+            } else {
+                html += '<div class="w-full h-full bg-blue-50 flex items-center justify-center"><i class="fa-solid fa-link text-blue-400"></i></div>';
+            }
+            
+            // 选中标记
+            if (this.selectMode && isSelected) {
+                html += '<div class="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center"><i class="fa-solid fa-check text-white text-[10px]"></i></div>';
+            } else if (this.selectMode) {
+                html += '<div class="absolute top-1 right-1 w-5 h-5 border-2 border-gray-300 rounded-full bg-white/80"></div>';
+            }
+            
+            // 非多选模式下显示删除按钮（hover/点击）
+            if (!this.selectMode) {
+                html += '<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">';
+                html += '<button onclick="event.stopPropagation();EmojiManager.deleteSingleEmoji(\'' + group.id + '\',' + idx + ')" class="w-7 h-7 bg-red-500 rounded-full flex items-center justify-center"><i class="fa-solid fa-trash text-white text-xs"></i></button>';
+                html += '</div>';
+            }
+            
+            // 含义标签
+            html += '<div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center py-0.5 truncate px-1">' + (e.meaning || '表情') + '</div>';
+            
+            html += '</div>';
+        });
+        html += '</div>';
+        html += '</div>';
+        return html;
+    },
+
+    toggleGroup: function(groupId) {
+        if (this.expandedGroupId === groupId) {
+            this.expandedGroupId = null;
+        } else {
+            this.expandedGroupId = groupId;
+        }
+        this.selectMode = false;
+        this.selectedIndices.clear();
+        this.renderGroups();
+    },
+
+    enterSelectMode: function() {
+        this.selectMode = true;
+        this.selectedIndices.clear();
+        this.renderGroups();
+    },
+
+    exitSelectMode: function() {
+        this.selectMode = false;
+        this.selectedIndices.clear();
+        this.renderGroups();
+    },
+
+    toggleEmojiSelect: function(index) {
+        if (this.selectedIndices.has(index)) {
+            this.selectedIndices.delete(index);
+        } else {
+            this.selectedIndices.add(index);
+        }
+        this.renderGroups();
+    },
+
+    selectAllEmojis: function(groupId) {
+        const groups = API.Emoji.getGroups();
+        const group = groups.find(g => g.id === groupId);
+        if (group) {
+            if (this.selectedIndices.size === group.emojis.length) {
+                // 已全选，取消全选
+                this.selectedIndices.clear();
+            } else {
+                group.emojis.forEach((_, idx) => this.selectedIndices.add(idx));
+            }
+        }
+        this.renderGroups();
+    },
+
+    deleteSingleEmoji: function(groupId, emojiIndex) {
+        if (!confirm('确定要删除这个表情包吗？')) return;
+        API.Emoji.deleteEmoji(groupId, emojiIndex);
+        this.renderGroups();
+    },
+
+    deleteSelectedEmojis: function(groupId) {
+        if (this.selectedIndices.size === 0) return;
+        if (!confirm('确定要删除选中的 ' + this.selectedIndices.size + ' 个表情包吗？')) return;
+        API.Emoji.deleteEmojis(groupId, Array.from(this.selectedIndices));
+        this.selectedIndices.clear();
+        this.selectMode = false;
+        this.renderGroups();
     },
 
     deleteGroup: function(groupId) {
         if (!confirm('确定要删除这个表情包分组吗？')) return;
         API.Emoji.deleteGroup(groupId);
+        if (this.expandedGroupId === groupId) {
+            this.expandedGroupId = null;
+        }
         this.renderGroups();
     },
     
@@ -131,21 +281,52 @@ const MemoryApp = {
     },
 
     selectChar: function(charId) {
-        this.currentCharId = charId;
-        const char = API.Chat.getChar(charId);
-        if (!char) return;
+         this.currentCharId = charId;
+         const char = API.Chat.getChar(charId);
+         if (!char) return;
 
-        document.getElementById('memory-char-select').classList.add('hidden');
-        document.getElementById('memory-timeline').classList.remove('hidden');
-        
-        document.getElementById('memory-current-avatar').src = char.avatar;
-        document.getElementById('memory-current-name').textContent = char.remark;
-        
-        this.renderMemories();
+         document.getElementById('memory-char-select').classList.add('hidden');
+         document.getElementById('memory-timeline').classList.remove('hidden');
+         document.getElementById('memory-header').classList.add('hidden');
+         
+         document.getElementById('memory-current-avatar').src = char.avatar;
+         document.getElementById('memory-current-name').textContent = char.remark;
+         
+         // 初始化标签页
+         this.switchTab('memories');
+     },
+
+    /**
+     * 切换标签页
+     */
+    switchTab: function(tab) {
+        const memoriesContainer = document.getElementById('memory-cards-container');
+        const summariesContainer = document.getElementById('offline-summaries-container');
+        const tabMemories = document.getElementById('tab-memories');
+        const tabSummaries = document.getElementById('tab-offline-summaries');
+
+        if (tab === 'memories') {
+            memoriesContainer.classList.remove('hidden');
+            summariesContainer.classList.add('hidden');
+            tabMemories.classList.add('border-blue-500', 'text-blue-500');
+            tabMemories.classList.remove('border-transparent', 'text-gray-600');
+            tabSummaries.classList.remove('border-blue-500', 'text-blue-500');
+            tabSummaries.classList.add('border-transparent', 'text-gray-600');
+            this.renderMemories();
+        } else if (tab === 'offline-summaries') {
+            memoriesContainer.classList.add('hidden');
+            summariesContainer.classList.remove('hidden');
+            tabSummaries.classList.add('border-blue-500', 'text-blue-500');
+            tabSummaries.classList.remove('border-transparent', 'text-gray-600');
+            tabMemories.classList.remove('border-blue-500', 'text-blue-500');
+            tabMemories.classList.add('border-transparent', 'text-gray-600');
+            this.renderOfflineSummaries();
+        }
     },
 
     backToCharSelect: function() {
         this.currentCharId = null;
+        document.getElementById('memory-header').classList.remove('hidden');
         this.showCharSelect();
     },
 
@@ -194,6 +375,15 @@ const MemoryApp = {
         const char = API.Chat.getChar(this.currentCharId);
         if (!char) return;
 
+        const summaryBtn = document.getElementById('trigger-summary-btn');
+        if (!summaryBtn) return;
+
+        // 设置加载状态
+        summaryBtn.disabled = true;
+        summaryBtn.classList.add('opacity-50');
+        const originalText = summaryBtn.textContent;
+        summaryBtn.textContent = '总结中...';
+
         const history = API.Chat.getHistory(this.currentCharId);
         const summaryPrompt = char.settings && char.settings.summaryPrompt ? char.settings.summaryPrompt : null;
 
@@ -204,9 +394,64 @@ const MemoryApp = {
             alert('记忆总结完成！');
         } catch (e) {
             alert('总结失败: ' + e.message);
+        } finally {
+            // 恢复按钮状态
+            summaryBtn.disabled = false;
+            summaryBtn.classList.remove('opacity-50');
+            summaryBtn.textContent = originalText;
         }
     },
     
+   /**
+    * 渲染线下聊天总结列表
+    */
+   renderOfflineSummaries: function() {
+       const container = document.getElementById('offline-summaries-container');
+       const summaries = API.Offline.getOfflineSummaries(this.currentCharId);
+
+       if (summaries.length === 0) {
+           container.innerHTML = '<div class="text-center text-gray-400 py-12"><i class="fa-solid fa-book text-4xl mb-2 opacity-50"></i><p class="text-sm">暂无线下总结</p><p class="text-xs mt-1">线下聊天会自动生成总结</p></div>';
+           return;
+       }
+
+       container.innerHTML = summaries.map((s, idx) =>
+           '<div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">' +
+               '<div class="flex justify-between items-start mb-2">' +
+                   '<span class="text-xs text-gray-400">' + new Date(s.timestamp).toLocaleString() + '</span>' +
+                   '<div class="flex gap-2">' +
+                       '<button onclick="MemoryApp.editOfflineSummary(' + idx + ')" class="text-blue-500 text-xs"><i class="fa-solid fa-pen"></i></button>' +
+                       '<button onclick="MemoryApp.deleteOfflineSummary(' + idx + ')" class="text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>' +
+                   '</div>' +
+               '</div>' +
+               '<p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">' + s.content + '</p>' +
+           '</div>'
+       ).join('');
+   },
+
+   /**
+    * 编辑线下总结
+    */
+   editOfflineSummary: function(index) {
+       const summaries = API.Offline.getOfflineSummaries(this.currentCharId);
+       const summary = summaries[index];
+       const newContent = prompt('编辑线下总结:', summary.content);
+       if (newContent !== null && newContent.trim()) {
+           API.Offline.updateOfflineSummary(this.currentCharId, summary.id, newContent.trim());
+           this.renderOfflineSummaries();
+       }
+   },
+
+   /**
+    * 删除线下总结
+    */
+   deleteOfflineSummary: function(index) {
+       if (!confirm('确定要删除这条线下总结吗？')) return;
+       const summaries = API.Offline.getOfflineSummaries(this.currentCharId);
+       const summary = summaries[index];
+       API.Offline.deleteOfflineSummary(this.currentCharId, summary.id);
+       this.renderOfflineSummaries();
+   },
+
     // Add manual memory input
     addManualMemory: function() {
         const content = prompt('请输入新的记忆内容:');

@@ -1,7 +1,7 @@
 <!-- ==================== MEMORY APP ==================== -->
 <div id="memory-app" class="absolute inset-0 z-50 flex flex-col hidden pt-0 overflow-hidden bg-[#F2F2F7]">
-    <!-- Header -->
-    <div class="h-24 bg-[#F7F7F7] px-6 pt-10 flex justify-between items-center shrink-0 border-b border-[#E5E5E5]">
+    <!-- Header (Only shown in character selection) -->
+    <div id="memory-header" class="h-24 bg-[#F7F7F7] px-6 pt-10 flex justify-between items-center shrink-0 border-b border-[#E5E5E5]">
         <button id="close-memory-btn" class="text-black"><i class="fa-solid fa-chevron-left text-lg"></i></button>
         <h1 class="text-black font-bold text-xl tracking-wide">记忆时间轴</h1>
         <div class="w-6"></div>
@@ -17,19 +17,34 @@
 
     <!-- Memory Timeline (After selecting character) -->
     <div id="memory-timeline" class="hidden flex-1 flex flex-col overflow-hidden">
-        <div class="p-4 bg-white border-b border-gray-200 flex items-center gap-3 shrink-0">
-            <button onclick="MemoryApp.backToCharSelect()" class="text-gray-600"><i class="fa-solid fa-chevron-left"></i></button>
-            <img id="memory-current-avatar" src="" class="w-10 h-10 rounded-full object-cover">
-            <div class="flex-1">
-                <h3 id="memory-current-name" class="font-bold text-gray-800"></h3>
-                <p class="text-xs text-gray-400">记忆总数: <span id="memory-count">0</span></p>
+        <!-- Character Header with Avatar (Only Header) -->
+        <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
+            <button onclick="MemoryApp.backToCharSelect()" class="text-gray-600 w-8 h-8 flex items-center justify-center"><i class="fa-solid fa-chevron-left text-base"></i></button>
+            <div class="flex items-center gap-2 flex-1 ml-2">
+                <img id="memory-current-avatar" src="" class="w-10 h-10 rounded-full object-cover">
+                <div>
+                    <h3 id="memory-current-name" class="font-bold text-gray-800 text-sm"></h3>
+                    <p class="text-xs text-gray-400">记忆总数: <span id="memory-count">0</span></p>
+                </div>
             </div>
-            <button onclick="MemoryApp.addManualMemory()" class="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition mr-2"><i class="fa-solid fa-plus"></i></button>
-            <button onclick="MemoryApp.triggerSummary()" class="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition">立即总结</button>
+            <button id="add-memory-btn" onclick="MemoryApp.addManualMemory()" class="text-gray-400 px-2 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition"><i class="fa-solid fa-plus text-base"></i></button>
+            <button id="trigger-summary-btn" onclick="MemoryApp.triggerSummary()" class="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition ml-2">立即总结</button>
+        </div>
+
+        <!-- Tab Selector -->
+        <div class="flex border-b border-gray-200 bg-white shrink-0">
+            <button onclick="MemoryApp.switchTab('memories')" id="tab-memories" class="flex-1 py-3 text-sm font-medium text-gray-600 border-b-2 border-transparent active:scale-95 transition">普通记忆</button>
+            <button onclick="MemoryApp.switchTab('offline-summaries')" id="tab-offline-summaries" class="flex-1 py-3 text-sm font-medium text-gray-600 border-b-2 border-transparent active:scale-95 transition">线下总结</button>
         </div>
         
+        <!-- Memories Tab -->
         <div id="memory-cards-container" class="flex-1 overflow-y-auto p-4 space-y-4">
             <!-- Memory cards will be injected here -->
+        </div>
+
+        <!-- Offline Summaries Tab -->
+        <div id="offline-summaries-container" class="hidden flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- Offline summary cards will be injected here -->
         </div>
     </div>
 </div>

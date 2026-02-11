@@ -126,6 +126,7 @@ const ComponentLoader = {
             { name: 'memory-app', containerId: 'phone-shell', position: 'append' },
             { name: 'worldbook-app', containerId: 'phone-shell', position: 'append' },
             { name: 'chat-interface', containerId: 'phone-shell', position: 'append' },
+            { name: 'offline-mode', containerId: 'phone-shell', position: 'append' },
             { name: 'chat-settings', containerId: 'phone-shell', position: 'append' },
             { name: 'settings-app', containerId: 'phone-shell', position: 'append' },
             { name: 'css-preset-modal', containerId: 'phone-shell', position: 'append' }

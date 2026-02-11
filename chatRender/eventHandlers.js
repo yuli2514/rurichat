@@ -18,6 +18,9 @@ const ChatEventHandlers = {
     touchStartY: 0,
     menuCloseHandler: null,
     menuCloseTimeout: null,
+    isDesktop: function() {
+        return !('ontouchstart' in window) && !(navigator.maxTouchPoints > 0);
+    },
 
     /**
      * 触摸开始事件处理
@@ -31,7 +34,7 @@ const ChatEventHandlers = {
         this.longPressTimer = setTimeout(() => {
             this.longPressTriggered = true;
             if (navigator.vibrate) navigator.vibrate(50);
-            this.showContextMenu(event, index, this.touchStartX, this.touchStartY);
+            this.showLongPressMenu(event, index);
         }, 500); // 500ms 触发长按
     },
 
@@ -138,6 +141,87 @@ const ChatEventHandlers = {
             document.addEventListener('click', this.menuCloseHandler);
             document.addEventListener('touchstart', this.menuCloseHandler, { passive: true });
         }, 300);
+    },
+
+    /**
+     * 显示长按菜单（编辑/删除）
+     * @param {Event} event - 事件对象
+     * @param {number} index - 消息索引
+     */
+    showLongPressMenu: function(event, index) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+        this.currentContextMenuMsgIndex = index;
+        
+        const menu = document.getElementById('chat-longpress-menu');
+        if (!menu) return;
+        
+        const container = document.getElementById('super-chat-interface');
+        const containerRect = container.getBoundingClientRect();
+
+        let clientX = 0;
+        let clientY = 0;
+
+        if (event.touches && event.touches.length > 0) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        } else if (event.changedTouches && event.changedTouches.length > 0) {
+            clientX = event.changedTouches[0].clientX;
+            clientY = event.changedTouches[0].clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+
+        let left = clientX - containerRect.left;
+        let top = clientY - containerRect.top;
+        
+        if (left + 120 > containerRect.width) left = containerRect.width - 130;
+        if (top + 100 > containerRect.height) top = top - 100;
+
+        left = Math.max(10, left);
+        top = Math.max(10, top);
+
+        menu.style.top = top + 'px';
+        menu.style.left = left + 'px';
+        menu.classList.remove('hidden');
+
+        // 移除旧的监听器
+        if (this.menuCloseHandler) {
+            document.removeEventListener('click', this.menuCloseHandler);
+            document.removeEventListener('touchstart', this.menuCloseHandler);
+        }
+
+        // 创建新的关闭处理器
+        this.menuCloseHandler = (e) => {
+            if (menu.contains(e.target)) {
+                return;
+            }
+            setTimeout(() => {
+                this.closeLongPressMenu();
+            }, 100);
+        };
+
+        // 延迟添加关闭监听器
+        setTimeout(() => {
+            document.addEventListener('click', this.menuCloseHandler);
+            document.addEventListener('touchstart', this.menuCloseHandler, { passive: true });
+        }, 300);
+    },
+
+    /**
+     * 关闭长按菜单
+     */
+    closeLongPressMenu: function() {
+        const menu = document.getElementById('chat-longpress-menu');
+        if (menu) {
+            menu.classList.add('hidden');
+        }
+        if (this.menuCloseHandler) {
+            document.removeEventListener('click', this.menuCloseHandler);
+            document.removeEventListener('touchstart', this.menuCloseHandler);
+            this.menuCloseHandler = null;
+        }
     },
 
     /**

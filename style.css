@@ -509,6 +509,45 @@
             pointer-events: none !important;
         }
 
+        /* Long press menu for edit/delete */
+        #chat-longpress-menu {
+            z-index: 9999 !important;
+            pointer-events: auto !important;
+            touch-action: manipulation !important;
+            -webkit-tap-highlight-color: transparent !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+
+        #chat-longpress-menu button {
+            pointer-events: auto !important;
+            touch-action: manipulation !important;
+            -webkit-tap-highlight-color: transparent !important;
+            min-height: 44px !important;
+            cursor: pointer !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            transition: background-color 0.15s ease !important;
+        }
+
+        #chat-longpress-menu button:active {
+            background-color: rgba(0, 0, 0, 0.08) !important;
+        }
+
+        #chat-longpress-menu button * {
+            pointer-events: none !important;
+        }
+
+        /* Edit message modal */
+        #edit-message-modal {
+            z-index: 100 !important;
+        }
+
+        #edit-message-input {
+            resize: none !important;
+            overflow-y: auto !important;
+        }
+
         /* ========== HOME SCREEN LAYOUT FIX ========== */
         /* Force consistent layout on both mobile and desktop */
         
