@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>长按测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .offline-bubble {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-4">长按气泡测试</h1>
+        
+        <div id="messages" class="space-y-4 mb-4">
+            <div class="flex justify-center">
+                <div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="0">
+                    <p class="text-gray-800">这是第一条消息</p>
+                </div>
+            </div>
+            <div class="flex justify-center">
+                <div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="1">
+                    <p class="text-gray-800">这是第二条消息</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 长按菜单 -->
+        <div id="longpress-menu" class="fixed hidden bg-white rounded-lg shadow-xl overflow-hidden w-28" style="z-index: 9999; pointer-events: auto;">
+            <div class="flex flex-col py-2" onclick="event.stopPropagation()">
+                <button onclick="handleAction('edit')" class="px-4 py-2.5 text-left text-sm text-gray-800 hover:bg-gray-100 active:bg-gray-100 flex items-center gap-2 border-b border-gray-100">
+                    编辑
+                </button>
+                <button onclick="handleAction('delete')" class="px-4 py-2.5 text-left text-sm text-red-500 hover:bg-gray-100 active:bg-gray-100 flex items-center gap-2">
+                    删除
+                </button>
+            </div>
+        </div>
+
+        <div id="log" class="bg-white p-4 rounded-lg text-xs font-mono max-h-64 overflow-y-auto">
+            <p class="text-gray-400">日志输出...</p>
+        </div>
+    </div>
+
+    <script>
+        const log = (msg) => {
+            const logEl = document.getElementById('log');
+            const p = document.createElement('p');
+            p.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+            logEl.appendChild(p);
+            logEl.scrollTop = logEl.scrollHeight;
+        };
+
+        const messages = document.getElementById('messages');
+        let currentIndex = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let longPressTimer = null;
+
+        // 鼠标按下
+        messages.addEventListener('mousedown', (e) => {
+            const bubble = e.target.closest('.offline-bubble');
+            if (!bubble) {
+                log('mousedown: bubble not found');
+                return;
+            }
+            const index = parseInt(bubble.getAttribute('data-msg-index'));
+            log('mousedown on bubble ' + index);
+            
+            touchStartX = e.clientX;
+            touchStartY = e.clientY;
+            currentIndex = index;
+
+            longPressTimer = setTimeout(() => {
+                log('Long press triggered on bubble ' + index);
+                showMenu(e, index);
+            }, 500);
+        });
+
+        // 鼠标移动
+        document.addEventListener('mousemove', (e) => {
+            if (longPressTimer) {
+                const moveX = e.clientX;
+                const moveY = e.clientY;
+                if (Math.abs(moveX - touchStartX) > 20 || Math.abs(moveY - touchStartY) > 20) {
+                    log('Mouse moved, canceling long press');
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            }
+        });
+
+        // 鼠标抬起
+        document.addEventListener('mouseup', (e) => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        });
+
+        // 右键菜单
+        messages.addEventListener('contextmenu', (e) => {
+            const bubble = e.target.closest('.offline-bubble');
+            if (!bubble) {
+                log('contextmenu: bubble not found');
+                return;
+            }
+            e.preventDefault();
+            const index = parseInt(bubble.getAttribute('data-msg-index'));
+            log('contextmenu on bubble ' + index);
+            showMenu(e, index);
+        });
+
+        // 触摸开始
+        messages.addEventListener('touchstart', (e) => {
+            const bubble = e.target.closest('.offline-bubble');
+            if (!bubble) {
+                log('touchstart: bubble not found');
+                return;
+            }
+            const index = parseInt(bubble.getAttribute('data-msg-index'));
+            log('touchstart on bubble ' + index);
+            
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            currentIndex = index;
+
+            longPressTimer = setTimeout(() => {
+                log('Touch long press triggered on bubble ' + index);
+                showMenu(e, index);
+            }, 500);
+        }, { passive: true });
+
+        // 触摸移动
+        messages.addEventListener('touchmove', (e) => {
+            if (longPressTimer) {
+                const moveX = e.touches[0].clientX;
+                const moveY = e.touches[0].clientY;
+                if (Math.abs(moveX - touchStartX) > 20 || Math.abs(moveY - touchStartY) > 20) {
+                    log('Touch moved, canceling long press');
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            }
+        }, { passive: true });
+
+        // 触摸结束
+        messages.addEventListener('touchend', (e) => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }, { passive: true });
+
+        function showMenu(e, index) {
+            const menu = document.getElementById('longpress-menu');
+            let clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            let clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+
+            log('Showing menu at ' + clientX + ', ' + clientY);
+
+            let left = clientX;
+            let top = clientY;
+
+            if (left + 120 > window.innerWidth) left = window.innerWidth - 130;
+            if (top + 100 > window.innerHeight) top = top - 100;
+
+            left = Math.max(10, left);
+            top = Math.max(10, top);
+
+            menu.style.top = top + 'px';
+            menu.style.left = left + 'px';
+            menu.style.display = 'block';
+            menu.classList.remove('hidden');
+
+            log('Menu displayed at ' + left + ', ' + top);
+        }
+
+        function closeMenu() {
+            const menu = document.getElementById('longpress-menu');
+            menu.classList.add('hidden');
+            menu.style.display = 'none';
+        }
+
+        function handleAction(action) {
+            log('Action: ' + action + ' on bubble ' + currentIndex);
+            closeMenu();
+        }
+
+        // 点击其他地方关闭菜单
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('longpress-menu');
+            if (!menu.contains(e.target)) {
+                closeMenu();
+            }
+        });
+
+        log('Test page loaded');
+    </script>
+</body>
+</html>
