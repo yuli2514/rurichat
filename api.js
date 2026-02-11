@@ -450,6 +450,18 @@ const API = {
             systemPrompt += '\n  示例：[语音:哈喽~在干嘛呢]';
             systemPrompt += '\n  示例：[语音:好的好的，我知道啦]';
             systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起';
+            systemPrompt += '\n';
+            systemPrompt += '\n★ 转账消息 [转账:金额] 或 [转账:金额:备注]：';
+            systemPrompt += '\n  格式：[转账:100] 或 [转账:100:给你买奶茶]';
+            systemPrompt += '\n  用途：当你想给用户转账/发红包时使用，会显示为粉色转账卡片';
+            systemPrompt += '\n  示例：[转账:520:爱你哦]';
+            systemPrompt += '\n  示例：[转账:88.88:生日快乐]';
+            systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起，不要用[图片:]来描述转账';
+            systemPrompt += '\n';
+            systemPrompt += '\n★ 领取转账 [领取转账]：';
+            systemPrompt += '\n  格式：[领取转账]';
+            systemPrompt += '\n  用途：当用户给你转账后，你想收下时使用';
+            systemPrompt += '\n  注意：根据角色性格和剧情决定是否领取，可以拒绝或犹豫';
 
             // --- Memory Integration ---
             const memories = API.Memory.getMemories(charId);

@@ -390,9 +390,13 @@ const ChatInterface = {
     },
 
     handleCameraCapture: async function(input) {
+        // 手机端拍照返回后 this.currentCharId 可能丢失，使用 MediaHandlers 的缓存机制
+        const charId = this.currentCharId || MediaHandlers._getValidCharId(null);
+        console.log('[ChatInterface] handleCameraCapture - charId:', charId);
+        
         await MediaHandlers.handleCameraCapture(
             input,
-            this.currentCharId,
+            charId,
             this.compressImageForChat.bind(this),
             this.renderMessages.bind(this)
         );

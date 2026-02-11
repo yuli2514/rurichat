@@ -24,14 +24,26 @@ const VoiceHandler = {
      * 打开语音面板
      */
     openVoicePanel: function() {
+        // 确保聊天界面存在
+        const chatInterface = document.getElementById('super-chat-interface');
+        if (!chatInterface) {
+            console.error('[VoiceHandler] 聊天界面不存在');
+            return;
+        }
+        
         let panel = document.getElementById('voice-panel');
         if (!panel) {
             this.createVoicePanel();
             panel = document.getElementById('voice-panel');
         }
-        panel.classList.remove('hidden');
-        // 重置状态
-        this.resetState();
+        
+        if (panel) {
+            panel.classList.remove('hidden');
+            // 重置状态
+            this.resetState();
+        } else {
+            console.error('[VoiceHandler] 语音面板创建失败');
+        }
     },
 
     /**
@@ -73,11 +85,13 @@ const VoiceHandler = {
      * 创建语音面板DOM
      */
     createVoicePanel: function() {
+        console.log('[VoiceHandler] 创建语音面板');
+        
         const panel = document.createElement('div');
         panel.id = 'voice-panel';
         panel.className = 'hidden absolute inset-0 bg-black/50 flex items-center justify-center z-[100]';
         panel.innerHTML = `
-            <div class="bg-white rounded-2xl p-5 w-[85%] max-w-[320px] shadow-2xl">
+            <div class="bg-white rounded-2xl p-5 w-[85%] max-w-[320px] shadow-2xl" onclick="event.stopPropagation()">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-bold text-lg text-gray-800">语音消息</h3>
                     <button onclick="VoiceHandler.closeVoicePanel()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
@@ -89,11 +103,11 @@ const VoiceHandler = {
                 <div class="mb-4">
                     <label class="text-xs text-gray-500 mb-1 block">伪造语音（输入文字）</label>
                     <div class="flex gap-2">
-                        <input type="text" id="voice-fake-input" 
-                            class="flex-1 bg-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" 
+                        <input type="text" id="voice-fake-input"
+                            class="flex-1 bg-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="输入文字生成语音气泡...">
-                        <button onclick="VoiceHandler.sendFakeVoice()" 
-                            class="px-4 py-2 bg-green-500 text-white rounded-xl text-sm font-medium active:scale-95 transition">
+                        <button onclick="VoiceHandler.sendFakeVoice()"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium active:scale-95 transition">
                             发送
                         </button>
                     </div>
@@ -105,13 +119,8 @@ const VoiceHandler = {
                 <div class="text-center">
                     <label class="text-xs text-gray-500 mb-3 block">真实录音（长按录音）</label>
                     <div id="voice-recording-time" class="text-2xl font-mono text-gray-700 mb-3">0:00</div>
-                    <div id="voice-record-btn" 
-                        class="w-16 h-16 mx-auto bg-green-500 rounded-full flex items-center justify-center text-white cursor-pointer active:scale-95 transition select-none"
-                        ontouchstart="VoiceHandler.startRecording(event)"
-                        ontouchend="VoiceHandler.stopRecording(event)"
-                        onmousedown="VoiceHandler.startRecording(event)"
-                        onmouseup="VoiceHandler.stopRecording(event)"
-                        onmouseleave="VoiceHandler.stopRecording(event)">
+                    <div id="voice-record-btn"
+                        class="w-16 h-16 mx-auto bg-blue-500 rounded-full flex items-center justify-center text-white cursor-pointer active:scale-95 transition select-none">
                         <i class="fa-solid fa-microphone text-2xl"></i>
                     </div>
                     <p class="text-xs text-gray-400 mt-2">长按说话，松开发送</p>
@@ -119,10 +128,31 @@ const VoiceHandler = {
             </div>
         `;
         
+        // 点击背景关闭面板
+        panel.addEventListener('click', (e) => {
+            if (e.target === panel) {
+                this.closeVoicePanel();
+            }
+        });
+        
         // 添加到聊天界面
         const chatInterface = document.getElementById('super-chat-interface');
         if (chatInterface) {
             chatInterface.appendChild(panel);
+            console.log('[VoiceHandler] 语音面板已添加到DOM');
+            
+            // 绑定录音按钮事件（使用addEventListener而不是内联事件，更可靠）
+            const recordBtn = panel.querySelector('#voice-record-btn');
+            if (recordBtn) {
+                recordBtn.addEventListener('touchstart', (e) => this.startRecording(e), { passive: false });
+                recordBtn.addEventListener('touchend', (e) => this.stopRecording(e), { passive: false });
+                recordBtn.addEventListener('mousedown', (e) => this.startRecording(e));
+                recordBtn.addEventListener('mouseup', (e) => this.stopRecording(e));
+                recordBtn.addEventListener('mouseleave', (e) => this.stopRecording(e));
+                console.log('[VoiceHandler] 录音按钮事件已绑定');
+            }
+        } else {
+            console.error('[VoiceHandler] 找不到聊天界面容器');
         }
     },
 

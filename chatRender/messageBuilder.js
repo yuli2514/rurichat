@@ -190,6 +190,49 @@ const MessageBuilder = {
     },
 
     /**
+     * 构建转账卡片消息HTML
+     * @param {Object} params - 参数对象
+     * @returns {string} - 转账卡片HTML
+     */
+    buildTransferMessage: function(params) {
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode } = params;
+        
+        const transferData = msg.transferData || {};
+        const amount = transferData.amount || 0;
+        const remark = transferData.remark || '';
+        const status = transferData.status || 'pending';
+        const isReceived = status === 'received';
+        
+        // 确定显示的名字
+        let displayName = '';
+        if (isMe) {
+            displayName = transferData.toName || '对方';
+        } else {
+            displayName = '我';
+        }
+        
+        const statusText = isReceived ? '已收款' : '待领取';
+        const cardClass = isReceived ? 'transfer-card received' : 'transfer-card';
+        
+        return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+            checkboxHtml +
+            '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0" loading="lazy">' +
+            '<div class="max-w-[70%]">' +
+                '<div onclick="' + (deleteMode ? 'ChatInterface.toggleDeleteSelection(' + index + ')' : 'TransferHandler.handleTransferClick(' + index + ')') + '" ' +
+                     'class="' + cardClass + ' cursor-pointer">' +
+                    '<div class="transfer-card-header">' +
+                        '<i class="fa-solid fa-money-bill-transfer transfer-card-icon"></i>' +
+                        '<span class="transfer-card-status">' + statusText + '</span>' +
+                    '</div>' +
+                    '<div class="transfer-card-amount">￥' + amount.toFixed(2) + '</div>' +
+                    (remark ? '<div class="transfer-card-remark">' + remark + '</div>' : '') +
+                    '<div class="transfer-card-footer">转账给' + displayName + '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    },
+
+    /**
      * 构建单条消息的完整HTML
      * @param {Object} params - 参数对象
      * @returns {string} - 消息HTML
@@ -218,6 +261,7 @@ const MessageBuilder = {
 
         const isImage = msg.type === 'image';
         const isVoice = msg.type === 'voice';
+        const isTransfer = msg.type === 'transfer';
         
         if (isImage) {
             const imageClass = this.getImageClass(isMe, msg);
@@ -226,6 +270,10 @@ const MessageBuilder = {
             });
         } else if (isVoice) {
             return this.buildVoiceMessage({
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode
+            });
+        } else if (isTransfer) {
+            return this.buildTransferMessage({
                 msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode
             });
         } else {

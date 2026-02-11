@@ -60,23 +60,58 @@ const AIHandler = {
                     }
                 }
                 
+                // AI领取转账：检测 [领取转账] 或 [收下转账] 格式
+                let isReceiveTransfer = false;
+                const receiveTransferMatch = text.match(/^\[(?:领取转账|收下转账|接受转账|RECEIVE_TRANSFER)\]$/i);
+                if (receiveTransferMatch) {
+                    isReceiveTransfer = true;
+                    // 查找最近一条用户发送的待领取转账
+                    const history = API.Chat.getHistory(chatInterface.currentCharId);
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        const msg = history[i];
+                        if (msg.type === 'transfer' && msg.transferData &&
+                            msg.transferData.fromUser && msg.transferData.status === 'pending') {
+                            TransferHandler.receiveTransfer(i);
+                            break;
+                        }
+                    }
+                    continue; // 跳过这条消息，不显示
+                }
+                
+                // AI转账消息：检测 [转账:金额] 或 [转账:金额:备注] 格式（优先检测）
+                let isTransferMessage = false;
+                let transferAmount = 0;
+                let transferRemark = '';
+                // 更宽松的正则：支持各种格式如 [转账:100]、[转账：100元]、[转账:100:备注]
+                const transferMatch = text.match(/^\[(?:转账|TRANSFER)[：:]\s*(\d+(?:\.\d{0,2})?)\s*元?\s*(?:[：:]\s*(.+?))?\s*\]$/i);
+                if (transferMatch) {
+                    transferAmount = parseFloat(transferMatch[1]);
+                    transferRemark = transferMatch[2] || '';
+                    isTransferMessage = true;
+                    console.log('[AIHandler] 检测到转账消息:', transferAmount, transferRemark);
+                }
+                
                 // 文字意念传图：检测图片描述格式 [图片:xxx] 或 [IMAGE:xxx]
                 let isTextImageCard = false;
-                const imageDescMatch = text.match(/^\[(?:图片|IMAGE|图像|画面)[：:]\s*(.+?)\s*\]$/i);
-                if (imageDescMatch) {
-                    const imageDescription = imageDescMatch[1];
-                    // 使用 Canvas 生成白底文字卡片
-                    text = chatInterface.generateTextImageCard(imageDescription);
-                    isTextImageCard = true;
+                if (!isTransferMessage) {
+                    const imageDescMatch = text.match(/^\[(?:图片|IMAGE|图像|画面)[：:]\s*(.+?)\s*\]$/i);
+                    if (imageDescMatch) {
+                        const imageDescription = imageDescMatch[1];
+                        // 使用 Canvas 生成白底文字卡片
+                        text = chatInterface.generateTextImageCard(imageDescription);
+                        isTextImageCard = true;
+                    }
                 }
                 
                 // AI语音消息：检测 [语音:xxx] 或 [VOICE:xxx] 格式
                 let isVoiceMessage = false;
                 let voiceContent = null;
-                const voiceMatch = text.match(/^\[(?:语音|VOICE|voice)[：:]\s*(.+?)\s*\]$/i);
-                if (voiceMatch) {
-                    voiceContent = voiceMatch[1];
-                    isVoiceMessage = true;
+                if (!isTransferMessage) {
+                    const voiceMatch = text.match(/^\[(?:语音|VOICE|voice)[：:]\s*(.+?)\s*\]$/i);
+                    if (voiceMatch) {
+                        voiceContent = voiceMatch[1];
+                        isVoiceMessage = true;
+                    }
                 }
                 
                 const isImageUrl = text.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i) ||
@@ -112,7 +147,25 @@ const AIHandler = {
                 
                 // 根据消息类型构建不同的消息对象
                 let msg;
-                if (isVoiceMessage) {
+                if (isTransferMessage) {
+                    // AI转账消息
+                    const char = API.Chat.getChar(chatInterface.currentCharId);
+                    msg = {
+                        id: msgId,
+                        sender: 'char',
+                        content: '',
+                        type: 'transfer',
+                        timestamp: Date.now(),
+                        transferData: {
+                            amount: transferAmount,
+                            remark: transferRemark,
+                            status: 'pending',
+                            fromUser: false,
+                            fromName: char ? char.remark : '对方',
+                            createdAt: Date.now()
+                        }
+                    };
+                } else if (isVoiceMessage) {
                     // AI语音消息
                     const voiceDuration = Math.max(1, Math.ceil(voiceContent.length / 3.5));
                     msg = {
