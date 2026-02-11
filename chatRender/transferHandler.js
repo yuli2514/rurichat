@@ -19,12 +19,27 @@ const TransferHandler = {
     // 当前转账金额和备注
     currentAmount: '',
     currentRemark: '',
+    
+    // 防止面板立即关闭的标志
+    panelJustOpened: false,
 
     /**
      * 打开转账界面
      */
-    openTransferPanel: function() {
+    openTransferPanel: function(event) {
         console.log('[TransferHandler] openTransferPanel called');
+        
+        // 阻止事件冒泡，防止触发其他监听器
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        
+        // 设置标志，防止立即关闭
+        this.panelJustOpened = true;
+        setTimeout(() => {
+            this.panelJustOpened = false;
+        }, 500);
         
         this.currentAmount = '';
         this.currentRemark = '';
@@ -83,14 +98,28 @@ const TransferHandler = {
         overlay.className = 'transfer-overlay';
         overlay.innerHTML = panelHtml;
         
-        // 延迟添加点击关闭事件，防止移动端touch事件立即触发
-        setTimeout(() => {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    this.closeTransferPanel();
-                }
+        // 添加点击关闭事件
+        overlay.addEventListener('click', (e) => {
+            // 如果面板刚打开，不处理关闭
+            if (this.panelJustOpened) {
+                console.log('[TransferHandler] Panel just opened, ignoring close');
+                return;
+            }
+            if (e.target === overlay) {
+                this.closeTransferPanel();
+            }
+        });
+        
+        // 阻止面板内部的点击事件冒泡
+        const panel = overlay.querySelector('.transfer-panel');
+        if (panel) {
+            panel.addEventListener('click', (e) => {
+                e.stopPropagation();
             });
-        }, 300);
+            panel.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+            }, { passive: true });
+        }
         
         document.getElementById('super-chat-interface').appendChild(overlay);
         

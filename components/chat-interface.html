@@ -110,7 +110,7 @@
                         <span class="text-xs">语音</span>
                     </button>
                     <!-- 第二排：转账、语音通话、视频通话、线下模式 -->
-                    <button type="button" onclick="TransferHandler.openTransferPanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                    <button type="button" onclick="TransferHandler.openTransferPanel(event)" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
                         <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-money-bill-transfer text-2xl text-gray-600"></i></div>
                         <span class="text-xs">转账</span>
                     </button>
@@ -152,7 +152,8 @@
     </div>
     
     <!-- Hidden file inputs for camera and gallery - 移到panel外面确保始终可用 -->
-    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment" onchange="ChatInterface.handleCameraCapture(this)">
+    <!-- 相机输入事件通过 ChatInterface._bindCameraInput() 绑定，更可靠 -->
+    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment">
     <input type="file" id="gallery-input" class="hidden" accept="image/*" onchange="ChatInterface.handleGallerySelect(this)">
     
     <!-- Text Drawing Modal - 放在 panel-container 外面，确保始终可见 -->

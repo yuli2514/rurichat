@@ -35,6 +35,32 @@ const ChatInterface = {
                 }
             });
         }
+        
+        // 绑定相机输入事件（移动端更可靠）
+        this._bindCameraInput();
+    },
+    
+    /**
+     * 绑定相机输入事件
+     * 使用 addEventListener 比 onchange 属性更可靠
+     */
+    _bindCameraInput: function() {
+        const cameraInput = document.getElementById('camera-input');
+        if (cameraInput) {
+            // 移除可能存在的旧监听器
+            cameraInput.removeEventListener('change', this._cameraChangeHandler);
+            
+            // 创建绑定的处理函数
+            this._cameraChangeHandler = async (e) => {
+                console.log('[ChatInterface] Camera change event triggered');
+                console.log('[ChatInterface] Files:', e.target.files);
+                await this.handleCameraCapture(e.target);
+            };
+            
+            // 添加新监听器
+            cameraInput.addEventListener('change', this._cameraChangeHandler);
+            console.log('[ChatInterface] Camera input event listener bound');
+        }
     },
 
     // ==================== 工具函数代理 ====================
