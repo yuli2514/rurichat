@@ -42,24 +42,25 @@ const ChatInterface = {
     
     /**
      * 绑定相机输入事件
-     * 使用 addEventListener 比 onchange 属性更可靠
+     * 使用多种事件监听确保移动端兼容性
      */
     _bindCameraInput: function() {
         const cameraInput = document.getElementById('camera-input');
-        if (cameraInput) {
-            // 移除可能存在的旧监听器
-            cameraInput.removeEventListener('change', this._cameraChangeHandler);
+        if (cameraInput && !cameraInput._boundByInit) {
+            cameraInput._boundByInit = true;
             
-            // 创建绑定的处理函数
-            this._cameraChangeHandler = async (e) => {
-                console.log('[ChatInterface] Camera change event triggered');
+            const handler = async (e) => {
+                console.log('[ChatInterface] Camera event triggered:', e.type);
                 console.log('[ChatInterface] Files:', e.target.files);
-                await this.handleCameraCapture(e.target);
+                if (e.target.files && e.target.files.length > 0) {
+                    await this.handleCameraCapture(e.target);
+                }
             };
             
-            // 添加新监听器
-            cameraInput.addEventListener('change', this._cameraChangeHandler);
-            console.log('[ChatInterface] Camera input event listener bound');
+            // 同时监听 change 和 input 事件，确保移动端兼容
+            cameraInput.addEventListener('change', handler);
+            cameraInput.addEventListener('input', handler);
+            console.log('[ChatInterface] Camera input event listeners bound');
         }
     },
 
@@ -421,16 +422,26 @@ const ChatInterface = {
     },
 
     handleCameraCapture: async function(input) {
+        console.log('[ChatInterface] handleCameraCapture called');
+        console.log('[ChatInterface] input:', input);
+        console.log('[ChatInterface] input.files:', input ? input.files : 'no input');
+        
         // 手机端拍照返回后 this.currentCharId 可能丢失，使用 MediaHandlers 的缓存机制
         const charId = this.currentCharId || MediaHandlers._getValidCharId(null);
         console.log('[ChatInterface] handleCameraCapture - charId:', charId);
         
-        await MediaHandlers.handleCameraCapture(
-            input,
-            charId,
-            this.compressImageForChat.bind(this),
-            this.renderMessages.bind(this)
-        );
+        try {
+            await MediaHandlers.handleCameraCapture(
+                input,
+                charId,
+                this.compressImageForChat.bind(this),
+                this.renderMessages.bind(this)
+            );
+            console.log('[ChatInterface] handleCameraCapture completed');
+        } catch (error) {
+            console.error('[ChatInterface] handleCameraCapture error:', error);
+            alert('拍照处理出错: ' + error.message);
+        }
     },
 
     openGalleryMenu: function() {

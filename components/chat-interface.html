@@ -152,8 +152,7 @@
     </div>
     
     <!-- Hidden file inputs for camera and gallery - 移到panel外面确保始终可用 -->
-    <!-- 相机输入事件通过 ChatInterface._bindCameraInput() 绑定，更可靠 -->
-    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment">
+    <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment" onchange="ChatInterface.handleCameraCapture(this)">
     <input type="file" id="gallery-input" class="hidden" accept="image/*" onchange="ChatInterface.handleGallerySelect(this)">
     
     <!-- Text Drawing Modal - 放在 panel-container 外面，确保始终可见 -->
