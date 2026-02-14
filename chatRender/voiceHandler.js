@@ -67,6 +67,13 @@ const VoiceHandler = {
         this._interimTranscript = '';
         this.isRecording = false;
         this.currentAudioBlob = null;
+        this._shouldRestart = false;
+        this._recognitionEnded = false;
+        this._pendingDuration = 0;
+        if (this._sendTimer) {
+            clearTimeout(this._sendTimer);
+            this._sendTimer = null;
+        }
         if (this.recordingTimer) {
             clearInterval(this.recordingTimer);
             this.recordingTimer = null;
@@ -165,8 +172,39 @@ const VoiceHandler = {
         if (this.isRecording) return;
         
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.mediaRecorder = new MediaRecorder(stream);
+            // 移动端强制请求 16kHz 采样率，桌面端也尝试请求
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            });
+            
+            // 检测浏览器支持的音频 MIME 类型，优先使用兼容性更好的格式
+            let mimeType = '';
+            const preferredTypes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/ogg',
+                'audio/mp4',
+                'audio/aac',
+                'audio/wav'
+            ];
+            for (const type of preferredTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    mimeType = type;
+                    break;
+                }
+            }
+            console.log('[VoiceHandler] 使用音频格式:', mimeType || '浏览器默认');
+            
+            const recorderOptions = {};
+            if (mimeType) recorderOptions.mimeType = mimeType;
+            this.mediaRecorder = new MediaRecorder(stream, recorderOptions);
+            this._recordingMimeType = mimeType || 'audio/webm';
             this.audioChunks = [];
             this.recognizedText = '';
             this.isRecording = true;
@@ -199,7 +237,7 @@ const VoiceHandler = {
             };
             
             this.mediaRecorder.onstop = () => {
-                this.currentAudioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                this.currentAudioBlob = new Blob(this.audioChunks, { type: this._recordingMimeType });
                 stream.getTracks().forEach(track => track.stop());
             };
             
@@ -241,11 +279,6 @@ const VoiceHandler = {
             this.mediaRecorder.stop();
         }
         
-        // 停止语音识别
-        if (this.recognition) {
-            this.recognition.stop();
-        }
-        
         // 更新UI
         const recordBtn = document.getElementById('voice-record-btn');
         if (recordBtn) {
@@ -256,14 +289,35 @@ const VoiceHandler = {
         
         // 如果录音时间太短，不发送
         if (duration < 1) {
+            if (this.recognition) {
+                try { this.recognition.abort(); } catch(e) {}
+            }
             this.resetState();
             return;
         }
         
-        // 延迟发送，等待音频数据和识别结果（增加延迟以确保语音识别有足够时间返回结果）
-        setTimeout(() => {
-            this.sendRealVoice(duration);
-        }, 800);
+        // 标记等待识别完成
+        this._pendingDuration = duration;
+        
+        // 停止语音识别 —— 移动端需要等 onend 回调确认识别彻底结束后再发送
+        if (this.recognition) {
+            // _recognitionEnded 标记由 onend 回调设置
+            this._recognitionEnded = false;
+            try { this.recognition.stop(); } catch(e) {}
+            
+            // 等待识别引擎 onend，最多等 2 秒，超时也发送
+            this._sendTimer = setTimeout(() => {
+                if (!this._recognitionEnded) {
+                    console.warn('[VoiceHandler] 语音识别 onend 超时，强制发送');
+                }
+                this.sendRealVoice(this._pendingDuration);
+            }, 2000);
+        } else {
+            // 没有识别引擎，直接延迟发送等待音频数据
+            setTimeout(() => {
+                this.sendRealVoice(duration);
+            }, 500);
+        }
     },
 
     /**
@@ -272,17 +326,25 @@ const VoiceHandler = {
     startSpeechRecognition: function() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            console.warn('浏览器不支持语音识别');
+            console.warn('[VoiceHandler] 浏览器不支持语音识别');
             return;
         }
         
         this.recognition = new SpeechRecognition();
-        this.recognition.continuous = true;
+        // 移动端 continuous 模式不稳定，改为非连续模式
+        this.recognition.continuous = false;
         this.recognition.interimResults = true;
         this.recognition.lang = 'zh-CN';
+        // 移动端设置较长的静音超时，避免过早结束
+        if ('maxAlternatives' in this.recognition) {
+            this.recognition.maxAlternatives = 1;
+        }
         
         // 用于保存中间识别结果作为fallback
         this._interimTranscript = '';
+        this._recognitionEnded = false;
+        // 标记是否因为非连续模式自动结束需要重启
+        this._shouldRestart = true;
         
         this.recognition.onresult = (event) => {
             let finalTranscript = '';
@@ -298,17 +360,51 @@ const VoiceHandler = {
             if (finalTranscript) {
                 this.recognizedText += finalTranscript;
                 this._interimTranscript = ''; // 有最终结果时清空中间结果
+                console.log('[VoiceHandler] 识别到最终文本:', finalTranscript, '累计:', this.recognizedText);
             } else if (interimTranscript) {
                 // 保存最新的中间识别结果作为fallback
                 this._interimTranscript = interimTranscript;
+                console.log('[VoiceHandler] 中间识别结果:', interimTranscript);
             }
         };
         
         this.recognition.onerror = (event) => {
-            console.warn('语音识别错误:', event.error);
+            console.warn('[VoiceHandler] 语音识别错误:', event.error);
+            // no-speech / aborted 不需要重启
+            if (event.error === 'no-speech' || event.error === 'aborted') {
+                this._shouldRestart = false;
+            }
         };
         
-        this.recognition.start();
+        this.recognition.onend = () => {
+            console.log('[VoiceHandler] 语音识别 onend, isRecording:', this.isRecording, 'shouldRestart:', this._shouldRestart);
+            this._recognitionEnded = true;
+            
+            if (this.isRecording && this._shouldRestart) {
+                // 非连续模式下识别自动结束，但用户还在录音，需要重启识别
+                try {
+                    this.recognition.start();
+                    console.log('[VoiceHandler] 语音识别已重启');
+                } catch(e) {
+                    console.warn('[VoiceHandler] 语音识别重启失败:', e);
+                }
+            } else if (!this.isRecording && this._sendTimer) {
+                // 用户已松手，识别已结束，立即发送（取消超时等待）
+                clearTimeout(this._sendTimer);
+                this._sendTimer = null;
+                // 短暂延迟确保 MediaRecorder.onstop 也完成
+                setTimeout(() => {
+                    this.sendRealVoice(this._pendingDuration);
+                }, 300);
+            }
+        };
+        
+        try {
+            this.recognition.start();
+            console.log('[VoiceHandler] 语音识别已启动');
+        } catch(e) {
+            console.error('[VoiceHandler] 语音识别启动失败:', e);
+        }
     },
 
     /**
