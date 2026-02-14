@@ -112,41 +112,40 @@ const MediaHandlers = {
     },
 
     /**
-     * 处理相机拍摄的图片 - 移动端优化版本
+     * 处理相机拍摄的图片 - 移动端稳定版本（使用 FileReader）
      * @param {HTMLInputElement} input - 文件输入元素
      * @param {string} currentCharId - 当前角色ID
      * @param {Function} compressFunc - 图片压缩函数
      * @param {Function} renderCallback - 渲染回调函数
      */
-    handleCameraCapture: async function(input, currentCharId, compressFunc, renderCallback) {
-        const file = input && input.files && input.files[0];
+    handleCameraCapture: function(input, currentCharId, compressFunc, renderCallback) {
+        var file = input && input.files && input.files[0];
         if (!file) {
             return;
         }
 
         // 获取有效的角色ID
-        const charId = this._getValidCharId(currentCharId);
+        var charId = this._getValidCharId(currentCharId);
         if (!charId) {
             input.value = '';
             return;
         }
 
-        try {
-            // 使用 createObjectURL 代替 FileReader，更快更省内存
-            const objectUrl = URL.createObjectURL(file);
-            
-            // 创建图片对象
-            const img = new Image();
-            
-            img.onload = async () => {
+        // 使用最稳定的 FileReader 读取文件
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var base64Data = e.target.result;
+
+            // 创建图片对象用于压缩
+            var img = new Image();
+            img.onload = function() {
                 try {
-                    // 压缩图片
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    // 移动端优化：最大600px，质量0.5
-                    const MAX_SIZE = 600;
+                    var canvas = document.createElement('canvas');
+                    var width = img.width;
+                    var height = img.height;
+
+                    // 移动端优化：最大600px
+                    var MAX_SIZE = 600;
                     if (width > MAX_SIZE || height > MAX_SIZE) {
                         if (width > height) {
                             height = Math.round(height * MAX_SIZE / width);
@@ -156,20 +155,17 @@ const MediaHandlers = {
                             height = MAX_SIZE;
                         }
                     }
-                    
+
                     canvas.width = width;
                     canvas.height = height;
-                    const ctx = canvas.getContext('2d');
+                    var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    
+
                     // 质量0.5，大幅减少数据量
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
-                    
-                    // 释放 objectUrl
-                    URL.revokeObjectURL(objectUrl);
-                    
-                    // 先发送消息，再关闭界面
-                    const msg = {
+                    var compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
+
+                    // 发送消息
+                    var msg = {
                         id: Date.now(),
                         sender: 'user',
                         content: compressedBase64,
@@ -177,42 +173,40 @@ const MediaHandlers = {
                         timestamp: Date.now(),
                         isVisionImage: true
                     };
-                    
-                    // 添加消息
+
                     API.Chat.addMessage(charId, msg);
-                    
+
                     // 渲染消息
                     if (renderCallback) {
                         renderCallback();
                     } else if (typeof ChatInterface !== 'undefined') {
                         ChatInterface.renderMessages();
                     }
-                    
+
                     // 更新角色列表
                     if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
                         ChatManager.renderList();
                     }
-                    
+
                     // 清理
                     MediaHandlers._clearPendingCharId();
                     input.value = '';
-                    
-                } catch (e) {
-                    URL.revokeObjectURL(objectUrl);
+                } catch (err) {
+                    console.error('[MediaHandlers] Camera compress error:', err);
                     input.value = '';
                 }
             };
-            
-            img.onerror = () => {
-                URL.revokeObjectURL(objectUrl);
+            img.onerror = function() {
+                console.error('[MediaHandlers] Camera image load error');
                 input.value = '';
             };
-            
-            img.src = objectUrl;
-            
-        } catch (error) {
+            img.src = base64Data;
+        };
+        reader.onerror = function() {
+            console.error('[MediaHandlers] Camera FileReader error');
             input.value = '';
-        }
+        };
+        reader.readAsDataURL(file);
     },
 
     /**
