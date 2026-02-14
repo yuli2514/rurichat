@@ -51,22 +51,15 @@ const ComponentLoader = {
         const url = `components/${name}.html`;
         
         try {
-            console.log(`[ComponentLoader] Loading: ${name} from ${url}`);
             // 检查缓存
             let html = this.cache[name];
             if (!html) {
                 const response = await fetch(url);
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status} for component: ${name}`);
+                    throw new Error(`Failed to load component: ${name}`);
                 }
                 html = await response.text();
-                if (!html || html.trim().length === 0) {
-                    throw new Error(`Empty response for component: ${name}`);
-                }
                 this.cache[name] = html;
-                console.log(`[ComponentLoader] ✓ Fetched: ${name} (${html.length} bytes)`);
-            } else {
-                console.log(`[ComponentLoader] ✓ Cached: ${name}`);
             }
             
             // 获取容器
@@ -96,14 +89,10 @@ const ComponentLoader = {
             
             this.loaded.add(name);
             this.eventBus.emit('component:loaded', { name, containerId });
-            console.log(`[ComponentLoader] ✓ Inserted: ${name} into #${containerId}`);
             
             return true;
         } catch (error) {
-            console.error(`[ComponentLoader] ✗ FAILED: ${name}:`, error.message);
-            // 记录失败的组件
-            if (!this._failedComponents) this._failedComponents = [];
-            this._failedComponents.push({ name, error: error.message });
+            console.error(`Error loading component ${name}:`, error);
             return false;
         }
     },
@@ -126,11 +115,9 @@ const ComponentLoader = {
     
     /**
      * 初始化所有组件
-     * 核心组件失败会阻塞应用，非核心组件失败只会警告
      */
     async init() {
-        // 核心组件 - 这些必须加载成功
-        const coreComponents = [
+        const components = [
             { name: 'system-ui', containerId: 'phone-shell', position: 'prepend' },
             { name: 'home-screen', containerId: 'phone-shell', position: 'append' },
             { name: 'chat-app', containerId: 'phone-shell', position: 'append' },
@@ -141,38 +128,20 @@ const ComponentLoader = {
             { name: 'chat-interface', containerId: 'phone-shell', position: 'append' },
             { name: 'chat-settings', containerId: 'phone-shell', position: 'append' },
             { name: 'settings-app', containerId: 'phone-shell', position: 'append' },
+            { name: 'offline-mode', containerId: 'phone-shell', position: 'append' },
             { name: 'css-preset-modal', containerId: 'phone-shell', position: 'append' }
         ];
         
-        // 可选组件 - 这些失败不会阻塞应用
-        const optionalComponents = [
-            { name: 'offline-mode', containerId: 'phone-shell', position: 'append' }
-        ];
-        
         console.log('[ComponentLoader] Starting to load components...');
+        const success = await this.loadAll(components);
         
-        // 先加载核心组件
-        const coreSuccess = await this.loadAll(coreComponents);
-        
-        // 再加载可选组件（失败不阻塞）
-        for (const comp of optionalComponents) {
-            const result = await this.load(comp.name, comp.containerId, comp.position);
-            if (!result) {
-                console.warn(`[ComponentLoader] Optional component "${comp.name}" failed to load, skipping...`);
-            }
-        }
-        
-        if (coreSuccess) {
-            console.log('[ComponentLoader] All core components loaded successfully');
-            // 即使可选组件失败，也触发 allLoaded 事件
-            this.eventBus.emit('components:allLoaded');
+        if (success) {
+            console.log('[ComponentLoader] All components loaded successfully');
         } else {
-            console.error('[ComponentLoader] Some core components failed to load');
-            const failed = (this._failedComponents || []).map(f => f.name).join(', ');
-            console.error('[ComponentLoader] Failed: ' + failed);
+            console.error('[ComponentLoader] Some components failed to load');
         }
         
-        return coreSuccess;
+        return success;
     },
     
     /**
@@ -187,23 +156,6 @@ const ComponentLoader = {
      */
     clearCache() {
         this.cache = {};
-    },
-    
-    /**
-     * 重新加载特定组件（清除缓存并重新加载）
-     * @param {string} name - 组件名称
-     * @param {string} containerId - 容器元素ID
-     * @param {string} insertPosition - 插入位置
-     */
-    async reload(name, containerId, insertPosition = 'append') {
-        // 清除该组件的缓存
-        delete this.cache[name];
-        this.loaded.delete(name);
-        
-        console.log(`[ComponentLoader] Reloading component: ${name}`);
-        
-        // 重新加载
-        return this.load(name, containerId, insertPosition);
     }
 };
 

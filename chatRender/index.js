@@ -49,32 +49,17 @@ const ChatInterface = {
         if (cameraInput && !cameraInput._boundByInit) {
             cameraInput._boundByInit = true;
             
-            const handler = async (e) => {
-                console.log('[ChatInterface] Camera event triggered:', e.type);
-                console.log('[ChatInterface] Files:', e.target.files);
-                
-                // 防止重复触发：如果正在处理中，则忽略
-                if (this._isProcessingCamera) {
-                    console.log('[ChatInterface] Camera processing already in progress, ignoring');
-                    return;
-                }
-                
+            // 统一使用 change 事件（移动端和桌面端均支持）
+            // 只绑定一次，作为拍照的唯一入口
+            cameraInput.addEventListener('change', async (e) => {
+                console.log('[ChatInterface] Camera change triggered');
                 if (e.target.files && e.target.files.length > 0) {
-                    this._isProcessingCamera = true;
-                    try {
-                        await this.handleCameraCapture(e.target);
-                    } finally {
-                        // 延迟重置处理标志，防止某些浏览器连续触发
-                        setTimeout(() => {
-                            this._isProcessingCamera = false;
-                        }, 1000);
-                    }
+                    await this.handleCameraCapture(e.target);
+                    // 清空 value，允许再次选择同一文件
+                    cameraInput.value = '';
                 }
-            };
-            
-            // 只监听 change 事件一次
-            cameraInput.addEventListener('change', handler, { once: false });
-            console.log('[ChatInterface] Camera input event listener bound');
+            });
+            console.log('[ChatInterface] Camera input event listener bound (single change)');
         }
     },
 
@@ -226,10 +211,13 @@ const ChatInterface = {
      */
     _buildMessagesHtml: function(history, char) {
         const maxMessages = this.loadedMessageCount;
-        // 过滤掉线下模式的消息，线上聊天界面不显示线下文字
-        const onlineOnlyHistory = history.filter(msg => msg.mode !== 'offline');
-        const startIndex = Math.max(0, onlineOnlyHistory.length - maxMessages);
-        const renderedHistory = onlineOnlyHistory.slice(startIndex);
+        const startIndex = Math.max(0, history.length - maxMessages);
+        const renderedHistory = history.slice(startIndex);
+        
+        // 读取时间戳显示设置
+        const charSettings = char.settings || {};
+        const showAvatarTimestamp = charSettings.timestampAvatar || false;
+        const showBubbleTimestamp = charSettings.timestampBubble || false;
         
         let html = '';
         
@@ -256,7 +244,9 @@ const ChatInterface = {
                 char,
                 history,
                 deleteMode: this.deleteMode,
-                selectedForDelete: this.selectedForDelete
+                selectedForDelete: this.selectedForDelete,
+                showAvatarTimestamp: showAvatarTimestamp,
+                showBubbleTimestamp: showBubbleTimestamp
             });
             
             lastTimestamp = msg.timestamp;
@@ -288,91 +278,6 @@ const ChatInterface = {
 
     handleContextAction: function(action) {
         ChatEventHandlers.handleContextAction(action, this);
-    },
-
-    handleBubbleContextMenu: function(event, index) {
-        // 桌面端右键菜单，移动端长按菜单
-        if (event.type === 'contextmenu') {
-            // 桌面端右键菜单
-            this.showContextMenu(event, index);
-        } else {
-            // 移动端长按菜单
-            this.showLongPressMenu(event, index);
-        }
-    },
-
-    showLongPressMenu: function(event, index) {
-        ChatEventHandlers.showLongPressMenu(event, index);
-    },
-
-    closeLongPressMenu: function() {
-        ChatEventHandlers.closeLongPressMenu();
-    },
-
-    handleLongPressAction: function(action) {
-        const index = ChatEventHandlers.currentContextMenuMsgIndex;
-        if (index === null) return;
-        
-        const history = API.Chat.getHistory(this.currentCharId);
-        const msg = history[index];
-        if (!msg) return;
-
-        this.closeLongPressMenu();
-
-        if (action === 'edit') {
-            this.openEditMessage(index);
-        } else if (action === 'delete') {
-            this.enterDeleteMode(index);
-        }
-    },
-
-    openEditMessage: function(index) {
-        const history = API.Chat.getHistory(this.currentCharId);
-        const msg = history[index];
-        if (!msg || msg.type !== 'text') return;
-
-        this._editingMessageIndex = index;
-        const modal = document.getElementById('edit-message-modal');
-        const input = document.getElementById('edit-message-input');
-        
-        input.value = msg.content;
-        modal.classList.remove('hidden');
-        input.focus();
-    },
-
-    cancelEditMessage: function() {
-        const modal = document.getElementById('edit-message-modal');
-        modal.classList.add('hidden');
-        this._editingMessageIndex = null;
-    },
-
-    confirmEditMessage: function() {
-        const index = this._editingMessageIndex;
-        if (index === null) return;
-
-        const input = document.getElementById('edit-message-input');
-        const newText = input.value.trim();
-
-        if (!newText) {
-            alert('消息内容不能为空');
-            return;
-        }
-
-        const history = API.Chat.getHistory(this.currentCharId);
-        const msg = history[index];
-        if (!msg) return;
-
-        msg.content = newText;
-        msg.edited = true;
-        msg.editedAt = Date.now();
-        
-        API.Chat.saveHistory(this.currentCharId, history);
-        this.renderMessages();
-        if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
-            ChatManager.renderList();
-        }
-
-        this.cancelEditMessage();
     },
 
     // ==================== 删除模式代理 ====================

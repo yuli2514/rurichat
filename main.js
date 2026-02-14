@@ -84,37 +84,12 @@ function initializeApp() {
 }
 
 /**
- * 设置全局相机输入事件处理
- * 注意：ChatInterface._bindCameraInput() 已经绑定了 camera-input 的 change 事件
- * 这里只作为兜底处理器，仅在 ChatInterface 的处理器未绑定时才处理
+ * 全局相机处理已移至 chatRender/index.js _bindCameraInput() 统一管理
+ * 此处不再重复绑定，避免拍照重复发送
  */
 function setupGlobalCameraHandler() {
-    // 使用事件委托监听 document 上的 change 事件
-    document.addEventListener('change', async function(e) {
-        if (e.target && e.target.id === 'camera-input') {
-            console.log('[Global] Camera input change detected');
-            
-            // 如果 ChatInterface 已经绑定了处理器，跳过全局处理（避免双重触发）
-            if (e.target._boundByInit) {
-                console.log('[Global] Camera input already handled by ChatInterface, skipping');
-                return;
-            }
-            
-            console.log('[Global] Files:', e.target.files);
-            
-            if (e.target.files && e.target.files.length > 0) {
-                if (typeof ChatInterface !== 'undefined' && ChatInterface.handleCameraCapture) {
-                    try {
-                        await ChatInterface.handleCameraCapture(e.target);
-                    } catch (err) {
-                        console.error('[Global] Camera capture error:', err);
-                    }
-                }
-            }
-        }
-    });
-    
-    console.log('[Global] Camera handler setup complete');
+    // 已由 ChatInterface._bindCameraInput() 统一处理
+    console.log('[Global] Camera handler delegated to ChatInterface._bindCameraInput()');
 }
 
 // 检测是否使用组件化加载模式

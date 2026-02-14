@@ -299,8 +299,35 @@
         #chat-messages .char-message-avatar {
             width: var(--chat-avatar-size);
             height: var(--chat-avatar-size);
-            border-radius: var(--chat-avatar-radius) !important;
         }
+
+        /* 头像圆润度 - 通过CSS变量控制 */
+        #chat-messages .chat-avatar {
+            border-radius: var(--chat-avatar-radius, 50%) !important;
+        }
+
+        /* 头像下方时间戳 */
+        .avatar-timestamp {
+            font-size: 9px;
+            color: #b0b0b0;
+            text-align: center;
+            margin-top: 2px;
+            line-height: 1;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 气泡旁时间戳 */
+        .bubble-timestamp {
+            font-size: 9px;
+            color: #b0b0b0;
+            white-space: nowrap;
+            align-self: flex-end;
+            margin-bottom: 2px;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+
         .bubble-user {
             background-color: #4A9EFF;
             color: #ffffff;
@@ -507,45 +534,6 @@
 
         #chat-context-menu .context-menu-btn * {
             pointer-events: none !important;
-        }
-
-        /* Long press menu for edit/delete */
-        #chat-longpress-menu {
-            z-index: 9999 !important;
-            pointer-events: auto !important;
-            touch-action: manipulation !important;
-            -webkit-tap-highlight-color: transparent !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-        }
-
-        #chat-longpress-menu button {
-            pointer-events: auto !important;
-            touch-action: manipulation !important;
-            -webkit-tap-highlight-color: transparent !important;
-            min-height: 44px !important;
-            cursor: pointer !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            transition: background-color 0.15s ease !important;
-        }
-
-        #chat-longpress-menu button:active {
-            background-color: rgba(0, 0, 0, 0.08) !important;
-        }
-
-        #chat-longpress-menu button * {
-            pointer-events: none !important;
-        }
-
-        /* Edit message modal */
-        #edit-message-modal {
-            z-index: 100 !important;
-        }
-
-        #edit-message-input {
-            resize: none !important;
-            overflow-y: auto !important;
         }
 
         /* ========== HOME SCREEN LAYOUT FIX ========== */
@@ -957,15 +945,15 @@
         }
         
         .password-dot.filled {
-            background: #333;
-            border-color: #333;
+            background: white;
+            border-color: #ddd;
         }
         
         .password-dot.filled::after {
             content: '';
             width: 12px;
             height: 12px;
-            background: white;
+            background: #333;
             border-radius: 50%;
         }
         
@@ -1099,35 +1087,4 @@
         
         .transfer-card.received .transfer-card-footer {
             border-top-color: #ddd;
-        }
-
-        /* ========== 时间戳样式 ========== */
-        
-        /* 头像下方时间戳 */
-        .avatar-timestamp {
-            font-size: 10px;
-            color: #999;
-            margin-top: 3px;
-            white-space: nowrap;
-            text-align: center;
-            line-height: 1;
-        }
-
-        /* 气泡旁时间戳 */
-        .bubble-timestamp {
-            font-size: 10px;
-            color: #999;
-            white-space: nowrap;
-            align-self: flex-end;
-            flex-shrink: 0;
-            line-height: 1;
-            margin-bottom: 4px;
-        }
-
-        .bubble-timestamp-left {
-            margin-left: 2px;
-        }
-
-        .bubble-timestamp-right {
-            margin-right: 2px;
         }

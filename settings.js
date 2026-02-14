@@ -305,11 +305,43 @@ const SettingsManager = {
                 Object.keys(data).forEach(k => localStorage.setItem(k, data[k]));
                 alert('数据导入成功，页面将刷新');
                 location.reload();
-            } catch (err) { 
-                alert('数据文件无效'); 
+            } catch (err) {
+                alert('数据文件无效');
             }
         };
         reader.readAsText(file);
+    },
+
+    /**
+     * 清空所有数据（localStorage + IndexedDB），然后自动刷新
+     */
+    clearAllData: function() {
+        if (!confirm('⚠️ 确定要清空所有数据吗？\n\n这将删除所有角色、聊天记录、设置、记忆、线下数据等，且不可恢复！')) return;
+        if (!confirm('再次确认：真的要清空所有数据吗？此操作不可撤销！')) return;
+
+        try {
+            // 清空 localStorage
+            localStorage.clear();
+            console.log('[Settings] localStorage cleared');
+
+            // 清空 IndexedDB（线下模式壁纸等）
+            const dbNames = ['ruri_offline_db'];
+            dbNames.forEach(dbName => {
+                try {
+                    const deleteReq = indexedDB.deleteDatabase(dbName);
+                    deleteReq.onsuccess = () => console.log('[Settings] IndexedDB deleted:', dbName);
+                    deleteReq.onerror = (e) => console.error('[Settings] IndexedDB delete error:', dbName, e);
+                } catch (e) {
+                    console.error('[Settings] Error deleting IndexedDB:', dbName, e);
+                }
+            });
+
+            alert('所有数据已清空，页面将自动刷新');
+            location.reload();
+        } catch (e) {
+            console.error('[Settings] clearAllData error:', e);
+            alert('清空数据时出错: ' + e.message);
+        }
     },
 
     loadSettings: function() {

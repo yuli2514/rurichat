@@ -273,6 +273,13 @@
                 <input type="file" class="hidden" accept=".json" onchange="SettingsManager.importData(this)">
             </label>
 
+            <div class="border-t border-gray-200 pt-6 mt-4">
+                <button onclick="SettingsManager.clearAllData()" class="w-full bg-red-500 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-trash-can"></i> 清空所有数据
+                </button>
+                <p class="text-xs text-red-400 text-center mt-2">⚠️ 此操作将永久删除所有数据，不可恢复！</p>
+            </div>
+
         </div>
     </div>
 

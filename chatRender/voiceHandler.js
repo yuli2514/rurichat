@@ -19,7 +19,6 @@ const VoiceHandler = {
     recordingStartTime: 0,
     recordingTimer: null,
     currentAudioBlob: null,
-    _savedCharId: null, // 保存录音时的角色ID
 
     /**
      * 打开语音面板
@@ -164,26 +163,13 @@ const VoiceHandler = {
         if (event) event.preventDefault();
         if (this.isRecording) return;
         
-        // 保存当前角色ID，防止录音过程中丢失
-        this._savedCharId = ChatInterface.currentCharId;
-        
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            // 检查浏览器是否支持 MediaRecorder
-            if (typeof MediaRecorder === 'undefined') {
-                console.warn('[VoiceHandler] MediaRecorder not supported, using fallback');
-                stream.getTracks().forEach(track => track.stop());
-                alert('您的浏览器不支持录音功能，请使用伪造语音');
-                return;
-            }
-            
             this.mediaRecorder = new MediaRecorder(stream);
             this.audioChunks = [];
             this.recognizedText = '';
             this.isRecording = true;
             this.recordingStartTime = Date.now();
-            this.currentAudioBlob = null; // 清除旧的Blob
             
             // 更新UI
             const recordBtn = document.getElementById('voice-record-btn');
@@ -226,7 +212,7 @@ const VoiceHandler = {
             
         } catch (err) {
             console.error('录音启动失败:', err);
-            alert('无法访问麦克风，请检查权限设置。移动端建议使用伪造语音功能。');
+            alert('无法访问麦克风，请检查权限设置');
             this.resetState();
         }
     },
@@ -273,26 +259,10 @@ const VoiceHandler = {
             return;
         }
         
-        // 等待音频数据准备好
-        this._waitForAudioBlob(duration, 0);
-    },
-
-    /**
-     * 等待音频Blob生成
-     */
-    _waitForAudioBlob: function(duration, attempt) {
-        if (this.currentAudioBlob) {
+        // 延迟发送，等待音频数据和识别结果
+        setTimeout(() => {
             this.sendRealVoice(duration);
-        } else if (attempt < 10) {
-            // 每100ms检查一次，最多等待1秒
-            setTimeout(() => {
-                this._waitForAudioBlob(duration, attempt + 1);
-            }, 100);
-        } else {
-            console.warn('[VoiceHandler] Audio blob generation timeout');
-            // 即使没有音频也发送（可能只有文字）
-            this.sendRealVoice(duration);
-        }
+        }, 300);
     },
 
     /**
@@ -333,33 +303,22 @@ const VoiceHandler = {
      * 发送真实语音消息
      */
     sendRealVoice: function(duration) {
-        // 优先使用保存的charId，如果没有则尝试获取当前的
-        const charId = this._savedCharId || ChatInterface.currentCharId;
-        if (!charId) {
-            console.error('[VoiceHandler] No charId found for sending voice');
-            return;
-        }
-        
-        const self = this;
+        if (!ChatInterface.currentCharId) return;
         
         // 将音频转为 base64
+        let audioBase64 = null;
         if (this.currentAudioBlob) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const audioBase64 = reader.result;
-                self.createAndSendVoiceMessage(duration, audioBase64, self.recognizedText || '[语音消息]', false, charId);
-                self.closeVoicePanel();
-            };
-            reader.onerror = () => {
-                console.error('[VoiceHandler] FileReader error');
-                self.createAndSendVoiceMessage(duration, null, self.recognizedText || '[语音消息]', false, charId);
-                self.closeVoicePanel();
+                audioBase64 = reader.result;
+                this.createAndSendVoiceMessage(duration, audioBase64, this.recognizedText || '[语音消息]', false);
             };
             reader.readAsDataURL(this.currentAudioBlob);
         } else {
-            this.createAndSendVoiceMessage(duration, null, this.recognizedText || '[语音消息]', false, charId);
-            this.closeVoicePanel();
+            this.createAndSendVoiceMessage(duration, null, this.recognizedText || '[语音消息]', false);
         }
+        
+        this.closeVoicePanel();
     },
 
     /**
@@ -384,10 +343,7 @@ const VoiceHandler = {
     /**
      * 创建并发送语音消息
      */
-    createAndSendVoiceMessage: function(duration, audioData, text, isFake, specificCharId) {
-        const charId = specificCharId || ChatInterface.currentCharId;
-        if (!charId) return;
-
+    createAndSendVoiceMessage: function(duration, audioData, text, isFake) {
         const msg = {
             id: Date.now(),
             sender: 'user',
@@ -402,22 +358,11 @@ const VoiceHandler = {
             }
         };
         
-        API.Chat.addMessage(charId, msg);
-        
-        // 只有当当前界面仍是该角色时才渲染
-        if (ChatInterface.currentCharId === charId) {
-            ChatInterface.renderMessages();
-        }
+        API.Chat.addMessage(ChatInterface.currentCharId, msg);
+        ChatInterface.renderMessages();
         
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
-        }
-        
-        // 触发 AI 回复
-        if (typeof AIHandler !== 'undefined' && AIHandler.generateAIReply) {
-            setTimeout(() => {
-                AIHandler.generateAIReply(charId);
-            }, 500);
         }
     },
 
@@ -440,42 +385,10 @@ const VoiceHandler = {
         
         // 如果有真实音频，播放它
         if (voiceData.audioBase64 && !voiceData.isFake) {
-            try {
-                const audio = new Audio();
-                audio.src = voiceData.audioBase64;
-                audio.play().catch(err => {
-                    console.error('音频播放失败:', err);
-                    alert('音频播放失败，请检查浏览器设置');
-                });
-            } catch (err) {
-                console.error('创建音频对象失败:', err);
-            }
-        } else if (voiceData.isFake) {
-            // 伪造语音：生成合成音频
-            this.playFakeSynthesizedVoice(voiceData.transcription || '[语音消息]', voiceData.duration || 1);
-        }
-    },
-
-    /**
-     * 播放伪造的合成语音
-     */
-    playFakeSynthesizedVoice: function(text, duration) {
-        try {
-            // 使用 Web Speech API 的 SpeechSynthesis 接口
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'zh-CN';
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            utterance.volume = 1.0;
-            
-            // 设置语速使得总时长接近指定的 duration
-            const estimatedRate = Math.max(0.5, Math.min(2.0, text.length / (duration * 3)));
-            utterance.rate = estimatedRate;
-            
-            window.speechSynthesis.cancel(); // 取消之前的播放
-            window.speechSynthesis.speak(utterance);
-        } catch (err) {
-            console.error('合成语音播放失败:', err);
+            const audio = new Audio(voiceData.audioBase64);
+            audio.play().catch(err => {
+                console.error('音频播放失败:', err);
+            });
         }
     }
 };

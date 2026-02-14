@@ -60,32 +60,6 @@ const API = {
             groups = groups.filter(g => g.id !== groupId);
             this.saveGroups(groups);
             return groups;
-        },
-
-        deleteEmoji: function(groupId, emojiIndex) {
-            let groups = this.getGroups();
-            const group = groups.find(g => g.id === groupId);
-            if (group && group.emojis[emojiIndex] !== undefined) {
-                group.emojis.splice(emojiIndex, 1);
-                this.saveGroups(groups);
-            }
-            return groups;
-        },
-
-        deleteEmojis: function(groupId, emojiIndices) {
-            let groups = this.getGroups();
-            const group = groups.find(g => g.id === groupId);
-            if (group) {
-                // 从大到小排序索引，避免删除时索引偏移
-                const sorted = [...emojiIndices].sort((a, b) => b - a);
-                sorted.forEach(idx => {
-                    if (group.emojis[idx] !== undefined) {
-                        group.emojis.splice(idx, 1);
-                    }
-                });
-                this.saveGroups(groups);
-            }
-            return groups;
         }
     },
 
@@ -134,7 +108,7 @@ const API = {
             return memories;
         },
 
-        generateSummary: async function(charId, charName, history, summaryPrompt, summaryFreq) {
+        generateSummary: async function(charId, charName, history, summaryPrompt) {
             const config = API.Settings.getApiConfig();
             if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
 
@@ -163,10 +137,8 @@ const API = {
             }
 
             // Filter out recalled messages and format history
-            // 使用 summaryFreq 决定总结多少轮的聊天记录，而非固定20条
             const visibleHistory = history.filter(m => !m.recalled);
-            const msgCount = summaryFreq ? summaryFreq * 2 : visibleHistory.length;
-            const recentMessages = visibleHistory.slice(-msgCount).map(m =>
+            const recentMessages = visibleHistory.slice(-20).map(m =>
                 (m.sender === 'user' ? userName : charDisplayName) + ': ' + (m.type === 'image' ? '[发送了一张图片]' : m.content)
             ).join('\n');
 
@@ -394,15 +366,7 @@ const API = {
             localStorage.setItem('ruri_chat_history_' + charId, JSON.stringify(history));
             
             // Update last message in char list
-            // 过滤掉线下消息，只取最后一条线上消息作为列表预览
-            const onlineHistory = history.filter(m => m.mode !== 'offline');
-            const lastMsg = onlineHistory[onlineHistory.length - 1];
-            
-            // 强制重新渲染角色列表以确保预览更新
-            if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
-                setTimeout(() => ChatManager.renderList(), 0);
-            }
-
+            const lastMsg = history[history.length - 1];
             if (lastMsg) {
                 let chars = this.getChars();
                 const idx = chars.findIndex(c => c.id === charId);
@@ -434,36 +398,21 @@ const API = {
             const settings = char.settings || {};
             const ctxLength = settings.contextLength || 20;
             
-            // 获取线下历史记录用于上下文互通
-            const offlineHistory = API.Offline.getHistory(charId);
-            
             // 构建线上聊天系统提示词
-            let systemPrompt = '【核心规则 - 必须严格遵守】';
-            systemPrompt += '\n你是"' + char.name + '"，你必须始终以这个角色的身份说话和思考。';
-            systemPrompt += '\n★ 绝对禁止OOC（Out of Character）：不允许以任何形式跳出角色，不允许以AI/助手的身份说话。';
-            systemPrompt += '\n★ 严格遵循人设：你的一切言行必须符合角色设定中的性格、语气、习惯。';
-            systemPrompt += '\n★ 禁止说教：不要教育用户、不要讲大道理、不要给用户上课。';
-            systemPrompt += '\n★ 性格温和：即使角色设定中有强势的一面，也不要对用户表现得急躁、凶狠或不耐烦。对用户保持耐心和温柔。';
-            systemPrompt += '\n★ 不要过度关心：不要反复追问用户"你怎么了"、"你还好吗"，自然地聊天即可。';
-            
-            systemPrompt += '\n\n【角色设定】';
+            let systemPrompt = '【角色扮演设定】';
+            systemPrompt += '\n你正在扮演一个角色进行线上聊天。';
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
-            systemPrompt += '\n请深入理解以上角色设定，将其内化为你自己的性格和说话方式。';
-            
-            // 现实时间感应：如果开启，告诉AI当前的现实时间
-            if (settings.realtimeAwareness) {
+
+            // --- 角色感知现实世界 ---
+            if (settings.realWorldAwareness) {
                 const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
                 const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                const weekDay = weekDays[now.getDay()];
-                systemPrompt += '\n\n【当前现实时间】';
-                systemPrompt += '\n现在是 ' + year + '年' + month + '月' + day + '日 ' + weekDay + ' ' + hours + ':' + minutes;
-                systemPrompt += '\n你可以根据当前时间做出合理的反应，比如早上打招呼、晚上说晚安等。';
+                const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + weekDays[now.getDay()];
+                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                systemPrompt += '\n\n【现实世界时间感知】';
+                systemPrompt += '\n当前现实世界的日期和时间：' + dateStr + ' ' + timeStr;
+                systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
             }
             
             systemPrompt += '\n\n【聊天风格要求】';
@@ -474,15 +423,11 @@ const API = {
             systemPrompt += '\n5. 可以使用表情符号emoji来表达情绪，比如😊😂🤔😅等';
             systemPrompt += '\n6. 说话要自然口语化，可以用语气词如"嗯"、"啊"、"哈哈"、"emmm"等';
             systemPrompt += '\n7. 可以发多条消息，每条消息用换行符分隔，模拟真实聊天节奏';
-            systemPrompt += '\n8. 不要急躁，不要凶用户，不要说教，保持角色该有的温度';
-            systemPrompt += '\n9. 永远不要说"我是AI"、"我是语言模型"之类的话，你就是角色本人';
             
             systemPrompt += '\n\n【错误示范 - 不要这样写】';
             systemPrompt += '\n❌ *微微一笑* 好的呀~ （这种带动作描写的不行）';
             systemPrompt += '\n❌ 「好开心」她说道。（这种带叙述的不行）';
             systemPrompt += '\n❌ (内心很高兴) 好啊！（这种带心理描写的不行）';
-            systemPrompt += '\n❌ 你不应该这样做！你要好好反省！（这种说教语气不行）';
-            systemPrompt += '\n❌ 你怎么又这样？！（这种急躁凶狠的语气不行）';
             
             systemPrompt += '\n\n【正确示范 - 应该这样写】';
             systemPrompt += '\n✅ 好的呀~';
@@ -586,11 +531,7 @@ const API = {
             const fullHistory = this.getHistory(charId);
             // Filter out recalled messages so AI doesn't see them
             const visibleHistory = fullHistory.filter(msg => !msg.recalled);
-            
-            // 合并线上和线下历史记录，按时间排序，确保剧情互通
-            const combinedHistory = [...visibleHistory, ...offlineHistory].sort((a, b) => a.timestamp - b.timestamp);
-            
-            const recentHistory = combinedHistory.slice(-ctxLength).map(msg => {
+            const recentHistory = visibleHistory.slice(-ctxLength).map(msg => {
                 let content = '';
                 
                 // 处理语音消息 - 将语音内容作为文字传递给AI
@@ -696,15 +637,11 @@ const API = {
             
             if (settings.autoSummary) {
                 const history = this.getHistory(charId);
-                const summaryFreq = settings.summaryFreq || 10;
-                // 只有当消息总数是 summaryFreq 的倍数时才触发总结
-                if (history.length > 0 && history.length % summaryFreq === 0) {
+                if (history.length % (settings.summaryFreq || 10) === 0) {
                     try {
-                        // 传入最近 summaryFreq 轮的聊天记录进行总结
-                        const recentHistory = history.slice(-summaryFreq);
-                        const summary = await API.Memory.generateSummary(charId, char.name, recentHistory, settings.summaryPrompt, summaryFreq);
+                        const summary = await API.Memory.generateSummary(charId, char.name, history, settings.summaryPrompt);
                         API.Memory.addMemory(charId, summary, 'auto');
-                        console.log('Auto summary generated for', char.name, '- summarized last', summaryFreq, 'messages');
+                        console.log('Auto summary generated for', char.name);
                     } catch (e) {
                         console.error('Auto summary failed:', e);
                     }
@@ -742,7 +679,24 @@ const API = {
         }
     },
 
-    // ==================== OFFLINE MODE DATA & LOGIC ====================
+    // ==================== HOME SCREEN DATA ====================
+    Home: {
+        getData: function() {
+            try {
+                return JSON.parse(localStorage.getItem('ruri_home_data') || '{}');
+            } catch (e) {
+                console.error('Error parsing home data:', e);
+                return {};
+            }
+        },
+
+        saveData: function(data) {
+            const current = this.getData();
+            localStorage.setItem('ruri_home_data', JSON.stringify({ ...current, ...data }));
+        }
+    },
+
+    // ==================== OFFLINE MODE DATA ====================
     Offline: {
         getHistory: function(charId) {
             if (!charId) return [];
@@ -766,62 +720,75 @@ const API = {
             return history;
         },
 
-        getPreset: function(charId) {
+        getSettings: function(charId) {
+            if (!charId) return {};
             try {
-                return localStorage.getItem('ruri_offline_preset_' + charId) || '';
+                return JSON.parse(localStorage.getItem('ruri_offline_settings_' + charId) || '{}');
             } catch (e) {
-                return '';
+                console.error('Error parsing offline settings:', e);
+                return {};
             }
         },
 
-        savePreset: function(charId, preset) {
-            localStorage.setItem('ruri_offline_preset_' + charId, preset);
+        saveSettings: function(charId, update) {
+            if (!charId) return;
+            const current = this.getSettings(charId);
+            const merged = { ...current, ...update };
+            
+            // 检查壁纸大小，大型图片存到 IndexedDB
+            if (merged.wallpaper && merged.wallpaper.length > 500000) {
+                const wallpaperData = merged.wallpaper;
+                merged.wallpaper = ''; // 清空 localStorage 中的大图
+                this._saveWallpaperToIndexedDB(charId, wallpaperData);
+            }
+            
+            localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(merged));
         },
 
-        // 新增：获取预设列表（支持多预设）
         getPresets: function(charId) {
+            if (!charId) return [];
             try {
                 return JSON.parse(localStorage.getItem('ruri_offline_presets_' + charId) || '[]');
             } catch (e) {
+                console.error('Error parsing offline presets:', e);
                 return [];
             }
         },
 
-        // 新增：保存预设列表
         savePresets: function(charId, presets) {
+            if (!charId) return;
             localStorage.setItem('ruri_offline_presets_' + charId, JSON.stringify(presets));
         },
 
-        // 新增：添加单个预设
         addPreset: function(charId, preset) {
             const presets = this.getPresets(charId);
             presets.push({
                 id: Date.now(),
-                name: preset.name || '未命名预设',
-                content: preset.content || '',
-                enabled: preset.enabled !== false
+                name: preset.name,
+                content: preset.content,
+                enabled: preset.enabled !== undefined ? preset.enabled : true
             });
             this.savePresets(charId, presets);
+            return presets;
         },
 
-        // 新增：更新预设
-        updatePreset: function(charId, presetId, preset) {
+        updatePreset: function(charId, presetId, update) {
             const presets = this.getPresets(charId);
-            const index = presets.findIndex(p => p.id === presetId);
-            if (index !== -1) {
-                presets[index] = { ...presets[index], ...preset };
+            const idx = presets.findIndex(p => p.id === presetId);
+            if (idx !== -1) {
+                presets[idx] = { ...presets[idx], ...update };
                 this.savePresets(charId, presets);
             }
+            return presets;
         },
 
-        // 新增：删除预设
         deletePreset: function(charId, presetId) {
-            const presets = this.getPresets(charId);
-            const filtered = presets.filter(p => p.id !== presetId);
-            this.savePresets(charId, filtered);
+            let presets = this.getPresets(charId);
+            presets = presets.filter(p => p.id !== presetId);
+            this.savePresets(charId, presets);
+            return presets;
         },
 
-        // 新增：切换预设启用状态
         togglePreset: function(charId, presetId) {
             const presets = this.getPresets(charId);
             const preset = presets.find(p => p.id === presetId);
@@ -829,191 +796,12 @@ const API = {
                 preset.enabled = !preset.enabled;
                 this.savePresets(charId, presets);
             }
+            return presets;
         },
 
-        // 新增：获取线下聊天总结列表
-        getOfflineSummaries: function(charId) {
-            try {
-                return JSON.parse(localStorage.getItem('ruri_offline_summaries_' + charId) || '[]');
-            } catch (e) {
-                return [];
-            }
-        },
-
-        // 新增：保存线下聊天总结
-        saveOfflineSummary: function(charId, summary) {
-            const summaries = this.getOfflineSummaries(charId);
-            summaries.push({
-                id: Date.now(),
-                content: summary,
-                timestamp: Date.now()
-            });
-            localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(summaries));
-        },
-
-        // 新增：删除线下聊天总结
-        deleteOfflineSummary: function(charId, summaryId) {
-            const summaries = this.getOfflineSummaries(charId);
-            const filtered = summaries.filter(s => s.id !== summaryId);
-            localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(filtered));
-        },
-
-        // 新增：更新线下聊天总结
-        updateOfflineSummary: function(charId, summaryId, content) {
-            const summaries = this.getOfflineSummaries(charId);
-            const summary = summaries.find(s => s.id === summaryId);
-            if (summary) {
-                summary.content = content;
-                localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(summaries));
-            }
-        },
-
-        // 新增：自动总结线下聊天
-        autoSummarizeOfflineChat: async function(charId) {
-            const config = API.Settings.getApiConfig();
-            if (!config.endpoint || !config.key) return;
-
-            const char = API.Chat.getChar(charId);
-            if (!char) return;
-
-            const settings = char.settings || {};
-            if (!settings.autoSummarize) return; // 只有启用自动总结才执行
-
-            const history = this.getHistory(charId);
-            if (history.length < 5) return; // 少于5条消息不总结
-
-            // 获取最近的消息进行总结
-            const recentHistory = history.slice(-10);
-            const historyText = recentHistory.map(msg => {
-                const sender = msg.sender === 'user' ? '用户' : char.name;
-                return sender + ': ' + msg.content;
-            }).join('\n');
-
-            const summaryPrompt = '请用简洁的语言总结以下对话内容，保留关键情节和人物互动信息：\n\n' + historyText;
-
-            try {
-                const response = await fetch(config.endpoint + '/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + config.key
-                    },
-                    body: JSON.stringify({
-                        model: config.model || 'gpt-3.5-turbo',
-                        messages: [
-                            { role: 'system', content: '你是一个专业的对话总结助手。' },
-                            { role: 'user', content: summaryPrompt }
-                        ],
-                        temperature: 0.5,
-                        max_tokens: 500
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const summary = data.choices[0].message.content;
-                    this.saveOfflineSummary(charId, summary);
-                }
-            } catch (e) {
-                console.error('自动总结失败:', e);
-            }
-        },
-
-        getSettings: function(charId) {
-            try {
-                const data = localStorage.getItem('ruri_offline_settings_' + charId) || '{}';
-                return JSON.parse(data);
-            } catch (e) {
-                console.error('[Offline] Error parsing settings:', e);
-                return {};
-            }
-        },
-
-        saveSettings: function(charId, settings) {
-            try {
-                const current = this.getSettings(charId);
-                const merged = { ...current, ...settings };
-                
-                // 如果包含大型 wallpaper 数据，分离存储
-                if (merged.wallpaper && merged.wallpaper.length > 100000) {
-                    // 大型图片数据单独存储
-                    const wallpaperData = merged.wallpaper;
-                    const settingsWithoutWallpaper = { ...merged };
-                    delete settingsWithoutWallpaper.wallpaper;
-                    
-                    // 保存设置（不含图片）
-                    localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(settingsWithoutWallpaper));
-                    
-                    // 使用 IndexedDB 存储大型图片
-                    this._saveWallpaperToIndexedDB(charId, wallpaperData);
-                } else {
-                    // 小型数据直接保存到 localStorage
-                    localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(merged));
-                }
-            } catch (e) {
-                console.error('[Offline] Error saving settings:', e);
-                if (e.name === 'QuotaExceededError') {
-                    alert('存储空间不足，请清除一些数据后重试');
-                } else {
-                    alert('保存设置失败: ' + e.message);
-                }
-            }
-        },
-
-        _saveWallpaperToIndexedDB: function(charId, wallpaperData) {
-            const request = indexedDB.open('RuriOfflineDB', 1);
-            
-            request.onerror = () => {
-                console.error('[Offline] IndexedDB open failed');
-            };
-            
-            request.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains('wallpapers')) {
-                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
-                }
-            };
-            
-            request.onsuccess = (e) => {
-                const db = e.target.result;
-                const transaction = db.transaction(['wallpapers'], 'readwrite');
-                const store = transaction.objectStore('wallpapers');
-                store.put({ charId: charId, data: wallpaperData, timestamp: Date.now() });
-            };
-        },
-
-        _getWallpaperFromIndexedDB: function(charId, callback) {
-            const request = indexedDB.open('RuriOfflineDB', 1);
-            
-            request.onerror = () => {
-                console.error('[Offline] IndexedDB open failed');
-                callback(null);
-            };
-            
-            request.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains('wallpapers')) {
-                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
-                }
-            };
-            
-            request.onsuccess = (e) => {
-                const db = e.target.result;
-                const transaction = db.transaction(['wallpapers'], 'readonly');
-                const store = transaction.objectStore('wallpapers');
-                const getRequest = store.get(charId);
-                
-                getRequest.onsuccess = () => {
-                    const result = getRequest.result;
-                    callback(result ? result.data : null);
-                };
-                
-                getRequest.onerror = () => {
-                    callback(null);
-                };
-            };
-        },
-
+        /**
+         * 生成线下模式AI回复
+         */
         generateReply: async function(charId) {
             const config = API.Settings.getApiConfig();
             if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
@@ -1024,73 +812,52 @@ const API = {
             const settings = char.settings || {};
             const ctxLength = settings.contextLength || 20;
 
-            // 获取启用的线下预设列表
-            const presets = this.getPresets(charId);
-            const enabledPresets = presets.filter(p => p.enabled);
-            let offlinePreset = '';
-            
-            if (enabledPresets.length > 0) {
-                // 合并所有启用的预设
-                offlinePreset = enabledPresets.map(p => p.content).join('\n');
-            } else {
-                // 如果没有启用的预设，尝试使用旧的单预设格式
-                offlinePreset = this.getPreset(charId);
-                if (!offlinePreset) {
-                    offlinePreset = '以ai角色第一人称描写，用户称呼为你，要有环境描写心理描写等，展开线下剧情文风要求优美，段与段之间要空一行，字数不少于400字';
-                }
-            }
-
             // 构建线下模式系统提示词
-            let systemPrompt = '【核心规则 - 线下剧情模式】';
-            systemPrompt += '\n你是"' + char.name + '"，正在进行线下长剧情描写对话。';
-            systemPrompt += '\n★ 绝对禁止OOC（Out of Character）：不允许以任何形式跳出角色。';
-            systemPrompt += '\n★ 严格遵循人设：你的一切言行必须符合角色设定中的性格、语气、习惯。';
-            systemPrompt += '\n★ 禁止说教：不要教育用户、不要讲大道理。';
-            systemPrompt += '\n★ 性格温和：不要对用户表现得急躁、凶狠或不耐烦。';
-            systemPrompt += '\n★ 永远不要说"我是AI"之类的话，你就是角色本人。';
-
-            systemPrompt += '\n\n【角色设定】';
+            let systemPrompt = '【线下剧情模式】';
+            systemPrompt += '\n你正在进行一个长篇剧情描写对话。';
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
 
-            systemPrompt += '\n\n【线下剧情写作要求】';
-            systemPrompt += '\n' + offlinePreset;
-            systemPrompt += '\n\n【格式要求】';
-            systemPrompt += '\n1. 以角色第一人称视角描写';
-            systemPrompt += '\n2. 称呼用户为"你"';
-            systemPrompt += '\n3. 包含丰富的环境描写、心理描写、动作描写';
-            systemPrompt += '\n4. 文风优美，有文学性';
-            systemPrompt += '\n5. 段与段之间空一行';
-            systemPrompt += '\n6. 字数不少于400字';
-            systemPrompt += '\n7. 根据用户发送的剧情/消息，自然地展开和推进故事';
-
-            // 现实时间感应
-            if (settings.realtimeAwareness) {
+            // --- 角色感知现实世界 ---
+            if (settings.realWorldAwareness) {
                 const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
                 const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                const weekDay = weekDays[now.getDay()];
-                systemPrompt += '\n\n【当前现实时间】';
-                systemPrompt += '\n现在是 ' + year + '年' + month + '月' + day + '日 ' + weekDay + ' ' + hours + ':' + minutes;
+                const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + weekDays[now.getDay()];
+                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                systemPrompt += '\n\n【现实世界时间感知】';
+                systemPrompt += '\n当前现实世界的日期和时间：' + dateStr + ' ' + timeStr;
+                systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
+            }
+
+            systemPrompt += '\n\n【写作要求】';
+            systemPrompt += '\n1. 这是线下剧情描写模式，请用文学化的语言进行描写';
+            systemPrompt += '\n2. 可以包含动作描写、心理描写、场景描写、对话等';
+            systemPrompt += '\n3. 每次回复请写一段完整的剧情推进，字数在200-500字之间';
+            systemPrompt += '\n4. 保持角色性格一致，注意剧情连贯性';
+            systemPrompt += '\n5. 适当使用段落分隔，增强可读性';
+
+            // 加载线下模式预设
+            const presets = this.getPresets(charId);
+            const enabledPresets = presets.filter(p => p.enabled);
+            if (enabledPresets.length > 0) {
+                systemPrompt += '\n\n【用户自定义写作要求】';
+                enabledPresets.forEach(p => {
+                    systemPrompt += '\n- ' + p.name + ': ' + p.content;
+                });
             }
 
             // 记忆集成
             const memories = API.Memory.getMemories(charId);
             if (memories.length > 0) {
                 const recentMemories = memories.slice(-5).map(m => m.content).join('; ');
-                systemPrompt += '\n\n[过往记忆/背景: ' + recentMemories + ']';
+                systemPrompt += '\n\n[过往记忆/上下文: ' + recentMemories + ']';
             }
 
-            // 线下聊天总结集成
+            // 线下总结集成
             const offlineSummaries = this.getOfflineSummaries(charId);
             if (offlineSummaries.length > 0) {
-                const recentSummaries = offlineSummaries.slice(-3).map(s => s.content).join('\n');
-                systemPrompt += '\n\n【线下聊天历史总结】';
-                systemPrompt += '\n' + recentSummaries;
+                const recentSummaries = offlineSummaries.slice(-3).map(s => s.content).join('; ');
+                systemPrompt += '\n\n[线下剧情总结: ' + recentSummaries + ']';
             }
 
             // 世界书集成
@@ -1106,31 +873,22 @@ const API = {
                 }
             }
 
-            // 用户人设集成
+            // 用户面具集成
             if (settings.userPersonaId) {
                 const personas = API.Profile.getPersonas();
                 const persona = personas.find(p => p.id === settings.userPersonaId);
                 if (persona) {
-                    systemPrompt += '\n\n[用户人设信息: ' + persona.content + ']';
+                    systemPrompt += '\n[用户人设信息: ' + persona.content + ']';
                 }
             }
 
-            // 构建历史消息（线上+线下共享）
-            const onlineHistory = API.Chat.getHistory(charId).filter(msg => !msg.recalled);
+            // 获取线下聊天记录
             const offlineHistory = this.getHistory(charId);
-            
-            // 合并历史并按时间排序，取最近的上下文，确保剧情互通
-            const allHistory = [...onlineHistory, ...offlineHistory].sort((a, b) => a.timestamp - b.timestamp);
-            const recentHistory = allHistory.slice(-ctxLength).map(msg => {
-                let content = msg.content;
-                if (msg.type === 'image') content = '[发送了一张图片]';
-                if (msg.type === 'voice') content = msg.voiceData ? msg.voiceData.transcription : '[语音消息]';
-                
-                return {
-                    role: (msg.sender === 'user') ? 'user' : 'assistant',
-                    content: content
-                };
-            });
+            const visibleHistory = offlineHistory.slice(-ctxLength);
+            const recentHistory = visibleHistory.map(msg => ({
+                role: msg.sender === 'user' ? 'user' : 'assistant',
+                content: msg.content
+            }));
 
             const messages = [
                 { role: 'system', content: systemPrompt }
@@ -1154,23 +912,171 @@ const API = {
             
             const data = await response.json();
             return data.choices[0].message.content;
-        }
-    },
+        },
 
-    // ==================== HOME SCREEN DATA ====================
-    Home: {
-        getData: function() {
-            try {
-                return JSON.parse(localStorage.getItem('ruri_home_data') || '{}');
-            } catch (e) {
-                console.error('Error parsing home data:', e);
-                return {};
+        /**
+         * 线下剧情自动总结
+         */
+        autoSummarizeOfflineChat: async function(charId) {
+            const char = API.Chat.getChar(charId);
+            if (!char) return;
+            const settings = char.settings || {};
+            
+            if (settings.autoSummary) {
+                const history = this.getHistory(charId);
+                const freq = settings.summaryFreq || 10;
+                if (history.length > 0 && history.length % freq === 0) {
+                    try {
+                        const summary = await this.generateOfflineSummary(charId, char.name, history, settings.summaryPrompt);
+                        this.addOfflineSummary(charId, summary);
+                        console.log('[Offline] Auto summary generated for', char.name);
+                    } catch (e) {
+                        console.error('[Offline] Auto summary failed:', e);
+                    }
+                }
             }
         },
 
-        saveData: function(data) {
-            const current = this.getData();
-            localStorage.setItem('ruri_home_data', JSON.stringify({ ...current, ...data }));
+        /**
+         * 生成线下剧情总结
+         */
+        generateOfflineSummary: async function(charId, charName, history, summaryPrompt) {
+            const config = API.Settings.getApiConfig();
+            if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
+            if (history.length === 0) throw new Error('暂无线下聊天记录可总结');
+
+            const char = API.Chat.getChar(charId);
+            const settings = char && char.settings ? char.settings : {};
+            const charDisplayName = settings.charNameForSummary || (char ? char.name : null) || charName;
+            let userName = settings.userName || '用户';
+
+            const recentMessages = history.slice(-20).map(m =>
+                (m.sender === 'user' ? userName : charDisplayName) + ': ' + m.content
+            ).join('\n');
+
+            let systemContent = '';
+            if (summaryPrompt) {
+                systemContent = summaryPrompt;
+            } else {
+                systemContent = '你是一个剧情总结助手。请以第三人称视角总结以下线下剧情对话的关键信息。';
+                systemContent += '\n\n【角色信息】';
+                systemContent += '\n- 角色名称: ' + charDisplayName;
+                systemContent += '\n\n【总结要求】';
+                systemContent += '\n1. 使用第三人称描述剧情发展';
+                systemContent += '\n2. 提取重要的事件、情感和细节';
+                systemContent += '\n3. 用简洁的语言概括，不超过200字';
+            }
+
+            const response = await fetch(config.endpoint + '/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + config.key
+                },
+                body: JSON.stringify({
+                    model: config.model || 'gpt-3.5-turbo',
+                    messages: [
+                        { role: 'system', content: systemContent },
+                        { role: 'user', content: '以下是线下剧情聊天记录：\n\n' + recentMessages }
+                    ],
+                    temperature: 0.5
+                })
+            });
+
+            if (!response.ok) throw new Error('API Request Failed');
+            const data = await response.json();
+            return data.choices[0].message.content;
+        },
+
+        // 线下总结存储
+        getOfflineSummaries: function(charId) {
+            if (!charId) return [];
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_summaries_' + charId) || '[]');
+            } catch (e) {
+                console.error('Error parsing offline summaries:', e);
+                return [];
+            }
+        },
+
+        saveOfflineSummaries: function(charId, summaries) {
+            if (!charId) return;
+            localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(summaries));
+        },
+
+        addOfflineSummary: function(charId, content) {
+            const summaries = this.getOfflineSummaries(charId);
+            summaries.push({
+                id: 'offline_sum_' + Date.now(),
+                content: content,
+                timestamp: Date.now(),
+                type: 'auto'
+            });
+            this.saveOfflineSummaries(charId, summaries);
+            return summaries;
+        },
+
+        deleteOfflineSummary: function(charId, index) {
+            const summaries = this.getOfflineSummaries(charId);
+            summaries.splice(index, 1);
+            this.saveOfflineSummaries(charId, summaries);
+            return summaries;
+        },
+
+        /**
+         * IndexedDB 壁纸存储 - 保存
+         */
+        _saveWallpaperToIndexedDB: function(charId, data) {
+            const request = indexedDB.open('ruri_offline_db', 1);
+            request.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('wallpapers')) {
+                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
+                }
+            };
+            request.onsuccess = function(e) {
+                const db = e.target.result;
+                const tx = db.transaction('wallpapers', 'readwrite');
+                const store = tx.objectStore('wallpapers');
+                store.put({ charId: charId, data: data });
+                console.log('[Offline] Wallpaper saved to IndexedDB for', charId);
+            };
+            request.onerror = function(e) {
+                console.error('[Offline] IndexedDB open error:', e);
+            };
+        },
+
+        /**
+         * IndexedDB 壁纸存储 - 读取
+         */
+        _getWallpaperFromIndexedDB: function(charId, callback) {
+            const request = indexedDB.open('ruri_offline_db', 1);
+            request.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('wallpapers')) {
+                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
+                }
+            };
+            request.onsuccess = function(e) {
+                const db = e.target.result;
+                const tx = db.transaction('wallpapers', 'readonly');
+                const store = tx.objectStore('wallpapers');
+                const getReq = store.get(charId);
+                getReq.onsuccess = function() {
+                    if (getReq.result && getReq.result.data) {
+                        callback(getReq.result.data);
+                    } else {
+                        callback(null);
+                    }
+                };
+                getReq.onerror = function() {
+                    callback(null);
+                };
+            };
+            request.onerror = function(e) {
+                console.error('[Offline] IndexedDB open error:', e);
+                callback(null);
+            };
         }
     }
 };

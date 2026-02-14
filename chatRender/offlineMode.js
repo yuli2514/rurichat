@@ -362,7 +362,7 @@ const OfflineMode = {
      },
 
     /**
-     * 重回（��新生成最后一条AI回复）
+     * 重回（重新生成最后一条AI回复）
      */
     regenerate: async function() {
         const history = API.Offline.getHistory(this.currentCharId);

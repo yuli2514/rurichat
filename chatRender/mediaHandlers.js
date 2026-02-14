@@ -164,13 +164,6 @@ const MediaHandlers = {
                         ChatManager.renderList();
                     }
                     
-                    // 触发 AI 回复
-                    if (typeof AIHandler !== 'undefined' && AIHandler.generateAIReply) {
-                        setTimeout(() => {
-                            AIHandler.generateAIReply(charId);
-                        }, 500);
-                    }
-                    
                     // 清理
                     MediaHandlers._clearPendingCharId();
                     input.value = '';
@@ -354,19 +347,9 @@ const MediaHandlers = {
             
             // 清理缓存
             MediaHandlers._clearPendingCharId();
-            
-            // 重置input (延迟执行，确保在读取完成后)
-            input.value = '';
         };
-        
-        reader.onerror = (e) => {
-            console.error('[MediaHandlers] FileReader error:', e);
-            alert('读取图片失败，请重试');
-            input.value = '';
-        };
-
         reader.readAsDataURL(file);
-        // input.value = ''; // 移除此行，移至 onload/onerror 回调中
+        input.value = ''; // 重置input
     }
 };
 
