@@ -35,9 +35,38 @@ const MediaHandlers = {
             panelContainer.classList.add('hidden');
         }
         
-        const cameraInput = document.getElementById('camera-input');
-        console.log('[MediaHandlers] camera-input element:', cameraInput);
+        // 获取现有 camera-input
+        let cameraInput = document.getElementById('camera-input');
         if (cameraInput) {
+            // 【防止重复绑定】克隆替换，彻底移除所有旧事件监听器（含 addEventListener 和 inline）
+            const newInput = cameraInput.cloneNode(false);
+            newInput.removeAttribute('onchange');
+            // 【优化 Input 属性】移动端 Chrome 标准属性：拍照使用 capture="camera"
+            newInput.setAttribute('type', 'file');
+            newInput.setAttribute('accept', 'image/*');
+            newInput.setAttribute('capture', 'camera');
+            newInput.id = 'camera-input';
+            newInput.className = cameraInput.className;
+            cameraInput.parentNode.replaceChild(newInput, cameraInput);
+            cameraInput = newInput;
+            // 标记已绑定，防止 _bindCameraInput 再次绑定
+            cameraInput._boundByInit = true;
+
+            // 绑定唯一的 change 事件（一次性）
+            cameraInput.addEventListener('change', function _onCameraChange(e) {
+                // 立即移除自身，确保只触发一次
+                cameraInput.removeEventListener('change', _onCameraChange);
+                if (e.target.files && e.target.files.length > 0) {
+                    console.log('[MediaHandlers] Camera change triggered');
+                    if (typeof ChatInterface !== 'undefined' && ChatInterface.handleCameraCapture) {
+                        ChatInterface.handleCameraCapture(e.target);
+                    } else {
+                        MediaHandlers.handleCameraCapture(e.target, currentCharId);
+                    }
+                }
+            });
+
+            // 【直接触发】同步调用 click()，不套任何异步，移动端 Chrome 兼容
             cameraInput.click();
         } else {
             console.error('[MediaHandlers] camera-input not found!');
@@ -282,7 +311,41 @@ const MediaHandlers = {
             }
         }
         document.getElementById('panel-container').classList.add('hidden');
-        document.getElementById('gallery-input').click();
+
+        // 获取现有 gallery-input
+        let galleryInput = document.getElementById('gallery-input');
+        if (galleryInput) {
+            // 【防止重复绑定】克隆替换，彻底移除所有旧事件监听器（含 addEventListener 和 inline onchange）
+            const newInput = galleryInput.cloneNode(false);
+            newInput.removeAttribute('onchange');
+            // 【优化 Input 属性】相册不需要 capture，只需 accept="image/*"
+            newInput.setAttribute('type', 'file');
+            newInput.setAttribute('accept', 'image/*');
+            newInput.removeAttribute('capture');
+            newInput.id = 'gallery-input';
+            newInput.className = galleryInput.className;
+            galleryInput.parentNode.replaceChild(newInput, galleryInput);
+            galleryInput = newInput;
+
+            // 绑定唯一的 change 事件（一次性）
+            galleryInput.addEventListener('change', function _onGalleryChange(e) {
+                // 立即移除自身，确保只触发一次
+                galleryInput.removeEventListener('change', _onGalleryChange);
+                if (e.target.files && e.target.files.length > 0) {
+                    console.log('[MediaHandlers] Gallery change triggered');
+                    if (typeof ChatInterface !== 'undefined' && ChatInterface.handleGallerySelect) {
+                        ChatInterface.handleGallerySelect(e.target);
+                    } else {
+                        MediaHandlers.handleGallerySelect(e.target, currentCharId);
+                    }
+                }
+            });
+
+            // 【直接触发】同步调用 click()，不套任何异步，移动端 Chrome 兼容
+            galleryInput.click();
+        } else {
+            console.error('[MediaHandlers] gallery-input not found!');
+        }
     },
 
     /**
