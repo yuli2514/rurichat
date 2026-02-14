@@ -21,6 +21,13 @@ const VoiceHandler = {
     currentAudioBlob: null,
 
     /**
+     * 检测是否为移动端
+     */
+    _isMobile: function() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    },
+
+    /**
      * 打开语音面板
      */
     openVoicePanel: function() {
@@ -70,6 +77,7 @@ const VoiceHandler = {
         this._shouldRestart = false;
         this._recognitionEnded = false;
         this._pendingDuration = 0;
+        this._lastRecognitionError = '';
         if (this._sendTimer) {
             clearTimeout(this._sendTimer);
             this._sendTimer = null;
@@ -171,40 +179,53 @@ const VoiceHandler = {
         if (event) event.preventDefault();
         if (this.isRecording) return;
         
+        const isMobile = this._isMobile();
+        
         try {
-            // 移动端强制请求 16kHz 采样率，桌面端也尝试请求
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    sampleRate: 16000,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true
-                }
-            });
-            
-            // 检测浏览器支持的音频 MIME 类型，优先使用兼容性更好的格式
-            let mimeType = '';
-            const preferredTypes = [
-                'audio/webm;codecs=opus',
-                'audio/webm',
-                'audio/ogg;codecs=opus',
-                'audio/ogg',
-                'audio/mp4',
-                'audio/aac',
-                'audio/wav'
-            ];
-            for (const type of preferredTypes) {
-                if (MediaRecorder.isTypeSupported(type)) {
-                    mimeType = type;
-                    break;
-                }
+            // 电脑端：保持原样；移动端：约束采样率和声道
+            let stream;
+            if (isMobile) {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+            } else {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             }
-            console.log('[VoiceHandler] 使用音频格式:', mimeType || '浏览器默认');
             
-            const recorderOptions = {};
-            if (mimeType) recorderOptions.mimeType = mimeType;
-            this.mediaRecorder = new MediaRecorder(stream, recorderOptions);
-            this._recordingMimeType = mimeType || 'audio/webm';
+            // 移动端：检测浏览器支持的音频 MIME 类型
+            if (isMobile) {
+                let mimeType = '';
+                const preferredTypes = [
+                    'audio/webm;codecs=opus',
+                    'audio/webm',
+                    'audio/ogg;codecs=opus',
+                    'audio/ogg',
+                    'audio/mp4',
+                    'audio/aac',
+                    'audio/wav'
+                ];
+                for (const type of preferredTypes) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        mimeType = type;
+                        break;
+                    }
+                }
+                console.log('[VoiceHandler] 移动端使用音频格式:', mimeType || '浏览器默认');
+                const recorderOptions = {};
+                if (mimeType) recorderOptions.mimeType = mimeType;
+                this.mediaRecorder = new MediaRecorder(stream, recorderOptions);
+                this._recordingMimeType = mimeType || 'audio/webm';
+            } else {
+                // 电脑端：保持原样
+                this.mediaRecorder = new MediaRecorder(stream);
+                this._recordingMimeType = 'audio/webm';
+            }
+            
             this.audioChunks = [];
             this.recognizedText = '';
             this.isRecording = true;
@@ -296,27 +317,36 @@ const VoiceHandler = {
             return;
         }
         
-        // 标记等待识别完成
-        this._pendingDuration = duration;
-        
-        // 停止语音识别 —— 移动端需要等 onend 回调确认识别彻底结束后再发送
-        if (this.recognition) {
-            // _recognitionEnded 标记由 onend 回调设置
-            this._recognitionEnded = false;
-            try { this.recognition.stop(); } catch(e) {}
+        if (this._isMobile()) {
+            // ===== 移动端：等待 recognition.onend 确认识别结束后再发送 =====
+            this._pendingDuration = duration;
             
-            // 等待识别引擎 onend，最多等 2 秒，超时也发送
-            this._sendTimer = setTimeout(() => {
-                if (!this._recognitionEnded) {
-                    console.warn('[VoiceHandler] 语音识别 onend 超时，强制发送');
-                }
-                this.sendRealVoice(this._pendingDuration);
-            }, 2000);
+            if (this.recognition) {
+                this._recognitionEnded = false;
+                try { this.recognition.stop(); } catch(e) {}
+                
+                // 最多等 2 秒，超时也发送
+                this._sendTimer = setTimeout(() => {
+                    if (!this._recognitionEnded) {
+                        console.warn('[VoiceHandler] 移动端语音识别 onend 超时，强制发送');
+                    }
+                    this.sendRealVoice(this._pendingDuration);
+                }, 2000);
+            } else {
+                setTimeout(() => {
+                    this.sendRealVoice(duration);
+                }, 500);
+            }
         } else {
-            // 没有识别引擎，直接延迟发送等待音频数据
+            // ===== 电脑端：保持原样，停止识别后固定延迟发送 =====
+            if (this.recognition) {
+                this.recognition.stop();
+            }
+            
+            // 延迟发送，等待音频数据和识别结果
             setTimeout(() => {
                 this.sendRealVoice(duration);
-            }, 500);
+            }, 800);
         }
     },
 
@@ -330,21 +360,28 @@ const VoiceHandler = {
             return;
         }
         
+        const isMobile = this._isMobile();
+        
         this.recognition = new SpeechRecognition();
-        // 移动端 continuous 模式不稳定，改为非连续模式
-        this.recognition.continuous = false;
         this.recognition.interimResults = true;
         this.recognition.lang = 'zh-CN';
-        // 移动端设置较长的静音超时，避免过早结束
-        if ('maxAlternatives' in this.recognition) {
-            this.recognition.maxAlternatives = 1;
+        
+        if (isMobile) {
+            // 移动端：非连续模式（更稳定），识别完手动重启
+            this.recognition.continuous = false;
+            if ('maxAlternatives' in this.recognition) {
+                this.recognition.maxAlternatives = 1;
+            }
+        } else {
+            // 电脑端：保持原样，连续模式
+            this.recognition.continuous = true;
         }
         
         // 用于保存中间识别结果作为fallback
         this._interimTranscript = '';
         this._recognitionEnded = false;
-        // 标记是否因为非连续模式自动结束需要重启
-        this._shouldRestart = true;
+        this._lastRecognitionError = '';
+        this._shouldRestart = isMobile; // 只有移动端需要自动重启
         
         this.recognition.onresult = (event) => {
             let finalTranscript = '';
@@ -370,38 +407,40 @@ const VoiceHandler = {
         
         this.recognition.onerror = (event) => {
             console.warn('[VoiceHandler] 语音识别错误:', event.error);
-            // no-speech / aborted 不需要重启
-            if (event.error === 'no-speech' || event.error === 'aborted') {
+            this._lastRecognitionError = event.error;
+            if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'not-allowed') {
                 this._shouldRestart = false;
             }
         };
         
         this.recognition.onend = () => {
-            console.log('[VoiceHandler] 语音识别 onend, isRecording:', this.isRecording, 'shouldRestart:', this._shouldRestart);
+            console.log('[VoiceHandler] 语音识别 onend, isRecording:', this.isRecording, 'isMobile:', isMobile);
             this._recognitionEnded = true;
             
-            if (this.isRecording && this._shouldRestart) {
-                // 非连续模式下识别自动结束，但用户还在录音，需要重启识别
-                try {
-                    this.recognition.start();
-                    console.log('[VoiceHandler] 语音识别已重启');
-                } catch(e) {
-                    console.warn('[VoiceHandler] 语音识别重启失败:', e);
+            if (isMobile) {
+                if (this.isRecording && this._shouldRestart) {
+                    // 移动端非连续模式：识别自动结束但用户还在录音，手动重启
+                    try {
+                        this.recognition.start();
+                        console.log('[VoiceHandler] 移动端语音识别已重启');
+                    } catch(e) {
+                        console.warn('[VoiceHandler] 移动端语音识别重启失败:', e);
+                    }
+                } else if (!this.isRecording && this._sendTimer) {
+                    // 用户已松手，识别已结束，立即发送（取消超时等待）
+                    clearTimeout(this._sendTimer);
+                    this._sendTimer = null;
+                    setTimeout(() => {
+                        this.sendRealVoice(this._pendingDuration);
+                    }, 300);
                 }
-            } else if (!this.isRecording && this._sendTimer) {
-                // 用户已松手，识别已结束，立即发送（取消超时等待）
-                clearTimeout(this._sendTimer);
-                this._sendTimer = null;
-                // 短暂延迟确保 MediaRecorder.onstop 也完成
-                setTimeout(() => {
-                    this.sendRealVoice(this._pendingDuration);
-                }, 300);
             }
+            // 电脑端 onend 不需要特殊处理，靠 stopRecording 的 setTimeout 发送
         };
         
         try {
             this.recognition.start();
-            console.log('[VoiceHandler] 语音识别已启动');
+            console.log('[VoiceHandler] 语音识别已启动, 模式:', isMobile ? '移动端(非连续)' : '电脑端(连续)');
         } catch(e) {
             console.error('[VoiceHandler] 语音识别启动失败:', e);
         }
@@ -417,32 +456,62 @@ const VoiceHandler = {
         // 优先使用最终识别结果，如果没有则使用中间识别结果作为fallback
         const savedText = this.recognizedText || this._interimTranscript || '';
         const savedAudioBlob = this.currentAudioBlob;
+        const lastError = this._lastRecognitionError || '';
         
-        console.log('[VoiceHandler] 发送真实语音, 识别文本:', savedText, '最终结果:', this.recognizedText, '中间结果:', this._interimTranscript);
+        console.log('[VoiceHandler] 发送真实语音, 识别文本:', savedText, '最终结果:', this.recognizedText, '中间结果:', this._interimTranscript, '错误:', lastError);
+        
+        // ASR 失败时给出明确提示
+        if (!savedText) {
+            let errorMsg = '语音转文字失败';
+            if (lastError === 'not-allowed') {
+                errorMsg = '麦克风语音识别权限被拒绝，请在浏览器设置中允许语音识别权限（注意：语音识别权限和麦克风权限是分开的）';
+            } else if (lastError === 'no-speech') {
+                errorMsg = '未检测到语音输入，请靠近麦克风说话';
+            } else if (lastError === 'network') {
+                errorMsg = '语音识别需要网络连接（浏览器会将音频发送到云端识别），请检查网络';
+            } else if (lastError === 'service-not-available') {
+                errorMsg = '语音识别服务不可用，当前浏览器可能不支持语音识别功能';
+            } else if (lastError) {
+                errorMsg = '语音识别失败: ' + lastError;
+            } else {
+                errorMsg = '语音转文字失败，浏览器未返回识别结果。请确认：\n1. 使用 Chrome 浏览器\n2. 网络连接正常\n3. 已授予语音识别权限';
+            }
+            console.error('[VoiceHandler]', errorMsg);
+            alert(errorMsg);
+        }
         
         // 先关闭面板
         this.closeVoicePanel();
         
-        // 禁止直传原始 Blob，必须先转码为 16kHz/单声道/16-bit WAV
+        // 本地回放用原始 Blob（保留原始格式），同时为 AI 生成 16kHz WAV 转码版本
         if (savedAudioBlob) {
-            this._resampleToWAV(savedAudioBlob).then(wavBase64 => {
-                this.createAndSendVoiceMessage(duration, wavBase64, savedText || '[语音消息]', false);
-            }).catch(err => {
-                console.error('[VoiceHandler] WAV 转码失败:', err);
-                // 转码失败也不直传原始 Blob，只发送文字
-                this.createAndSendVoiceMessage(duration, null, savedText || '[语音消息]', false);
-            });
+            // 先将原始 Blob 转为 base64 用于回放
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const originalBase64 = reader.result;
+                
+                // 同时用 OfflineAudioContext 重采样为 16kHz WAV 供 AI 使用
+                this._resampleToWAV16k(savedAudioBlob).then(wavBase64 => {
+                    console.log('[VoiceHandler] 16kHz WAV 转码成功');
+                    this.createAndSendVoiceMessage(duration, originalBase64, wavBase64, savedText || '[语音消息]', false);
+                }).catch(err => {
+                    console.warn('[VoiceHandler] 16kHz 转码失败，AI 将使用原始音频:', err);
+                    this.createAndSendVoiceMessage(duration, originalBase64, originalBase64, savedText || '[语音消息]', false);
+                });
+            };
+            reader.readAsDataURL(savedAudioBlob);
         } else {
-            this.createAndSendVoiceMessage(duration, null, savedText || '[语音消息]', false);
+            this.createAndSendVoiceMessage(duration, null, null, savedText || '[语音消息]', false);
         }
     },
 
     /**
-     * 将任意音频 Blob 强制转码为 16000Hz、单声道、16-bit PCM WAV 的 Base64 Data URL
-     * @param {Blob} blob - 原始录音 Blob（可能是 webm/ogg/mp4 等）
+     * 使用 OfflineAudioContext 将音频重采样为 16000Hz 单声道 16-bit PCM WAV
+     * 只用于发送给 AI 的数据，不影响本地回放
+     * @param {Blob} blob - 原始录音 Blob
      * @returns {Promise<string>} WAV 格式的 base64 data URL
      */
-    _resampleToWAV: async function(blob) {
+    _resampleToWAV16k: async function(blob) {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         try {
             const arrayBuffer = await blob.arrayBuffer();
@@ -462,57 +531,42 @@ const VoiceHandler = {
             const resampledBuffer = await offlineCtx.startRendering();
             const pcmData = resampledBuffer.getChannelData(0);
             
-            // 编码为标准 WAV
-            const wavBlob = this._encodeWAV(pcmData, targetSampleRate);
-            console.log('[VoiceHandler] 音频已转码为 16kHz WAV, 大小:', wavBlob.size, 'bytes');
+            // 编码为 16-bit PCM WAV
+            const wavBuffer = new ArrayBuffer(44 + pcmData.length * 2);
+            const view = new DataView(wavBuffer);
+            const writeStr = (off, str) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
             
-            // 转为 base64 data URL
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + pcmData.length * 2, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, targetSampleRate, true);
+            view.setUint32(28, targetSampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeStr(36, 'data');
+            view.setUint32(40, pcmData.length * 2, true);
+            
+            for (let i = 0; i < pcmData.length; i++) {
+                const s = Math.max(-1, Math.min(1, pcmData[i]));
+                view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            
+            const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+            console.log('[VoiceHandler] 音频已重采样为 16kHz WAV, 大小:', wavBlob.size, 'bytes');
+            
             return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(wavBlob);
+                const r = new FileReader();
+                r.onloadend = () => resolve(r.result);
+                r.onerror = reject;
+                r.readAsDataURL(wavBlob);
             });
         } finally {
             audioContext.close();
         }
-    },
-
-    /**
-     * 将 PCM float32 数据编码为 16-bit PCM WAV 格式 Blob
-     * @param {Float32Array} samples - PCM 采样数据
-     * @param {number} sampleRate - 采样率
-     * @returns {Blob} WAV 格式 Blob
-     */
-    _encodeWAV: function(samples, sampleRate) {
-        const buffer = new ArrayBuffer(44 + samples.length * 2);
-        const view = new DataView(buffer);
-        
-        const writeString = (offset, str) => {
-            for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-        };
-        
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + samples.length * 2, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true);            // fmt chunk size
-        view.setUint16(20, 1, true);              // PCM format
-        view.setUint16(22, 1, true);              // 单声道
-        view.setUint32(24, sampleRate, true);      // 采样率
-        view.setUint32(28, sampleRate * 2, true);  // 字节率
-        view.setUint16(32, 2, true);              // 块对齐
-        view.setUint16(34, 16, true);             // 位深度
-        writeString(36, 'data');
-        view.setUint32(40, samples.length * 2, true);
-        
-        // float32 → int16 PCM
-        for (let i = 0; i < samples.length; i++) {
-            const s = Math.max(-1, Math.min(1, samples[i]));
-            view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-        }
-        
-        return new Blob([buffer], { type: 'audio/wav' });
     },
 
     /**
@@ -530,14 +584,19 @@ const VoiceHandler = {
         // 根据字数计算伪造时长（约每秒3-4个字）
         const duration = Math.max(1, Math.ceil(text.length / 3.5));
         
-        this.createAndSendVoiceMessage(duration, null, text, true);
+        this.createAndSendVoiceMessage(duration, null, null, text, true);
         this.closeVoicePanel();
     },
 
     /**
      * 创建并发送语音消息
+     * @param {number} duration - 语音时长
+     * @param {string|null} audioData - 原始音频 base64（用于本地回放）
+     * @param {string|null} audioDataForAI - 16kHz WAV base64（用于发送给 AI）
+     * @param {string} text - 识别文本
+     * @param {boolean} isFake - 是否伪造
      */
-    createAndSendVoiceMessage: function(duration, audioData, text, isFake) {
+    createAndSendVoiceMessage: function(duration, audioData, audioDataForAI, text, isFake) {
         const msg = {
             id: Date.now(),
             sender: 'user',
@@ -547,6 +606,7 @@ const VoiceHandler = {
             voiceData: {
                 duration: duration,
                 audioBase64: audioData,
+                audioBase64ForAI: audioDataForAI,
                 isFake: isFake,
                 transcription: text
             }
@@ -577,7 +637,7 @@ const VoiceHandler = {
             textEl.classList.toggle('hidden');
         }
         
-        // 如果有真实音频，播放它
+        // 如果有真实音频，播放它（使用原始格式的 audioBase64）
         if (voiceData.audioBase64 && !voiceData.isFake) {
             const audio = new Audio(voiceData.audioBase64);
             audio.play().catch(err => {
