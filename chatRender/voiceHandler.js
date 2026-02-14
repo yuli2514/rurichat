@@ -423,17 +423,96 @@ const VoiceHandler = {
         // 先关闭面板
         this.closeVoicePanel();
         
-        // 将音频转为 base64
+        // 禁止直传原始 Blob，必须先转码为 16kHz/单声道/16-bit WAV
         if (savedAudioBlob) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const audioBase64 = reader.result;
-                this.createAndSendVoiceMessage(duration, audioBase64, savedText || '[语音消息]', false);
-            };
-            reader.readAsDataURL(savedAudioBlob);
+            this._resampleToWAV(savedAudioBlob).then(wavBase64 => {
+                this.createAndSendVoiceMessage(duration, wavBase64, savedText || '[语音消息]', false);
+            }).catch(err => {
+                console.error('[VoiceHandler] WAV 转码失败:', err);
+                // 转码失败也不直传原始 Blob，只发送文字
+                this.createAndSendVoiceMessage(duration, null, savedText || '[语音消息]', false);
+            });
         } else {
             this.createAndSendVoiceMessage(duration, null, savedText || '[语音消息]', false);
         }
+    },
+
+    /**
+     * 将任意音频 Blob 强制转码为 16000Hz、单声道、16-bit PCM WAV 的 Base64 Data URL
+     * @param {Blob} blob - 原始录音 Blob（可能是 webm/ogg/mp4 等）
+     * @returns {Promise<string>} WAV 格式的 base64 data URL
+     */
+    _resampleToWAV: async function(blob) {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            const targetSampleRate = 16000;
+            const offlineCtx = new OfflineAudioContext(
+                1, // 单声道
+                Math.ceil(audioBuffer.duration * targetSampleRate),
+                targetSampleRate
+            );
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineCtx.destination);
+            source.start(0);
+            
+            const resampledBuffer = await offlineCtx.startRendering();
+            const pcmData = resampledBuffer.getChannelData(0);
+            
+            // 编码为标准 WAV
+            const wavBlob = this._encodeWAV(pcmData, targetSampleRate);
+            console.log('[VoiceHandler] 音频已转码为 16kHz WAV, 大小:', wavBlob.size, 'bytes');
+            
+            // 转为 base64 data URL
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(wavBlob);
+            });
+        } finally {
+            audioContext.close();
+        }
+    },
+
+    /**
+     * 将 PCM float32 数据编码为 16-bit PCM WAV 格式 Blob
+     * @param {Float32Array} samples - PCM 采样数据
+     * @param {number} sampleRate - 采样率
+     * @returns {Blob} WAV 格式 Blob
+     */
+    _encodeWAV: function(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        
+        const writeString = (offset, str) => {
+            for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+        };
+        
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);            // fmt chunk size
+        view.setUint16(20, 1, true);              // PCM format
+        view.setUint16(22, 1, true);              // 单声道
+        view.setUint32(24, sampleRate, true);      // 采样率
+        view.setUint32(28, sampleRate * 2, true);  // 字节率
+        view.setUint16(32, 2, true);              // 块对齐
+        view.setUint16(34, 16, true);             // 位深度
+        writeString(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        
+        // float32 → int16 PCM
+        for (let i = 0; i < samples.length; i++) {
+            const s = Math.max(-1, Math.min(1, samples[i]));
+            view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        
+        return new Blob([buffer], { type: 'audio/wav' });
     },
 
     /**
