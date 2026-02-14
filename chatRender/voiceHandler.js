@@ -64,6 +64,7 @@ const VoiceHandler = {
     resetState: function() {
         this.audioChunks = [];
         this.recognizedText = '';
+        this._interimTranscript = '';
         this.isRecording = false;
         this.currentAudioBlob = null;
         if (this.recordingTimer) {
@@ -259,10 +260,10 @@ const VoiceHandler = {
             return;
         }
         
-        // 延迟发送，等待音频数据和识别结果
+        // 延迟发送，等待音频数据和识别结果（增加延迟以确保语音识别有足够时间返回结果）
         setTimeout(() => {
             this.sendRealVoice(duration);
-        }, 300);
+        }, 800);
     },
 
     /**
@@ -280,15 +281,26 @@ const VoiceHandler = {
         this.recognition.interimResults = true;
         this.recognition.lang = 'zh-CN';
         
+        // 用于保存中间识别结果作为fallback
+        this._interimTranscript = '';
+        
         this.recognition.onresult = (event) => {
             let finalTranscript = '';
+            let interimTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
                 }
             }
             if (finalTranscript) {
                 this.recognizedText += finalTranscript;
+                this._interimTranscript = ''; // 有最终结果时清空中间结果
+            } else if (interimTranscript) {
+                // 保存最新的中间识别结果作为fallback
+                this._interimTranscript = interimTranscript;
             }
         };
         
@@ -305,20 +317,27 @@ const VoiceHandler = {
     sendRealVoice: function(duration) {
         if (!ChatInterface.currentCharId) return;
         
+        // 在关闭面板之前保存识别文本和音频数据，因为closeVoicePanel会调用resetState清空recognizedText
+        // 优先使用最终识别结果，如果没有则使用中间识别结果作为fallback
+        const savedText = this.recognizedText || this._interimTranscript || '';
+        const savedAudioBlob = this.currentAudioBlob;
+        
+        console.log('[VoiceHandler] 发送真实语音, 识别文本:', savedText, '最终结果:', this.recognizedText, '中间结果:', this._interimTranscript);
+        
+        // 先关闭面板
+        this.closeVoicePanel();
+        
         // 将音频转为 base64
-        let audioBase64 = null;
-        if (this.currentAudioBlob) {
+        if (savedAudioBlob) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                audioBase64 = reader.result;
-                this.createAndSendVoiceMessage(duration, audioBase64, this.recognizedText || '[语音消息]', false);
+                const audioBase64 = reader.result;
+                this.createAndSendVoiceMessage(duration, audioBase64, savedText || '[语音消息]', false);
             };
-            reader.readAsDataURL(this.currentAudioBlob);
+            reader.readAsDataURL(savedAudioBlob);
         } else {
-            this.createAndSendVoiceMessage(duration, null, this.recognizedText || '[语音消息]', false);
+            this.createAndSendVoiceMessage(duration, null, savedText || '[语音消息]', false);
         }
-        
-        this.closeVoicePanel();
     },
 
     /**

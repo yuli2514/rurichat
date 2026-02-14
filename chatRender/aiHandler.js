@@ -51,6 +51,17 @@ const AIHandler = {
                 // 跳过空消息
                 if (!text || text.trim() === '') continue;
                 
+                // 清理AI可能添加的markdown图片格式：![xxx](url) -> url
+                const markdownImgMatch = text.match(/^!\[.*?\]\((.+?)\)$/);
+                if (markdownImgMatch) {
+                    text = markdownImgMatch[1];
+                }
+                // 清理markdown链接格式：[xxx](url) -> url（仅当内容看起来像表情包链接时）
+                const markdownLinkMatch = text.match(/^\[.*?\]\((https?:\/\/.+?)\)$/);
+                if (markdownLinkMatch) {
+                    text = markdownLinkMatch[1];
+                }
+                
                 // 解析 [表情包：xxx] 格式
                 const emojiMatch = text.match(/^\[表情包[：:]\s*(.+?)\s*\]$/);
                 if (emojiMatch) {

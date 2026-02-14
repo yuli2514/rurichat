@@ -232,14 +232,12 @@ const ChatSettings = {
         const cssInput = document.getElementById('custom-css-input');
         if (cssInput) cssInput.value = customCss;
         
-        const msgArea = document.getElementById('chat-messages');
-        if (msgArea) {
-            msgArea.style.setProperty('--chat-bubble-padding-v', (10 * cssBubble) + 'px');
-            msgArea.style.setProperty('--chat-bubble-padding-h', (14 * cssBubble) + 'px');
-            msgArea.style.setProperty('--chat-font-size', cssFont + 'px');
-            msgArea.style.setProperty('--chat-avatar-size', cssAvatar + 'px');
-            msgArea.style.setProperty('--chat-avatar-radius', cssAvatarRadius + '%');
-        }
+        // 应用CSS变量到界面（使用skipSave避免重复保存）
+        CssManager.updateCssVar('bubble', cssBubble, true);
+        CssManager.updateCssVar('font', cssFont, true);
+        CssManager.updateCssVar('avatar', cssAvatar, true);
+        CssManager.updateCssVar('toolbar', cssToolbar, true);
+        CssManager.updateCssVar('avatarRadius', cssAvatarRadius, true);
 
         // 角色感知现实世界
         const realWorldCheckbox = document.getElementById('setting-realworld-awareness');
@@ -251,18 +249,8 @@ const ChatSettings = {
         const timestampBubble = document.getElementById('setting-timestamp-bubble');
         if (timestampBubble) timestampBubble.checked = settings.timestampBubble || false;
 
-        const chatInterface = document.getElementById('super-chat-interface');
-        if (chatInterface) {
-            chatInterface.style.setProperty('--chat-toolbar-icon-size', cssToolbar + 'px');
-        }
-        
-        let style = document.getElementById('char-custom-css');
-        if (!style) {
-            style = document.createElement('style');
-            style.id = 'char-custom-css';
-            document.head.appendChild(style);
-        }
-        style.textContent = customCss;
+        // 应用自定义CSS（使用skipSave避免重复保存）
+        CssManager.applyCustomCss(customCss, true);
         
         CssManager.renderCssPresets();
     },

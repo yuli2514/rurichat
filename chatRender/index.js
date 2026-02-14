@@ -119,19 +119,39 @@ const ChatInterface = {
                 messagesArea.style.backgroundImage = '';
             }
 
-            // 应用自定义CSS
-            if (char.settings && char.settings.customCss) {
-                CssManager.applyCustomCss(char.settings.customCss);
-            } else {
-                CssManager.applyCustomCss('');
+            // 应用自定义CSS（仅设置样式，不触发保存回调）
+            {
+                let style = document.getElementById('char-custom-css');
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = 'char-custom-css';
+                    document.head.appendChild(style);
+                }
+                style.textContent = (char.settings && char.settings.customCss) ? char.settings.customCss : '';
             }
-            
-            // 应用CSS变量
-            if (char.settings) {
-                if (char.settings.cssBubble) CssManager.updateCssVar('bubble', char.settings.cssBubble);
-                if (char.settings.cssFont) CssManager.updateCssVar('font', char.settings.cssFont);
-                if (char.settings.cssAvatar) CssManager.updateCssVar('avatar', char.settings.cssAvatar);
-                if (char.settings.cssAvatarRadius !== undefined) CssManager.updateCssVar('avatarRadius', char.settings.cssAvatarRadius);
+
+            // 应用CSS变量（直接设置CSS变量，不通过CssManager避免重复保存）
+            {
+                const s = char.settings || {};
+                const cssBubble = s.cssBubble || 1.0;
+                const cssFont = s.cssFont || 16;
+                const cssAvatar = s.cssAvatar || 40;
+                const cssToolbar = s.cssToolbar || 20;
+                const cssAvatarRadius = s.cssAvatarRadius !== undefined ? s.cssAvatarRadius : 50;
+
+                const msgArea = document.getElementById('chat-messages');
+                if (msgArea) {
+                    msgArea.style.setProperty('--chat-bubble-padding-v', (10 * cssBubble) + 'px');
+                    msgArea.style.setProperty('--chat-bubble-padding-h', (14 * cssBubble) + 'px');
+                    msgArea.style.setProperty('--chat-font-size', cssFont + 'px');
+                    msgArea.style.setProperty('--chat-avatar-size', cssAvatar + 'px');
+                    msgArea.style.setProperty('--chat-avatar-radius', cssAvatarRadius + '%');
+                }
+
+                const chatInterfaceEl = document.getElementById('super-chat-interface');
+                if (chatInterfaceEl) {
+                    chatInterfaceEl.style.setProperty('--chat-toolbar-icon-size', cssToolbar + 'px');
+                }
             }
 
             this.renderMessages();

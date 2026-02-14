@@ -3,7 +3,13 @@
  * 负责聊天界面的CSS自定义和预设管理
  */
 const CssManager = {
-    updateCssVar: function(type, value) {
+    /**
+     * 更新CSS变量并应用到界面
+     * @param {string} type - 变量类型: bubble/font/avatar/toolbar/avatarRadius
+     * @param {*} value - 值
+     * @param {boolean} skipSave - 是否跳过保存（恢复设置时使用）
+     */
+    updateCssVar: function(type, value, skipSave) {
         const msgArea = document.getElementById('chat-messages');
         if (!msgArea) return;
 
@@ -16,7 +22,7 @@ const CssManager = {
             msgArea.style.setProperty('--chat-bubble-padding-v', v + 'px');
             msgArea.style.setProperty('--chat-bubble-padding-h', h + 'px');
             
-            if (typeof ChatSettings !== 'undefined') {
+            if (!skipSave && typeof ChatSettings !== 'undefined') {
                 ChatSettings.updateCharSettings({ cssBubble: value });
             }
         } else if (type === 'font') {
@@ -25,7 +31,7 @@ const CssManager = {
             
             msgArea.style.setProperty('--chat-font-size', value + 'px');
             
-            if (typeof ChatSettings !== 'undefined') {
+            if (!skipSave && typeof ChatSettings !== 'undefined') {
                 ChatSettings.updateCharSettings({ cssFont: value });
             }
         } else if (type === 'avatar') {
@@ -34,7 +40,7 @@ const CssManager = {
             
             msgArea.style.setProperty('--chat-avatar-size', value + 'px');
             
-            if (typeof ChatSettings !== 'undefined') {
+            if (!skipSave && typeof ChatSettings !== 'undefined') {
                 ChatSettings.updateCharSettings({ cssAvatar: value });
             }
         } else if (type === 'toolbar') {
@@ -46,7 +52,7 @@ const CssManager = {
                 chatInterface.style.setProperty('--chat-toolbar-icon-size', value + 'px');
             }
             
-            if (typeof ChatSettings !== 'undefined') {
+            if (!skipSave && typeof ChatSettings !== 'undefined') {
                 ChatSettings.updateCharSettings({ cssToolbar: value });
             }
         } else if (type === 'avatarRadius') {
@@ -55,13 +61,18 @@ const CssManager = {
             
             msgArea.style.setProperty('--chat-avatar-radius', value + '%');
             
-            if (typeof ChatSettings !== 'undefined') {
+            if (!skipSave && typeof ChatSettings !== 'undefined') {
                 ChatSettings.updateCharSettings({ cssAvatarRadius: value });
             }
         }
     },
 
-    applyCustomCss: function(css) {
+    /**
+     * 应用自定义CSS
+     * @param {string} css - CSS代码
+     * @param {boolean} skipSave - 是否跳过保存
+     */
+    applyCustomCss: function(css, skipSave) {
         let style = document.getElementById('char-custom-css');
         if (!style) {
             style = document.createElement('style');
@@ -69,7 +80,9 @@ const CssManager = {
             document.head.appendChild(style);
         }
         style.textContent = css;
-        ChatSettings.updateCharSettings({ customCss: css });
+        if (!skipSave) {
+            ChatSettings.updateCharSettings({ customCss: css });
+        }
     },
 
     saveCssPreset: function() {

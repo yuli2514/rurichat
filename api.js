@@ -525,7 +525,9 @@ const API = {
                     systemPrompt += '\n你可以使用以下表情包来表达情绪，根据你的人设性格决定发送频率：';
                     systemPrompt += '\n- 如果人设活泼开朗，可以多发表情包';
                     systemPrompt += '\n- 如果人设冷淡高冷，可以少发或不发';
-                    systemPrompt += '\n- 发送表情包时，只需要单独一行输出完整的URL即可';
+                    systemPrompt += '\n- 发送表情包时，只需要单独一行输出完整的URL即可，不要添加任何markdown格式、括号、感叹号或其他修饰符号';
+                    systemPrompt += '\n- 错误示例：![表情](URL) 或 [表情](URL) 或 ![](URL)';
+                    systemPrompt += '\n- 正确示例：直接输出URL，如 https://example.com/emoji.png';
                     systemPrompt += '\n\n可用表情包列表（含义: URL）：\n' + emojiList;
                 }
             }
@@ -562,9 +564,15 @@ const API = {
                 // 处理语音消息 - 将语音内容作为文字传递给AI
                 else if (msg.type === 'voice') {
                     const voiceData = msg.voiceData || {};
-                    const transcription = voiceData.transcription || msg.content || '[语音消息]';
+                    const transcription = voiceData.transcription || msg.content || '';
                     const sender = msg.sender === 'user' ? '用户' : char.name;
-                    content = '[' + sender + '发送了一条语音消息，内容是：] ' + transcription;
+                    if (transcription && transcription !== '[语音消息]') {
+                        // 有识别出的文字内容，直接告诉AI用户说了什么
+                        content = '[' + sender + '发送了一条语音消息，说的是：「' + transcription + '」]';
+                    } else {
+                        // 没有识别出文字，告诉AI用户发了语音但无法转文字
+                        content = '[' + sender + '发送了一条语音消息，语音转文字失败，请根据上下文推测用户可能在说什么，并自然地回应]';
+                    }
                 }
                 // 处理图片/表情包消息 - 尝试匹配表情包含义
                 else if (msg.type === 'image') {
