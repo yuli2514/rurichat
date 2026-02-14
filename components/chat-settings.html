@@ -31,7 +31,7 @@
                         </div>
                         <!-- AI小字 - 正上方居中，可点击编辑像打字 -->
                         <div class="absolute -top-7 left-1/2 transform -translate-x-1/2 text-center w-24 z-20">
-                            <span id="setting-char-name-display" class="text-xs text-gray-500 font-medium block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveCharNameEdit(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveCharNameEdit(this); }">AI名</span>
+                            <span id="setting-char-name-display" class="text-xs text-gray-500 font-medium block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveCharDecoText(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveCharDecoText(this); }">^ω^</span>
                         </div>
                         <!-- AI英文小字 - 正下方居中 -->
                         <div class="absolute -bottom-7 left-1/2 transform -translate-x-1/2 text-center w-32 z-20">
@@ -55,7 +55,7 @@
                         </div>
                         <!-- 用户小字 - 正上方居中，可直接编辑 -->
                         <div class="absolute -top-7 left-1/2 transform -translate-x-1/2 text-center w-24 z-20">
-                            <span id="setting-user-name-display" class="text-xs text-gray-500 font-medium block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveUserName(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveUserName(this); }">用户</span>
+                            <span id="setting-user-name-display" class="text-xs text-gray-500 font-medium block cursor-text select-text" contenteditable="true" onblur="ChatSettings.saveUserDecoText(this)" onkeydown="if(event.key==='Enter') {event.preventDefault(); ChatSettings.saveUserDecoText(this); }">ÒvÓ</span>
                         </div>
                         <!-- 用户英文小字 - 正下方居中 -->
                         <div class="absolute -bottom-7 left-1/2 transform -translate-x-1/2 text-center w-32 z-20">

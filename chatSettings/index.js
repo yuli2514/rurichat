@@ -76,14 +76,11 @@ const ChatSettings = {
 
         const settings = char.settings || {};
 
-        // 基本信息显示
+        // 装饰文字显示（纯装饰，不绑定角色名或用户名）
         const charNameDisplay = document.getElementById('setting-char-name-display');
         const userNameDisplay = document.getElementById('setting-user-name-display');
-        if (charNameDisplay) charNameDisplay.textContent = char.name || 'AI名';
-        if (userNameDisplay) {
-            const profile = API.Profile.getProfile();
-            userNameDisplay.textContent = profile.name || '用户';
-        }
+        if (charNameDisplay) charNameDisplay.textContent = settings.charDecoText || '^ω^';
+        if (userNameDisplay) userNameDisplay.textContent = settings.userDecoText || 'ÒvÓ';
 
         const musicEmojiText = document.getElementById('setting-music-emoji-text');
         if (musicEmojiText) {
@@ -290,6 +287,23 @@ const ChatSettings = {
         const text = span.textContent.trim();
         profile.name = text || '用户';
         API.Profile.saveProfile(profile);
+    },
+
+    // 装饰文字保存（纯装饰，不绑定角色名或用户名）
+    saveCharDecoText: function(span) {
+        const text = span.textContent.trim();
+        if (!text) {
+            span.textContent = '^ω^';
+        }
+        this.updateCharSettings({ charDecoText: text || '^ω^' });
+    },
+
+    saveUserDecoText: function(span) {
+        const text = span.textContent.trim();
+        if (!text) {
+            span.textContent = 'ÒvÓ';
+        }
+        this.updateCharSettings({ userDecoText: text || 'ÒvÓ' });
     },
 
     saveMusicEmojiText: function(span) {

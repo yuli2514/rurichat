@@ -375,6 +375,13 @@ const TransferHandler = {
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
         }
+        
+        // 触发AI回复，让角色自己判断是否领取转账
+        setTimeout(() => {
+            if (typeof AIHandler !== 'undefined' && AIHandler.triggerAI) {
+                AIHandler.triggerAI(ChatInterface);
+            }
+        }, 300);
     },
 
     /**

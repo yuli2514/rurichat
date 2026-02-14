@@ -468,11 +468,13 @@ const API = {
             systemPrompt += '\n  示例：[转账:520:爱你哦]';
             systemPrompt += '\n  示例：[转账:88.88:生日快乐]';
             systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起，不要用[图片:]来描述转账';
+            systemPrompt += '\n  ⚠️ 重要：如果聊天记录中已经有你发过的转账记录，不要重复发送新转账！除非用户明确要求你再转一次。';
             systemPrompt += '\n';
             systemPrompt += '\n★ 领取转账 [领取转账]：';
             systemPrompt += '\n  格式：[领取转账]';
             systemPrompt += '\n  用途：当用户给你转账后，你想收下时使用';
             systemPrompt += '\n  注意：根据角色性格和剧情决定是否领取，可以拒绝或犹豫';
+            systemPrompt += '\n  ⚠️ 重要：如果聊天记录显示你已经领取了某笔转账，不要重复领取。已领取的转账会标注"已经领取"。';
 
             // --- Memory Integration ---
             const memories = API.Memory.getMemories(charId);
@@ -534,8 +536,31 @@ const API = {
             const recentHistory = visibleHistory.slice(-ctxLength).map(msg => {
                 let content = '';
                 
+                // 处理转账消息 - 告诉AI转账状态，避免重复转账
+                if (msg.type === 'transfer') {
+                    const td = msg.transferData || {};
+                    const amount = td.amount || 0;
+                    const remark = td.remark || '';
+                    const status = td.status || 'pending';
+                    
+                    if (td.fromUser) {
+                        // 用户发的转账
+                        if (status === 'received') {
+                            content = '[用户给你转账了' + amount.toFixed(2) + '元' + (remark ? '，备注：' + remark : '') + '，你已经领取了这笔转账]';
+                        } else {
+                            content = '[用户给你转账了' + amount.toFixed(2) + '元' + (remark ? '，备注：' + remark : '') + '，你尚未领取，可以用[领取转账]来领取]';
+                        }
+                    } else {
+                        // AI发的转账
+                        if (status === 'received') {
+                            content = '[你之前给用户转账了' + amount.toFixed(2) + '元' + (remark ? '，备注：' + remark : '') + '，用户已经领取了]';
+                        } else {
+                            content = '[你之前给用户转账了' + amount.toFixed(2) + '元' + (remark ? '，备注：' + remark : '') + '，用户尚未领取]';
+                        }
+                    }
+                }
                 // 处理语音消息 - 将语音内容作为文字传递给AI
-                if (msg.type === 'voice') {
+                else if (msg.type === 'voice') {
                     const voiceData = msg.voiceData || {};
                     const transcription = voiceData.transcription || msg.content || '[语音消息]';
                     const sender = msg.sender === 'user' ? '用户' : char.name;
@@ -1016,6 +1041,15 @@ const API = {
             return summaries;
         },
 
+        updateOfflineSummary: function(charId, index, content) {
+            const summaries = this.getOfflineSummaries(charId);
+            if (summaries[index]) {
+                summaries[index].content = content;
+                this.saveOfflineSummaries(charId, summaries);
+            }
+            return summaries;
+        },
+
         deleteOfflineSummary: function(charId, index) {
             const summaries = this.getOfflineSummaries(charId);
             summaries.splice(index, 1);
@@ -1040,6 +1074,29 @@ const API = {
                 const store = tx.objectStore('wallpapers');
                 store.put({ charId: charId, data: data });
                 console.log('[Offline] Wallpaper saved to IndexedDB for', charId);
+            };
+            request.onerror = function(e) {
+                console.error('[Offline] IndexedDB open error:', e);
+            };
+        },
+
+        /**
+         * IndexedDB 壁纸存储 - 删除
+         */
+        _deleteWallpaperFromIndexedDB: function(charId) {
+            const request = indexedDB.open('ruri_offline_db', 1);
+            request.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('wallpapers')) {
+                    db.createObjectStore('wallpapers', { keyPath: 'charId' });
+                }
+            };
+            request.onsuccess = function(e) {
+                const db = e.target.result;
+                const tx = db.transaction('wallpapers', 'readwrite');
+                const store = tx.objectStore('wallpapers');
+                store.delete(charId);
+                console.log('[Offline] Wallpaper deleted from IndexedDB for', charId);
             };
             request.onerror = function(e) {
                 console.error('[Offline] IndexedDB open error:', e);

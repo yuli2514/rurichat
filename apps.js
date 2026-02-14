@@ -37,6 +37,11 @@ const EmojiManager = {
         alert('导入成功！共 ' + emojis.length + ' 个表情');
     },
 
+    // 当前展开管理的分组ID
+    expandedGroupId: null,
+    // 批量删除选中的索引
+    selectedForDelete: new Set(),
+
     renderGroups: function() {
         const list = document.getElementById('emoji-groups-list');
         const groups = API.Emoji.getGroups();
@@ -46,20 +51,115 @@ const EmojiManager = {
             return;
         }
 
-        list.innerHTML = groups.map(g => `
-            <div class="bg-white rounded-lg p-3 border border-gray-200">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="font-bold text-sm">${g.name}</span>
-                    <button onclick="EmojiManager.deleteGroup('${g.id}')" class="text-red-500 text-xs">删除</button>
-                </div>
-                <p class="text-xs text-gray-500">共 ${g.emojis.length} 个表情</p>
-            </div>
-        `).join('');
+        list.innerHTML = groups.map(g => {
+            const isExpanded = this.expandedGroupId === g.id;
+            let html = '<div class="bg-white rounded-lg p-3 border border-gray-200">';
+            html += '<div class="flex justify-between items-center mb-2">';
+            html += '<span class="font-bold text-sm">' + g.name + '</span>';
+            html += '<div class="flex gap-2">';
+            html += '<button onclick="EmojiManager.toggleExpand(\'' + g.id + '\')" class="text-blue-500 text-xs">' + (isExpanded ? '收起' : '管理') + '</button>';
+            html += '<button onclick="EmojiManager.deleteGroup(\'' + g.id + '\')" class="text-red-500 text-xs">删除组</button>';
+            html += '</div></div>';
+            html += '<p class="text-xs text-gray-500">共 ' + g.emojis.length + ' 个表情</p>';
+            
+            // 展开后显示表情包列表（带删除按钮）
+            if (isExpanded) {
+                html += '<div class="mt-3 border-t border-gray-100 pt-3">';
+                // 批量操作按钮
+                html += '<div class="flex justify-between items-center mb-2">';
+                html += '<button onclick="EmojiManager.selectAllEmojis(\'' + g.id + '\')" class="text-xs text-blue-500">全选</button>';
+                html += '<button onclick="EmojiManager.deleteSelectedEmojis(\'' + g.id + '\')" class="text-xs text-red-500 font-bold">删除选中 (' + this.selectedForDelete.size + ')</button>';
+                html += '</div>';
+                // 表情包网格
+                html += '<div class="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">';
+                g.emojis.forEach(function(e, idx) {
+                    const isSelected = EmojiManager.selectedForDelete.has(idx);
+                    const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(e.url) || e.url.startsWith('data:image');
+                    html += '<div class="relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer border-2 ' + (isSelected ? 'border-red-500' : 'border-transparent') + '" onclick="EmojiManager.toggleEmojiSelect(' + idx + ')">';
+                    if (isImage) {
+                        html += '<img src="' + e.url + '" class="w-full h-full object-cover" loading="lazy">';
+                    } else {
+                        html += '<div class="w-full h-full flex items-center justify-center"><i class="fa-solid fa-link text-gray-400"></i></div>';
+                    }
+                    if (isSelected) {
+                        html += '<div class="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><i class="fa-solid fa-check text-white text-[8px]"></i></div>';
+                    }
+                    html += '<div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[8px] text-center py-0.5 truncate px-1">' + (e.meaning || '表情') + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }).join('');
+    },
+
+    toggleExpand: function(groupId) {
+        if (this.expandedGroupId === groupId) {
+            this.expandedGroupId = null;
+        } else {
+            this.expandedGroupId = groupId;
+        }
+        this.selectedForDelete.clear();
+        this.renderGroups();
+    },
+
+    toggleEmojiSelect: function(index) {
+        if (this.selectedForDelete.has(index)) {
+            this.selectedForDelete.delete(index);
+        } else {
+            this.selectedForDelete.add(index);
+        }
+        this.renderGroups();
+    },
+
+    selectAllEmojis: function(groupId) {
+        const groups = API.Emoji.getGroups();
+        const group = groups.find(g => g.id === groupId);
+        if (!group) return;
+        
+        if (this.selectedForDelete.size === group.emojis.length) {
+            // 已全选则取消全选
+            this.selectedForDelete.clear();
+        } else {
+            // 全选
+            this.selectedForDelete.clear();
+            group.emojis.forEach(function(_, idx) {
+                EmojiManager.selectedForDelete.add(idx);
+            });
+        }
+        this.renderGroups();
+    },
+
+    deleteSelectedEmojis: function(groupId) {
+        if (this.selectedForDelete.size === 0) {
+            alert('请先选择要删除的表情包');
+            return;
+        }
+        if (!confirm('确定要删除选中的 ' + this.selectedForDelete.size + ' 个表情包吗？')) return;
+        
+        const groups = API.Emoji.getGroups();
+        const group = groups.find(g => g.id === groupId);
+        if (!group) return;
+        
+        // 从后往前删除，避免索引偏移
+        const indices = Array.from(this.selectedForDelete).sort((a, b) => b - a);
+        indices.forEach(function(idx) {
+            group.emojis.splice(idx, 1);
+        });
+        
+        API.Emoji.saveGroups(groups);
+        this.selectedForDelete.clear();
+        this.renderGroups();
     },
 
     deleteGroup: function(groupId) {
         if (!confirm('确定要删除这个表情包分组吗？')) return;
         API.Emoji.deleteGroup(groupId);
+        this.expandedGroupId = null;
+        this.selectedForDelete.clear();
         this.renderGroups();
     },
     
@@ -277,6 +377,7 @@ const MemoryApp = {
                     '<span class="text-xs text-gray-400">' + new Date(s.timestamp).toLocaleString() + '</span>' +
                     '<div class="flex gap-2">' +
                         '<span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-600">' + (s.type === 'auto' ? '自动' : '手动') + '</span>' +
+                        '<button onclick="MemoryApp.editOfflineSummary(' + idx + ')" class="text-blue-500 text-xs"><i class="fa-solid fa-pen"></i></button>' +
                         '<button onclick="MemoryApp.deleteOfflineSummary(' + idx + ')" class="text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>' +
                     '</div>' +
                 '</div>' +
@@ -288,6 +389,20 @@ const MemoryApp = {
     /**
      * 删除线下总结
      */
+    /**
+     * 编辑线下总结
+     */
+    editOfflineSummary: function(index) {
+        const summaries = API.Offline.getOfflineSummaries(this.currentCharId);
+        const summary = summaries[index];
+        if (!summary) return;
+        const newContent = prompt('编辑线下总结内容:', summary.content);
+        if (newContent !== null && newContent.trim()) {
+            API.Offline.updateOfflineSummary(this.currentCharId, index, newContent.trim());
+            this.renderOfflineSummaries();
+        }
+    },
+
     deleteOfflineSummary: function(index) {
         if (!confirm('确定要删除这条线下总结吗？')) return;
         API.Offline.deleteOfflineSummary(this.currentCharId, index);

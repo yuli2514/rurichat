@@ -579,7 +579,14 @@ const OfflineMode = {
       */
     clearWallpaper: function() {
          API.Offline.saveSettings(this.currentCharId, { wallpaper: '' });
-         this.loadSettings();
+         // 同时删除 IndexedDB 中的大型壁纸数据
+         API.Offline._deleteWallpaperFromIndexedDB(this.currentCharId);
+         // 立即重置背景样式为默认
+         const offlineEl = document.getElementById('offline-mode-interface');
+         if (offlineEl) {
+             offlineEl.style.backgroundColor = '#f5f5f5';
+             offlineEl.style.backgroundImage = 'none';
+         }
          document.getElementById('offline-wallpaper-input').value = '';
          this.renderMessages();
          alert('背景已清除，恢复默认灰白色');

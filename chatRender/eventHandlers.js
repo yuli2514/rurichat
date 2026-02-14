@@ -212,7 +212,7 @@ const ChatEventHandlers = {
     enterDeleteMode: function(initialIndex, chatInterface) {
         chatInterface.deleteMode = true;
         chatInterface.selectedForDelete = new Set([initialIndex]);
-        chatInterface.renderMessages();
+        chatInterface.renderMessagesNoScroll();
         this.showDeleteModeUI();
     },
 
