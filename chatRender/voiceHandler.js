@@ -78,6 +78,8 @@ const VoiceHandler = {
         this._recognitionEnded = false;
         this._pendingDuration = 0;
         this._lastRecognitionError = '';
+        // 注意：不在这里释放 _playbackObjectURL，因为它可能还在被使用
+        // objectURL 会在页面关闭时自动释放
         if (this._sendTimer) {
             clearTimeout(this._sendTimer);
             this._sendTimer = null;
@@ -259,13 +261,22 @@ const VoiceHandler = {
             
             this.mediaRecorder.onstop = () => {
                 this.currentAudioBlob = new Blob(this.audioChunks, { type: this._recordingMimeType });
+                // 移动端：立刻生成 objectURL 用于回放，确保原声清晰
+                if (isMobile && this.currentAudioBlob) {
+                    this._playbackObjectURL = URL.createObjectURL(this.currentAudioBlob);
+                    console.log('[VoiceHandler] 移动端回放URL已生成:', this._playbackObjectURL);
+                }
                 stream.getTracks().forEach(track => track.stop());
             };
             
             this.mediaRecorder.start();
             
-            // 启动语音识别
-            this.startSpeechRecognition();
+            // 启动语音识别：移动端彻底关闭前端识别，改由后端处理
+            if (!isMobile) {
+                this.startSpeechRecognition();
+            } else {
+                console.log('[VoiceHandler] 移动端：跳过前端语音识别，将由后端处理');
+            }
             
             // 震动反馈
             if (navigator.vibrate) navigator.vibrate(50);
@@ -318,25 +329,13 @@ const VoiceHandler = {
         }
         
         if (this._isMobile()) {
-            // ===== 移动端：等待 recognition.onend 确认识别结束后再发送 =====
+            // ===== 移动端：不使用前端识别，直接发送，后端异步处理语音转文字 =====
             this._pendingDuration = duration;
             
-            if (this.recognition) {
-                this._recognitionEnded = false;
-                try { this.recognition.stop(); } catch(e) {}
-                
-                // 最多等 2 秒，超时也发送
-                this._sendTimer = setTimeout(() => {
-                    if (!this._recognitionEnded) {
-                        console.warn('[VoiceHandler] 移动端语音识别 onend 超时，强制发送');
-                    }
-                    this.sendRealVoice(this._pendingDuration);
-                }, 2000);
-            } else {
-                setTimeout(() => {
-                    this.sendRealVoice(duration);
-                }, 500);
-            }
+            // 移动端不再有 recognition，直接等待音频数据准备好后发送
+            setTimeout(() => {
+                this.sendRealVoice(duration);
+            }, 500);
         } else {
             // ===== 电脑端：保持原样，停止识别后固定延迟发送 =====
             if (this.recognition) {
@@ -452,16 +451,19 @@ const VoiceHandler = {
     sendRealVoice: function(duration) {
         if (!ChatInterface.currentCharId) return;
         
+        const isMobile = this._isMobile();
+        
         // 在关闭面板之前保存识别文本和音频数据，因为closeVoicePanel会调用resetState清空recognizedText
         // 优先使用最终识别结果，如果没有则使用中间识别结果作为fallback
         const savedText = this.recognizedText || this._interimTranscript || '';
         const savedAudioBlob = this.currentAudioBlob;
+        const savedPlaybackURL = this._playbackObjectURL || null;
         const lastError = this._lastRecognitionError || '';
         
-        console.log('[VoiceHandler] 发送真实语音, 识别文本:', savedText, '最终结果:', this.recognizedText, '中间结果:', this._interimTranscript, '错误:', lastError);
+        console.log('[VoiceHandler] 发送真实语音, 识别文本:', savedText, '移动端:', isMobile, '回放URL:', savedPlaybackURL);
         
-        // ASR 失败时给出明确提示
-        if (!savedText) {
+        // 电脑端：ASR 失败时给出明确提示（移动端不使用前端ASR，不提示）
+        if (!isMobile && !savedText) {
             let errorMsg = '语音转文字失败';
             if (lastError === 'not-allowed') {
                 errorMsg = '麦克风语音识别权限被拒绝，请在浏览器设置中允许语音识别权限（注意：语音识别权限和麦克风权限是分开的）';
@@ -483,8 +485,32 @@ const VoiceHandler = {
         // 先关闭面板
         this.closeVoicePanel();
         
-        // 本地回放用原始 Blob（保留原始格式），同时为 AI 生成 16kHz WAV 转码版本
-        if (savedAudioBlob) {
+        if (isMobile && savedAudioBlob) {
+            // ===== 移动端双轨并行方案 =====
+            // 轨道1：立刻用 objectURL 挂载回放（确保用户能听到清晰原声）
+            // 轨道2：异步转码为 16kHz WAV，通过后端 API 进行语音转文字
+            
+            const playbackURL = savedPlaybackURL || URL.createObjectURL(savedAudioBlob);
+            
+            // 先立刻发送消息（文字暂时为"语音识别中..."），让用户能马上看到并回放
+            const msgId = Date.now();
+            const tempText = '[语音识别中...]';
+            this.createAndSendVoiceMessage(duration, playbackURL, null, tempText, false, msgId);
+            
+            // 异步转码并发送给后端识别
+            this._resampleToWAV16k(savedAudioBlob).then(wavBase64 => {
+                console.log('[VoiceHandler] 移动端 16kHz WAV 转码成功，发送后端识别');
+                return this._backendSpeechToText(wavBase64);
+            }).then(recognizedText => {
+                console.log('[VoiceHandler] 后端语音识别结果:', recognizedText);
+                // 更新消息中的识别文字
+                this._updateVoiceMessageText(msgId, recognizedText || '[语音消息]');
+            }).catch(err => {
+                console.warn('[VoiceHandler] 移动端语音识别失败:', err);
+                this._updateVoiceMessageText(msgId, '[语音消息]');
+            });
+        } else if (savedAudioBlob) {
+            // ===== 电脑端：保持原有逻辑 =====
             // 先将原始 Blob 转为 base64 用于回放
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -502,6 +528,121 @@ const VoiceHandler = {
             reader.readAsDataURL(savedAudioBlob);
         } else {
             this.createAndSendVoiceMessage(duration, null, null, savedText || '[语音消息]', false);
+        }
+    },
+
+    /**
+     * 后端语音转文字 API
+     * 将 16kHz WAV base64 发送给后端进行语音识别
+     * @param {string} wavBase64 - WAV 格式的 base64 data URL
+     * @returns {Promise<string>} 识别出的文字
+     */
+    _backendSpeechToText: async function(wavBase64) {
+        const config = API.Settings.getApiConfig();
+        if (!config.endpoint || !config.key) {
+            throw new Error('请先在设置中配置 API');
+        }
+        
+        // 使用 OpenAI 兼容的 Whisper API 进行语音转文字
+        // 将 base64 转为 Blob 再发送
+        const base64Data = wavBase64.split(',')[1];
+        const binaryStr = atob(base64Data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const wavBlob = new Blob([bytes], { type: 'audio/wav' });
+        
+        const formData = new FormData();
+        formData.append('file', wavBlob, 'audio.wav');
+        formData.append('model', 'whisper-1');
+        formData.append('language', 'zh');
+        
+        const response = await fetch(config.endpoint + '/audio/transcriptions', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + config.key
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            // 如果 Whisper API 不可用，回退到使用 LLM 描述
+            console.warn('[VoiceHandler] Whisper API 不可用 (HTTP ' + response.status + ')，回退到 LLM 方案');
+            return await this._llmSpeechToText(wavBase64);
+        }
+        
+        const data = await response.json();
+        return data.text || '';
+    },
+
+    /**
+     * 使用 LLM 进行语音转文字的回退方案
+     * 当 Whisper API 不可用时，将音频 base64 发送给 LLM 请求转写
+     * @param {string} wavBase64 - WAV 格式的 base64 data URL
+     * @returns {Promise<string>} 识别出的文字
+     */
+    _llmSpeechToText: async function(wavBase64) {
+        const config = API.Settings.getApiConfig();
+        
+        try {
+            const response = await fetch(config.endpoint + '/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + config.key
+                },
+                body: JSON.stringify({
+                    model: config.model || 'gpt-4o-mini',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: '你是一个语音转文字助手。用户会发送一段音频，请将音频中的语音内容转写为文字。只输出转写的文字内容，不要添加任何解释或格式。如果无法识别，请输出"[无法识别]"。'
+                        },
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: '请将这段音频转写为文字：' },
+                                { type: 'input_audio', input_audio: { data: wavBase64.split(',')[1], format: 'wav' } }
+                            ]
+                        }
+                    ],
+                    temperature: 0.1
+                })
+            });
+            
+            if (!response.ok) {
+                console.warn('[VoiceHandler] LLM 语音转文字也失败');
+                return '';
+            }
+            
+            const data = await response.json();
+            const text = data.choices[0].message.content || '';
+            return text.replace(/^\[|]$/g, '').trim();
+        } catch (e) {
+            console.error('[VoiceHandler] LLM 语音转文字异常:', e);
+            return '';
+        }
+    },
+
+    /**
+     * 更新已发送的语音消息的识别文字
+     * @param {number} msgId - 消息ID
+     * @param {string} text - 识别出的文字
+     */
+    _updateVoiceMessageText: function(msgId, text) {
+        if (!ChatInterface.currentCharId) return;
+        
+        const history = API.Chat.getHistory(ChatInterface.currentCharId);
+        const msgIndex = history.findIndex(m => m.id === msgId);
+        if (msgIndex !== -1) {
+            history[msgIndex].content = text;
+            if (history[msgIndex].voiceData) {
+                history[msgIndex].voiceData.transcription = text;
+            }
+            API.Chat.saveHistory(ChatInterface.currentCharId, history);
+            ChatInterface.renderMessages();
+            console.log('[VoiceHandler] 语音消息文字已更新:', text);
         }
     },
 
@@ -591,14 +732,15 @@ const VoiceHandler = {
     /**
      * 创建并发送语音消息
      * @param {number} duration - 语音时长
-     * @param {string|null} audioData - 原始音频 base64（用于本地回放）
+     * @param {string|null} audioData - 原始音频 base64 或 objectURL（用于本地回放）
      * @param {string|null} audioDataForAI - 16kHz WAV base64（用于发送给 AI）
      * @param {string} text - 识别文本
      * @param {boolean} isFake - 是否伪造
+     * @param {number} [customMsgId] - 自定义消息ID（移动端用于后续更新）
      */
-    createAndSendVoiceMessage: function(duration, audioData, audioDataForAI, text, isFake) {
+    createAndSendVoiceMessage: function(duration, audioData, audioDataForAI, text, isFake, customMsgId) {
         const msg = {
-            id: Date.now(),
+            id: customMsgId || Date.now(),
             sender: 'user',
             content: text,
             type: 'voice',
@@ -637,11 +779,17 @@ const VoiceHandler = {
             textEl.classList.toggle('hidden');
         }
         
-        // 如果有真实音频，播放它（使用原始格式的 audioBase64）
+        // 如果有真实音频，播放它
         if (voiceData.audioBase64 && !voiceData.isFake) {
-            const audio = new Audio(voiceData.audioBase64);
+            // 支持 objectURL（blob:开头）和 base64（data:开头）两种格式
+            const audioSrc = voiceData.audioBase64;
+            const audio = new Audio(audioSrc);
             audio.play().catch(err => {
                 console.error('音频播放失败:', err);
+                // objectURL 可能已过期，尝试提示用户
+                if (audioSrc.startsWith('blob:')) {
+                    console.warn('[VoiceHandler] objectURL 可能已过期，无法回放');
+                }
             });
         }
     }

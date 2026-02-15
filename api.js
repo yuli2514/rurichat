@@ -108,7 +108,7 @@ const API = {
             return memories;
         },
 
-        generateSummary: async function(charId, charName, history, summaryPrompt) {
+        generateSummary: async function(charId, charName, history, summaryPrompt, summaryRounds) {
             const config = API.Settings.getApiConfig();
             if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
 
@@ -136,11 +136,20 @@ const API = {
                 }
             }
 
+            // 使用用户设置的轮数来决定总结范围，默认20轮
+            const rounds = summaryRounds || settings.summaryFreq || 20;
+            
             // Filter out recalled messages and format history
             const visibleHistory = history.filter(m => !m.recalled);
-            const recentMessages = visibleHistory.slice(-20).map(m =>
-                (m.sender === 'user' ? userName : charDisplayName) + ': ' + (m.type === 'image' ? '[发送了一张图片]' : m.content)
-            ).join('\n');
+            // 根据用户设置的轮数来获取最近的对话进行总结
+            const recentMessages = visibleHistory.slice(-rounds).map(m => {
+                let content = m.content;
+                if (m.type === 'image') content = '[发送了一张图片]';
+                else if (m.type === 'emoji') content = '[发送了表情包：' + (m.emojiMeaning || '表情') + ']';
+                else if (m.type === 'voice') content = '[发送了语音消息：' + (m.voiceData && m.voiceData.transcription ? m.voiceData.transcription : '语音') + ']';
+                else if (m.type === 'transfer') content = '[转账消息]';
+                return (m.sender === 'user' ? userName : charDisplayName) + ': ' + content;
+            }).join('\n');
 
             // Build system prompt for summary
             let systemContent = '';
@@ -371,7 +380,7 @@ const API = {
                 let chars = this.getChars();
                 const idx = chars.findIndex(c => c.id === charId);
                 if (idx !== -1) {
-                    chars[idx].lastMessage = lastMsg.type === 'image' ? '[图片]' : lastMsg.content;
+                    chars[idx].lastMessage = lastMsg.type === 'image' ? '[图片]' : (lastMsg.type === 'emoji' ? '[表情包]' : lastMsg.content);
                     // Move to top
                     const updatedChar = chars.splice(idx, 1)[0];
                     chars.unshift(updatedChar);
@@ -476,11 +485,43 @@ const API = {
             systemPrompt += '\n  注意：根据角色性格和剧情决定是否领取，可以拒绝或犹豫';
             systemPrompt += '\n  ⚠️ 重要：如果聊天记录显示你已经领取了某笔转账，不要重复领取。已领取的转账会标注"已经领取"。';
 
-            // --- Memory Integration ---
+
+            systemPrompt += '\\n\\n【⚠️ 格式严格要求 - 必须遵守】';
+            systemPrompt += '\\n以下格式必须严格遵守，每种特殊消息必须单独占一行，不能和普通文字混在同一行：';
+            systemPrompt += '\\n';
+            systemPrompt += '\\n1. 表情包格式：必须单独一行输出完整URL，不加任何修饰';
+            systemPrompt += '\\n   ✅ 正确：https://example.com/emoji.png';
+            systemPrompt += '\\n   ❌ 错误：![表情](https://example.com/emoji.png)';
+            systemPrompt += '\\n   ❌ 错误：[表情](https://example.com/emoji.png)';
+            systemPrompt += '\\n   ❌ 错误：看这个表情 https://example.com/emoji.png';
+            systemPrompt += '\\n';
+            systemPrompt += '\\n2. 语音格式：[语音:内容] 必须单独一行';
+            systemPrompt += '\\n   ✅ 正确（单独一行）：[语音:你好呀~]';
+            systemPrompt += '\\n   ❌ 错误（混在文字里）：我想说[语音:你好呀~]给你听';
+            systemPrompt += '\\n';
+            systemPrompt += '\\n3. 图片格式：[图片:描述] 必须单独一行';
+            systemPrompt += '\\n   ✅ 正确（单独一行）：[图片:窗外的夕阳]';
+            systemPrompt += '\\n   ❌ 错误（混在文字里）：你看[图片:窗外的夕阳]好美';
+            systemPrompt += '\\n';
+            systemPrompt += '\\n4. 转账格式：[转账:金额] 或 [转账:金额:备注] 必须单独一行';
+            systemPrompt += '\\n   ✅ 正确（单独一行）：[转账:100:请你喝奶茶]';
+            systemPrompt += '\\n   ❌ 错误（混在文字里）：给你[转账:100]买东西';
+            systemPrompt += '\\n';
+            systemPrompt += '\\n5. 引用格式：[QUOTE:关键词] 必须在行首，后面紧跟回复内容';
+            systemPrompt += '\\n   ✅ 正确：[QUOTE:好累]怎么了？';
+            systemPrompt += '\\n';
+            systemPrompt += '\\n⚠️ 再次强调：语音、图片、转账、表情包URL 都必须单独占一行，绝对不能和其他文字混在一起！';
+
+            // --- Memory Integration (强化版) ---
             const memories = API.Memory.getMemories(charId);
             if (memories.length > 0) {
-                const recentMemories = memories.slice(-5).map(m => m.content).join('; ');
-                systemPrompt += '\n[Past Memories/Context: ' + recentMemories + ']';
+                systemPrompt += '\n\n【角色记忆 - 必须参考】';
+                systemPrompt += '\n以下是你（角色）关于之前对话的记忆，这些记忆非常重要，请务必参考来保持对话的连贯性和一致性：';
+                memories.forEach((m, i) => {
+                    const typeLabel = m.type === 'auto' ? '自动总结' : '手动记忆';
+                    systemPrompt += '\n[' + typeLabel + ' #' + (i + 1) + '] ' + m.content;
+                });
+                systemPrompt += '\n\n⚠️ 请认真阅读以上所有记忆条目，在回复时体现出你记得这些事情。';
             }
 
             // --- World Book Integration (支持多选) ---
@@ -574,12 +615,17 @@ const API = {
                         content = '[' + sender + '发送了一条语音消息，语音转文字失败，请根据上下文推测用户可能在说什么，并自然地回应]';
                     }
                 }
-                // 处理图片/表情包消息 - 尝试匹配表情包含义
+                // 处理表情包消息（新的emoji类型）
+                else if (msg.type === 'emoji') {
+                    const meaning = msg.emojiMeaning || emojiMap[msg.content] || '未知表情';
+                    content = '[用户发送了一个表情包，表情包的含义是：「' + meaning + '」，请注意这不是图片，是表情包，请根据表情包的含义来理解用户的情绪和意图]';
+                }
+                // 处理图片消息
                 else if (msg.type === 'image') {
                     const imgUrl = msg.content;
                     if (emojiMap[imgUrl]) {
                         // 匹配到表情包，显示含义
-                        content = '[发送了表情包：' + emojiMap[imgUrl] + ']';
+                        content = '[用户发送了一个表情包，表情包的含义是：「' + emojiMap[imgUrl] + '」，请注意这不是图片，是表情包，请根据表情包的含义来理解用户的情绪和意图]';
                     } else if (msg.isVisionImage && msg.content && msg.content.startsWith('data:image/')) {
                         // 用户发送的真实图片，使用Vision API格式让AI识别
                         content = [
@@ -609,8 +655,13 @@ const API = {
                         let quotedContent = quotedMsg.content;
                         let quotedType = '文字消息';
                         
-                        // 如果引用的是表情包，显示含义
-                        if (quotedMsg.type === 'image' && emojiMap[quotedMsg.content]) {
+                        // 如果引用的是表情包（新emoji类型）
+                        if (quotedMsg.type === 'emoji') {
+                            quotedContent = quotedMsg.emojiMeaning || emojiMap[quotedMsg.content] || '表情包';
+                            quotedType = '表情包';
+                        }
+                        // 如果引用的是旧的image类型但实际是表情包
+                        else if (quotedMsg.type === 'image' && emojiMap[quotedMsg.content]) {
                             quotedContent = emojiMap[quotedMsg.content];
                             quotedType = '表情包';
                         } else if (quotedMsg.type === 'image') {
@@ -670,13 +721,16 @@ const API = {
             
             if (settings.autoSummary) {
                 const history = this.getHistory(charId);
-                if (history.length % (settings.summaryFreq || 10) === 0) {
+                const freq = settings.summaryFreq || 10;
+                // 只有当历史消息数量达到freq的倍数时才触发总结
+                if (history.length > 0 && history.length % freq === 0) {
                     try {
-                        const summary = await API.Memory.generateSummary(charId, char.name, history, settings.summaryPrompt);
+                        // 传入freq作为总结的轮数范围，确保根据用户设置的轮数来总结
+                        const summary = await API.Memory.generateSummary(charId, char.name, history, settings.summaryPrompt, freq);
                         API.Memory.addMemory(charId, summary, 'auto');
-                        console.log('Auto summary generated for', char.name);
+                        console.log('[AutoSummary] 自动总结已生成, 角色:', char.name, '总结轮数:', freq, '历史总数:', history.length);
                     } catch (e) {
-                        console.error('Auto summary failed:', e);
+                        console.error('[AutoSummary] 自动总结失败:', e);
                     }
                 }
             }
@@ -879,11 +933,15 @@ const API = {
                 });
             }
 
-            // 记忆集成
+            // 记忆集成（强化版）
             const memories = API.Memory.getMemories(charId);
             if (memories.length > 0) {
-                const recentMemories = memories.slice(-5).map(m => m.content).join('; ');
-                systemPrompt += '\n\n[过往记忆/上下文: ' + recentMemories + ']';
+                systemPrompt += '\n\n【角色记忆 - 必须参考】';
+                systemPrompt += '\n以下是你（角色）关于之前对话的记忆，请务必参考来保持剧情的连贯性：';
+                memories.forEach((m, i) => {
+                    const typeLabel = m.type === 'auto' ? '自动总结' : '手动记忆';
+                    systemPrompt += '\n[' + typeLabel + ' #' + (i + 1) + '] ' + m.content;
+                });
             }
 
             // 线下总结集成
@@ -983,7 +1041,9 @@ const API = {
             const charDisplayName = settings.charNameForSummary || (char ? char.name : null) || charName;
             let userName = settings.userName || '用户';
 
-            const recentMessages = history.slice(-20).map(m =>
+            // 使用用户设置的轮数来决定总结范围
+            const rounds = settings.summaryFreq || 20;
+            const recentMessages = history.slice(-rounds).map(m =>
                 (m.sender === 'user' ? userName : charDisplayName) + ': ' + m.content
             ).join('\n');
 

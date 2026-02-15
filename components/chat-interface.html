@@ -49,11 +49,11 @@
             <!-- Input Container with Quote Preview -->
             <div class="flex-1 flex flex-col">
                 <!-- Quote Preview Bar (WeChat Style) - 只在输入框上方 -->
-                <div id="quote-preview" class="hidden mb-1 px-2 py-1.5 bg-[#e8e8e8] rounded-t-xl flex justify-between items-center text-xs text-gray-600 border-l-2 border-[#95ec69]">
-                    <div class="flex items-center gap-1.5 truncate max-w-[85%]">
-                        <span id="quote-content-text" class="truncate text-[11px]">引用内容...</span>
+                <div id="quote-preview" class="hidden mb-1 px-2 py-1.5 bg-[#e8e8e8] rounded-t-xl flex justify-between items-center text-xs text-gray-600 border-l-2 border-[#95ec69]" style="max-height: 48px; overflow: hidden;">
+                    <div class="flex items-center gap-1.5 min-w-0 max-w-[85%]">
+                        <span id="quote-content-text" class="text-[11px] overflow-hidden" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;">引用内容...</span>
                     </div>
-                    <button onclick="ChatInterface.cancelQuote()" class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                    <button onclick="ChatInterface.cancelQuote()" class="w-4 h-4 shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-600 transition"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                 </div>
                 <!-- Input -->
                 <textarea id="chat-input" rows="1" class="w-full bg-white rounded-xl px-3 py-2.5 text-base max-h-32 focus:outline-none border-none resize-none m-0 shadow-sm leading-5" placeholder=""></textarea>

@@ -145,10 +145,20 @@ const EmojiPanel = {
     saveRecentEmoji: function(emojiUrl) {
         try {
             let recent = JSON.parse(localStorage.getItem('recent_emojis') || '[]');
+            const allGroups = API.Emoji.getGroups();
             // 移除已存在的相同表情包（避免重复）
             recent = recent.filter(e => e.url !== emojiUrl);
+            // 查找表情包的含义
+            let meaning = '最近使用';
+            for (const g of allGroups) {
+                const found = g.emojis.find(e => e.url === emojiUrl);
+                if (found) {
+                    meaning = found.meaning || '最近使用';
+                    break;
+                }
+            }
             // 添加到最前面
-            recent.unshift({ url: emojiUrl, meaning: '最近使用' });
+            recent.unshift({ url: emojiUrl, meaning: meaning });
             // 只保留最近15个
             recent = recent.slice(0, 15);
             localStorage.setItem('recent_emojis', JSON.stringify(recent));
@@ -166,11 +176,23 @@ const EmojiPanel = {
         // 保存到最近使用
         this.saveRecentEmoji(emojiUrl);
         
+        // 查找表情包的含义（meaning）
+        let emojiMeaning = '';
+        const allGroups = API.Emoji.getGroups();
+        for (const g of allGroups) {
+            const found = g.emojis.find(e => e.url === emojiUrl);
+            if (found) {
+                emojiMeaning = found.meaning || '';
+                break;
+            }
+        }
+        
         const msg = {
             id: Date.now(),
             sender: 'user',
             content: emojiUrl,
-            type: 'image',
+            type: 'emoji',
+            emojiMeaning: emojiMeaning,
             timestamp: Date.now()
         };
         API.Chat.addMessage(currentCharId, msg);

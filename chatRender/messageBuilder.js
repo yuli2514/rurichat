@@ -62,7 +62,14 @@ const MessageBuilder = {
         const quotedMsg = history.find(h => h.id === msg.quote.id);
         if (quotedMsg && !quotedMsg.recalled) {
             const authorName = quotedMsg.sender === 'user' ? '我' : char.remark;
-            const quoteContent = quotedMsg.type === 'image' ? '[图片]' : quotedMsg.content.substring(0, 40) + (quotedMsg.content.length > 40 ? '...' : '');
+            let quoteContent = '';
+            if (quotedMsg.type === 'emoji') {
+                quoteContent = '[表情包]';
+            } else if (quotedMsg.type === 'image') {
+                quoteContent = '[图片]';
+            } else {
+                quoteContent = quotedMsg.content.substring(0, 40) + (quotedMsg.content.length > 40 ? '...' : '');
+            }
             return '<div class="quote-in-bubble"><span class="quote-author">' + authorName + ':</span><span>' + quoteContent + '</span></div>';
         } else if (quotedMsg && quotedMsg.recalled) {
             return '<div class="quote-in-bubble"><span class="text-gray-400 italic">引用的消息已撤回</span></div>';
@@ -318,7 +325,7 @@ const MessageBuilder = {
         const isSelected = deleteMode && selectedForDelete.has(index);
         const checkboxHtml = this.buildDeleteCheckbox(index, isSelected, deleteMode);
 
-        const isImage = msg.type === 'image';
+        const isImage = msg.type === 'image' || msg.type === 'emoji';
         const isVoice = msg.type === 'voice';
         const isTransfer = msg.type === 'transfer';
         
