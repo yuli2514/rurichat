@@ -99,16 +99,34 @@ function setupGlobalCameraHandler() {
 
 // 检测是否使用组件化加载模式
 document.addEventListener('DOMContentLoaded', () => {
-    // 如果存在 ComponentLoader（组件化模式），等待组件加载完成
+    /**
+     * 启动前先初始化 AvatarStore（IndexedDB），完成头像迁移
+     * 确保 getChars() 能从内存缓存同步读取头像
+     */
+    async function bootWithAvatarStore() {
+        if (typeof AvatarStore !== 'undefined') {
+            try {
+                await AvatarStore.init();
+                await AvatarStore.migrateFromLocalStorage();
+            } catch (e) {
+                console.error('[main.js] AvatarStore boot failed:', e);
+            }
+        }
+    }
+
+    async function startApp() {
+        await bootWithAvatarStore();
+        initializeApp();
+    }
+
     if (typeof ComponentLoader !== 'undefined' && typeof AppEvents !== 'undefined') {
         console.log('[main.js] Component mode detected, waiting for components...');
         AppEvents.on('app:ready', () => {
             console.log('[main.js] Components ready, initializing app...');
-            initializeApp();
+            startApp();
         });
     } else {
-        // 传统模式：HTML 已在页面中，直接初始化
         console.log('[main.js] Traditional mode, initializing directly...');
-        initializeApp();
+        startApp();
     }
 });

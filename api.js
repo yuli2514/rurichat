@@ -3,6 +3,164 @@
  * 负责所有涉及联网请求、API 调用、处理聊天数据的逻辑
  */
 
+/**
+ * AvatarStore - 头像存储在 IndexedDB，内存缓存同步读取
+ * 解决 localStorage 5MB 限制导致的"存储数据已损坏"问题
+ */
+const AvatarStore = {
+    _db: null,
+    _cache: {},       // 内存缓存: { charId: base64String }
+    _ready: false,
+    _readyPromise: null,
+    DB_NAME: 'RuriAvatarDB',
+    STORE_NAME: 'avatars',
+
+    /** 打开 IndexedDB */
+    _openDB: function() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(this.DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+                    db.createObjectStore(this.STORE_NAME, { keyPath: 'id' });
+                }
+            };
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    /** 初始化：打开DB + 预加载所有头像到内存 */
+    init: async function() {
+        if (this._readyPromise) return this._readyPromise;
+        this._readyPromise = this._doInit();
+        return this._readyPromise;
+    },
+
+    _doInit: async function() {
+        try {
+            this._db = await this._openDB();
+            // 预加载所有头像到内存缓存
+            const all = await this._getAllFromDB();
+            all.forEach(item => {
+                this._cache[item.id] = item.data;
+            });
+            this._ready = true;
+            console.log('[AvatarStore] Ready, cached ' + Object.keys(this._cache).length + ' avatars');
+        } catch (e) {
+            console.error('[AvatarStore] Init failed:', e);
+            this._ready = true; // 即使失败也标记ready，降级到无头像模式
+        }
+    },
+
+    /** 从 DB 读取所有记录 */
+    _getAllFromDB: function() {
+        return new Promise((resolve, reject) => {
+            if (!this._db) return resolve([]);
+            const tx = this._db.transaction(this.STORE_NAME, 'readonly');
+            const store = tx.objectStore(this.STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+        });
+    },
+
+    /** 同步获取头像（从内存缓存） */
+    get: function(charId) {
+        return this._cache[charId] || null;
+    },
+
+    /** 异步保存头像到 IndexedDB + 更新内存缓存 */
+    set: async function(charId, base64Data) {
+        this._cache[charId] = base64Data;
+        if (!this._db) return;
+        try {
+            const tx = this._db.transaction(this.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(this.STORE_NAME);
+            store.put({ id: charId, data: base64Data });
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch (e) {
+            console.error('[AvatarStore] Failed to save avatar for', charId, e);
+        }
+    },
+
+    /** 异步删除头像 */
+    remove: async function(charId) {
+        delete this._cache[charId];
+        if (!this._db) return;
+        try {
+            const tx = this._db.transaction(this.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(this.STORE_NAME);
+            store.delete(charId);
+        } catch (e) {
+            console.error('[AvatarStore] Failed to remove avatar for', charId, e);
+        }
+    },
+
+    /**
+     * 一次性迁移：从 localStorage 的 ruri_chars 中剥离 base64 头像
+     * 转存到 IndexedDB，localStorage 中只保留 'idb' 标记
+     */
+    migrateFromLocalStorage: async function() {
+        const MIGRATION_KEY = 'ruri_avatar_migrated_v2';
+        if (localStorage.getItem(MIGRATION_KEY)) return;
+
+        console.log('[AvatarStore] Starting avatar migration from localStorage...');
+        try {
+            const raw = localStorage.getItem('ruri_chars');
+            if (!raw) {
+                localStorage.setItem(MIGRATION_KEY, 'true');
+                return;
+            }
+
+            let chars;
+            try {
+                chars = JSON.parse(raw);
+            } catch (e) {
+                console.error('[AvatarStore] ruri_chars JSON parse failed, cannot migrate:', e);
+                localStorage.setItem(MIGRATION_KEY, 'true');
+                return;
+            }
+
+            if (!Array.isArray(chars)) {
+                localStorage.setItem(MIGRATION_KEY, 'true');
+                return;
+            }
+
+            let migrated = 0;
+            let totalSaved = 0;
+
+            for (const char of chars) {
+                if (!char || !char.id) continue;
+                // 检测 base64 头像（data:image 开头且长度超过 500 字符）
+                if (char.avatar && typeof char.avatar === 'string' &&
+                    char.avatar.startsWith('data:') && char.avatar.length > 500) {
+                    // 存入 IndexedDB
+                    await this.set(char.id, char.avatar);
+                    totalSaved += char.avatar.length;
+                    // 替换为标记
+                    char.avatar = 'idb';
+                    migrated++;
+                }
+            }
+
+            // 瘦身后重新保存到 localStorage
+            const slimJSON = JSON.stringify(chars);
+            localStorage.setItem('ruri_chars', slimJSON);
+            localStorage.setItem(MIGRATION_KEY, 'true');
+
+            console.log('[AvatarStore] Migration done: ' + migrated + ' avatars moved to IndexedDB, saved ~' + Math.round(totalSaved / 1024) + 'KB from localStorage');
+        } catch (e) {
+            console.error('[AvatarStore] Migration failed:', e);
+            // 迁移失败也标记完成，避免反复尝试
+            localStorage.setItem(MIGRATION_KEY, 'true');
+        }
+    }
+};
+
 const API = {
     // ==================== EMOJI DATA ====================
     Emoji: {
@@ -312,60 +470,66 @@ const API = {
                 const raw = localStorage.getItem('ruri_chars');
                 if (!raw || raw === 'undefined' || raw === 'null') return [];
                 const parsed = JSON.parse(raw);
-                // 确保返回的是数组
                 if (!Array.isArray(parsed)) {
                     console.error('ruri_chars is not an array, resetting. Value type:', typeof parsed);
                     return [];
                 }
-                // 过滤掉无效的角色数据（必须有id）
-                return parsed.filter(c => c && typeof c === 'object' && c.id);
+                // 过滤掉无效的角色数据（必须有id），并从 AvatarStore 恢复头像
+                return parsed.filter(c => c && typeof c === 'object' && c.id).map(c => {
+                    if (c.avatar === 'idb') {
+                        const cached = AvatarStore.get(c.id);
+                        if (cached) {
+                            c.avatar = cached;
+                        } else {
+                            // IndexedDB 中没有缓存，回退到默认头像
+                            c.avatar = 'icon.png';
+                        }
+                    }
+                    return c;
+                });
             } catch (e) {
                 console.error('Error parsing chars:', e);
-                // 尝试备份损坏的数据
-                try {
-                    const corrupted = localStorage.getItem('ruri_chars');
-                    if (corrupted) {
-                        localStorage.setItem('ruri_chars_backup_' + Date.now(), corrupted);
-                        console.log('Corrupted chars data backed up');
-                    }
-                } catch (backupErr) {
-                    console.error('Failed to backup corrupted data:', backupErr);
-                }
                 return [];
             }
         },
 
         saveChars: function(chars) {
-            try {
-                // 确保是数组
-                if (!Array.isArray(chars)) {
-                    console.error('saveChars: chars is not an array!');
-                    chars = [];
+            if (!Array.isArray(chars)) {
+                console.error('saveChars: chars is not an array!');
+                chars = [];
+            }
+            const validChars = chars.filter(c => c && typeof c === 'object' && c.id);
+
+            // 剥离 base64 头像 → 存入 IndexedDB，localStorage 只保留 'idb' 标记
+            const slimChars = validChars.map(c => {
+                const copy = { ...c };
+                if (copy.avatar && typeof copy.avatar === 'string' &&
+                    copy.avatar.startsWith('data:') && copy.avatar.length > 500) {
+                    // 异步存入 IndexedDB（fire-and-forget）
+                    AvatarStore.set(copy.id, copy.avatar);
+                    copy.avatar = 'idb';
                 }
-                // 过滤掉无效数据
-                const validChars = chars.filter(c => c && typeof c === 'object' && c.id);
-                localStorage.setItem('ruri_chars', JSON.stringify(validChars));
+                return copy;
+            });
+
+            try {
+                localStorage.setItem('ruri_chars', JSON.stringify(slimChars));
             } catch (e) {
-                console.error('Error saving chars:', e);
-                // 如果是存储空间满，尝试清理
-                if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
-                    console.error('Storage quota exceeded! Trying to save without avatars...');
+                console.error('saveChars localStorage write failed:', e);
+                // 如果还是超限，尝试强制清理所有头像后重试
+                if (e.name === 'QuotaExceededError') {
+                    const ultraSlim = slimChars.map(c => {
+                        const copy = { ...c };
+                        if (copy.avatar && copy.avatar !== 'idb' && copy.avatar.length > 200) {
+                            copy.avatar = 'idb';
+                        }
+                        return copy;
+                    });
                     try {
-                        // 尝试压缩：移除大型头像数据
-                        const compressedChars = chars.map(c => {
-                            if (c && c.avatar && c.avatar.length > 10000) {
-                                return { ...c, avatar: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(c.name || 'AI') + '&background=random' };
-                            }
-                            return c;
-                        });
-                        localStorage.setItem('ruri_chars', JSON.stringify(compressedChars));
-                        console.log('Saved chars with compressed avatars');
+                        localStorage.setItem('ruri_chars', JSON.stringify(ultraSlim));
                     } catch (e2) {
-                        console.error('Still failed to save chars:', e2);
-                        throw new Error('存储空间不足，请清理一些数据后重试');
+                        console.error('saveChars: even ultra-slim save failed:', e2);
                     }
-                } else {
-                    throw e;
                 }
             }
         },
@@ -376,12 +540,15 @@ const API = {
         },
 
         addChar: function(charData) {
-            // 验证角色数据
             if (!charData || !charData.id) {
                 throw new Error('角色数据无效：缺少ID');
             }
+            // 如果有 base64 头像，先存入 IndexedDB
+            if (charData.avatar && typeof charData.avatar === 'string' &&
+                charData.avatar.startsWith('data:') && charData.avatar.length > 500) {
+                AvatarStore.set(charData.id, charData.avatar);
+            }
             let chars = this.getChars();
-            // 确保是数组
             if (!Array.isArray(chars)) {
                 console.error('getChars returned non-array, using empty array');
                 chars = [];
@@ -395,6 +562,11 @@ const API = {
             let chars = this.getChars();
             const idx = chars.findIndex(c => c.id === charId);
             if (idx !== -1) {
+                // 如果更新了头像，先存入 IndexedDB
+                if (updateData.avatar && typeof updateData.avatar === 'string' &&
+                    updateData.avatar.startsWith('data:') && updateData.avatar.length > 500) {
+                    AvatarStore.set(charId, updateData.avatar);
+                }
                 chars[idx] = { ...chars[idx], ...updateData };
                 this.saveChars(chars);
                 return chars[idx];
@@ -415,6 +587,8 @@ const API = {
             let chars = this.getChars();
             chars = chars.filter(c => c.id !== charId);
             this.saveChars(chars);
+            // 同时清理 IndexedDB 中的头像
+            AvatarStore.remove(charId);
             localStorage.removeItem('ruri_chat_history_' + charId);
             localStorage.removeItem('ruri_memories_' + charId);
         },
