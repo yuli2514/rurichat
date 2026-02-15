@@ -309,15 +309,65 @@ const API = {
     Chat: {
         getChars: function() {
             try {
-                return JSON.parse(localStorage.getItem('ruri_chars') || '[]');
+                const raw = localStorage.getItem('ruri_chars');
+                if (!raw || raw === 'undefined' || raw === 'null') return [];
+                const parsed = JSON.parse(raw);
+                // 确保返回的是数组
+                if (!Array.isArray(parsed)) {
+                    console.error('ruri_chars is not an array, resetting. Value type:', typeof parsed);
+                    return [];
+                }
+                // 过滤掉无效的角色数据（必须有id）
+                return parsed.filter(c => c && typeof c === 'object' && c.id);
             } catch (e) {
                 console.error('Error parsing chars:', e);
+                // 尝试备份损坏的数据
+                try {
+                    const corrupted = localStorage.getItem('ruri_chars');
+                    if (corrupted) {
+                        localStorage.setItem('ruri_chars_backup_' + Date.now(), corrupted);
+                        console.log('Corrupted chars data backed up');
+                    }
+                } catch (backupErr) {
+                    console.error('Failed to backup corrupted data:', backupErr);
+                }
                 return [];
             }
         },
 
         saveChars: function(chars) {
-            localStorage.setItem('ruri_chars', JSON.stringify(chars));
+            try {
+                // 确保是数组
+                if (!Array.isArray(chars)) {
+                    console.error('saveChars: chars is not an array!');
+                    chars = [];
+                }
+                // 过滤掉无效数据
+                const validChars = chars.filter(c => c && typeof c === 'object' && c.id);
+                localStorage.setItem('ruri_chars', JSON.stringify(validChars));
+            } catch (e) {
+                console.error('Error saving chars:', e);
+                // 如果是存储空间满，尝试清理
+                if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+                    console.error('Storage quota exceeded! Trying to save without avatars...');
+                    try {
+                        // 尝试压缩：移除大型头像数据
+                        const compressedChars = chars.map(c => {
+                            if (c && c.avatar && c.avatar.length > 10000) {
+                                return { ...c, avatar: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(c.name || 'AI') + '&background=random' };
+                            }
+                            return c;
+                        });
+                        localStorage.setItem('ruri_chars', JSON.stringify(compressedChars));
+                        console.log('Saved chars with compressed avatars');
+                    } catch (e2) {
+                        console.error('Still failed to save chars:', e2);
+                        throw new Error('存储空间不足，请清理一些数据后重试');
+                    }
+                } else {
+                    throw e;
+                }
+            }
         },
 
         getChar: function(charId) {
@@ -326,7 +376,16 @@ const API = {
         },
 
         addChar: function(charData) {
+            // 验证角色数据
+            if (!charData || !charData.id) {
+                throw new Error('角色数据无效：缺少ID');
+            }
             let chars = this.getChars();
+            // 确保是数组
+            if (!Array.isArray(chars)) {
+                console.error('getChars returned non-array, using empty array');
+                chars = [];
+            }
             chars.unshift(charData);
             this.saveChars(chars);
             return chars;
@@ -574,9 +633,31 @@ const API = {
             }
 
             const fullHistory = this.getHistory(charId);
-            // Filter out recalled messages so AI doesn't see them
-            const visibleHistory = fullHistory.filter(msg => !msg.recalled);
-            const recentHistory = visibleHistory.slice(-ctxLength).map(msg => {
+            // 获取线下历史记录，实现线上线下上下文互通
+            const offlineHistory = API.Offline.getHistory(charId);
+            
+            // 合并线上和线下历史，按时间戳排序
+            const mergedHistory = [];
+            fullHistory.forEach(msg => {
+                // 跳过从线下同步过来的摘要消息（以 [线下剧情] 开头的），避免重复
+                if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('[线下剧情] ')) return;
+                if (!msg.recalled) {
+                    mergedHistory.push({ ...msg, _source: 'online' });
+                }
+            });
+            offlineHistory.forEach(msg => {
+                // 线下消息也加入合并列表
+                mergedHistory.push({ ...msg, _source: 'offline' });
+            });
+            
+            // 按时间戳排序
+            mergedHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            
+            // 取最近 ctxLength 轮
+            const recentMerged = mergedHistory.slice(-ctxLength);
+            
+            const recentHistory = recentMerged.map(msg => {
+                const isOffline = msg._source === 'offline';
                 let content = '';
                 
                 // 处理转账消息 - 告诉AI转账状态，避免重复转账
@@ -668,6 +749,11 @@ const API = {
                     }
                 } else {
                     content = msg.content;
+                }
+
+                // 如果是线下模式的消息，添加标记让AI知道这是线下剧情对话
+                if (isOffline && typeof content === 'string') {
+                    content = '[线下剧情对话] ' + content;
                 }
                 
                 // 处理引用消息 - 显示完整引用内容，让AI清楚知道用户引用了什么
@@ -854,58 +940,174 @@ const API = {
             localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(merged));
         },
 
-        getPresets: function(charId) {
-            if (!charId) return [];
+        // ---- 全局预设管理（所有角色共用预设内容，每个角色单独启用） ----
+        
+        /**
+         * 获取全局预设列表
+         */
+        getGlobalPresets: function() {
             try {
-                return JSON.parse(localStorage.getItem('ruri_offline_presets_' + charId) || '[]');
+                return JSON.parse(localStorage.getItem('ruri_offline_presets_global') || '[]');
             } catch (e) {
-                console.error('Error parsing offline presets:', e);
+                console.error('Error parsing global offline presets:', e);
                 return [];
             }
         },
 
-        savePresets: function(charId, presets) {
+        /**
+         * 保存全局预设列表
+         */
+        saveGlobalPresets: function(presets) {
+            localStorage.setItem('ruri_offline_presets_global', JSON.stringify(presets));
+        },
+
+        /**
+         * 获取角色启用的预设ID列表
+         */
+        getEnabledPresetIds: function(charId) {
+            if (!charId) return [];
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_preset_enabled_' + charId) || '[]');
+            } catch (e) {
+                console.error('Error parsing enabled preset ids:', e);
+                return [];
+            }
+        },
+
+        /**
+         * 保存角色启用的预设ID列表
+         */
+        saveEnabledPresetIds: function(charId, ids) {
             if (!charId) return;
-            localStorage.setItem('ruri_offline_presets_' + charId, JSON.stringify(presets));
+            localStorage.setItem('ruri_offline_preset_enabled_' + charId, JSON.stringify(ids));
         },
 
+        /**
+         * 获取预设列表（带角色启用状态）- 兼容旧接口
+         */
+        getPresets: function(charId) {
+            const globalPresets = this.getGlobalPresets();
+            if (!charId) return globalPresets.map(p => ({ ...p, enabled: false }));
+            
+            const enabledIds = this.getEnabledPresetIds(charId);
+            return globalPresets.map(p => ({
+                ...p,
+                enabled: enabledIds.includes(p.id)
+            }));
+        },
+
+        /**
+         * 添加全局预设
+         */
         addPreset: function(charId, preset) {
-            const presets = this.getPresets(charId);
+            const presets = this.getGlobalPresets();
+            const newId = Date.now();
             presets.push({
-                id: Date.now(),
+                id: newId,
                 name: preset.name,
-                content: preset.content,
-                enabled: preset.enabled !== undefined ? preset.enabled : true
+                content: preset.content
             });
-            this.savePresets(charId, presets);
-            return presets;
+            this.saveGlobalPresets(presets);
+            
+            // 默认在当前角色中启用
+            if (charId && preset.enabled !== false) {
+                const enabledIds = this.getEnabledPresetIds(charId);
+                enabledIds.push(newId);
+                this.saveEnabledPresetIds(charId, enabledIds);
+            }
+            
+            return this.getPresets(charId);
         },
 
+        /**
+         * 更新全局预设内容（名字和内容）
+         */
         updatePreset: function(charId, presetId, update) {
-            const presets = this.getPresets(charId);
+            const presets = this.getGlobalPresets();
             const idx = presets.findIndex(p => p.id === presetId);
             if (idx !== -1) {
-                presets[idx] = { ...presets[idx], ...update };
-                this.savePresets(charId, presets);
+                if (update.name !== undefined) presets[idx].name = update.name;
+                if (update.content !== undefined) presets[idx].content = update.content;
+                this.saveGlobalPresets(presets);
             }
-            return presets;
+            return this.getPresets(charId);
         },
 
+        /**
+         * 删除全局预设
+         */
         deletePreset: function(charId, presetId) {
-            let presets = this.getPresets(charId);
+            let presets = this.getGlobalPresets();
             presets = presets.filter(p => p.id !== presetId);
-            this.savePresets(charId, presets);
-            return presets;
+            this.saveGlobalPresets(presets);
+            return this.getPresets(charId);
         },
 
+        /**
+         * 切换角色的预设启用状态
+         */
         togglePreset: function(charId, presetId) {
-            const presets = this.getPresets(charId);
-            const preset = presets.find(p => p.id === presetId);
-            if (preset) {
-                preset.enabled = !preset.enabled;
-                this.savePresets(charId, presets);
+            if (!charId) return [];
+            const enabledIds = this.getEnabledPresetIds(charId);
+            const idx = enabledIds.indexOf(presetId);
+            if (idx !== -1) {
+                enabledIds.splice(idx, 1);
+            } else {
+                enabledIds.push(presetId);
             }
-            return presets;
+            this.saveEnabledPresetIds(charId, enabledIds);
+            return this.getPresets(charId);
+        },
+
+        /**
+         * 数据迁移：将旧的按角色存储的预设迁移到全局
+         */
+        migratePresetsToGlobal: function() {
+            if (localStorage.getItem('ruri_offline_presets_migrated')) return;
+            
+            const globalPresets = this.getGlobalPresets();
+            const existingNames = new Set(globalPresets.map(p => p.name));
+            const chars = API.Chat.getChars();
+            
+            chars.forEach(char => {
+                try {
+                    const oldPresets = JSON.parse(localStorage.getItem('ruri_offline_presets_' + char.id) || '[]');
+                    const enabledIds = [];
+                    
+                    oldPresets.forEach(oldPreset => {
+                        // 检查是否已存在同名预设
+                        const existingGlobal = globalPresets.find(g => g.name === oldPreset.name && g.content === oldPreset.content);
+                        if (existingGlobal) {
+                            // 已存在，只记录启用状态
+                            if (oldPreset.enabled) {
+                                enabledIds.push(existingGlobal.id);
+                            }
+                        } else {
+                            // 不存在，添加到全局
+                            const newId = oldPreset.id || Date.now() + Math.random();
+                            globalPresets.push({
+                                id: newId,
+                                name: oldPreset.name,
+                                content: oldPreset.content
+                            });
+                            existingNames.add(oldPreset.name);
+                            if (oldPreset.enabled) {
+                                enabledIds.push(newId);
+                            }
+                        }
+                    });
+                    
+                    if (enabledIds.length > 0) {
+                        this.saveEnabledPresetIds(char.id, enabledIds);
+                    }
+                } catch (e) {
+                    console.error('Error migrating presets for char:', char.id, e);
+                }
+            });
+            
+            this.saveGlobalPresets(globalPresets);
+            localStorage.setItem('ruri_offline_presets_migrated', 'true');
+            console.log('[Offline] Presets migrated to global storage');
         },
 
         /**
@@ -995,13 +1197,41 @@ const API = {
                 }
             }
 
-            // 获取线下聊天记录
+            // 获取线下聊天记录，并合并线上聊天记录实现上下文互通
             const offlineHistory = this.getHistory(charId);
-            const visibleHistory = offlineHistory.slice(-ctxLength);
-            const recentHistory = visibleHistory.map(msg => ({
-                role: msg.sender === 'user' ? 'user' : 'assistant',
-                content: msg.content
-            }));
+            const onlineHistory = API.Chat.getHistory(charId);
+            
+            // 合并线上和线下历史，按时间戳排序
+            const mergedHistory = [];
+            onlineHistory.forEach(msg => {
+                // 跳过从线下同步过来的摘要消息（以 [线下剧情] 开头的），避免重复
+                if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('[线下剧情] ')) return;
+                if (!msg.recalled) {
+                    mergedHistory.push({ ...msg, _source: 'online' });
+                }
+            });
+            offlineHistory.forEach(msg => {
+                mergedHistory.push({ ...msg, _source: 'offline' });
+            });
+            
+            // 按时间戳排序
+            mergedHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            
+            // 取最近 ctxLength 轮
+            const recentMerged = mergedHistory.slice(-ctxLength);
+            
+            const recentHistory = recentMerged.map(msg => {
+                const isOnline = msg._source === 'online';
+                let content = msg.content;
+                // 如果是线上模式的消息，添加标记让AI知道这是线上聊天
+                if (isOnline && typeof content === 'string') {
+                    content = '[线上聊天] ' + content;
+                }
+                return {
+                    role: msg.sender === 'user' ? 'user' : 'assistant',
+                    content: content
+                };
+            });
 
             const messages = [
                 { role: 'system', content: systemPrompt }

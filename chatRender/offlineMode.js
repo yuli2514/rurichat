@@ -390,9 +390,13 @@ const OfflineMode = {
     openPresetModal: function() {
         this.renderPresetList();
         document.getElementById('offline-preset-modal').classList.remove('hidden');
-        // 清空表单
+        // 清空表单并重置编辑状态
         document.getElementById('offline-preset-name').value = '';
         document.getElementById('offline-preset-input').value = '';
+        this._editingPresetId = null;
+        // 恢复按钮文字
+        const saveBtn = document.querySelector('#offline-preset-modal button[onclick="OfflineMode.savePreset()"]');
+        if (saveBtn) saveBtn.textContent = '保存预设';
     },
 
     closePresetModal: function() {
@@ -432,8 +436,11 @@ const OfflineMode = {
         `).join('');
     },
 
+    // 当前正在编辑的预设ID（null表示新建）
+    _editingPresetId: null,
+
     /**
-     * 保存预设
+     * 保存预设（新建或更新）
      */
     savePreset: function() {
         const name = document.getElementById('offline-preset-name').value.trim();
@@ -442,33 +449,46 @@ const OfflineMode = {
         if (!name) return alert('请输入预设名称');
         if (!content) return alert('请输入预设内容');
         
-        API.Offline.addPreset(this.currentCharId, { name, content, enabled: true });
+        if (this._editingPresetId) {
+            // 更新已有预设
+            API.Offline.updatePreset(this.currentCharId, this._editingPresetId, { name, content });
+            this._editingPresetId = null;
+            alert('预设已更新');
+        } else {
+            // 新建预设
+            API.Offline.addPreset(this.currentCharId, { name, content, enabled: true });
+            alert('预设已保存');
+        }
+        
         this.renderPresetList();
         document.getElementById('offline-preset-name').value = '';
         document.getElementById('offline-preset-input').value = '';
-        alert('预设已保存');
+        
+        // 恢复按钮文字
+        const saveBtn = document.querySelector('#offline-preset-modal button[onclick="OfflineMode.savePreset()"]');
+        if (saveBtn) saveBtn.textContent = '保存预设';
     },
 
     /**
-     * 编辑预设
+     * 编辑预设 - 将预设内容填入表单
      */
     editPreset: function(presetId) {
         const presets = API.Offline.getPresets(this.currentCharId);
         const preset = presets.find(p => p.id === presetId);
         if (!preset) return;
 
-        const newName = prompt('编辑预设名称:', preset.name);
-        if (newName === null) return;
+        // 填入表单
+        document.getElementById('offline-preset-name').value = preset.name;
+        document.getElementById('offline-preset-input').value = preset.content;
+        this._editingPresetId = presetId;
         
-        const newContent = prompt('编辑预设内容:', preset.content);
-        if (newContent === null) return;
-
-        if (!newName.trim()) return alert('预设名称不能为空');
-        if (!newContent.trim()) return alert('预设内容不能为空');
-
-        API.Offline.updatePreset(this.currentCharId, presetId, { name: newName, content: newContent });
-        this.renderPresetList();
-        alert('预设已更新');
+        // 修改按钮文字为"更新预设"
+        const saveBtn = document.querySelector('#offline-preset-modal button[onclick="OfflineMode.savePreset()"]');
+        if (saveBtn) saveBtn.textContent = '更新预设';
+        
+        // 滚动到表单区域
+        const formArea = document.getElementById('offline-preset-name');
+        if (formArea) formArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     },
 
     /**

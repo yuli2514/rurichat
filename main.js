@@ -65,6 +65,11 @@ function initializeApp() {
             }
         });
 
+        // 迁移旧的按角色存储的线下预设到全局存储
+        if (typeof API !== 'undefined' && API.Offline && typeof API.Offline.migratePresetsToGlobal === 'function') {
+            API.Offline.migratePresetsToGlobal();
+        }
+
         console.log('RuriChat Initialized Successfully');
 
         // 5. Global Layout Lock (Prevent Body Scroll)

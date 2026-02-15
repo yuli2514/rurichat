@@ -464,7 +464,8 @@ const ChatManager = {
             this.renderList();
             this.closeAddModal();
         } catch (e) {
-            alert('保存失败，存储数据可能已损坏。');
+            console.error('添加角色失败:', e);
+            alert('保存失败: ' + (e.message || '存储数据可能已损坏') + '\n\n请尝试：\n1. 清理浏览器存储空间\n2. 刷新页面后重试');
         }
     },
 
