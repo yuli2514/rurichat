@@ -486,29 +486,29 @@ const VoiceHandler = {
         this.closeVoicePanel();
         
         if (isMobile && savedAudioBlob) {
-            // ===== 移动端双轨并行方案 =====
-            // 轨道1：立刻用 objectURL 挂载回放（确保用户能听到清晰原声）
-            // 轨道2：异步转码为 16kHz WAV，通过后端 API 进行语音转文字
+            // ===== 移动端：原生录制 + 直传 API 方案 =====
+            // 1. 用 objectURL 挂载回放（确保用户能听到清晰原声）
+            // 2. 将原始 Blob 转为 base64，直传给 Gemini API（多模态识别）
+            // 3. 绝不使用 OfflineAudioContext 转码！绝不调用 Whisper API！
             
             const playbackURL = savedPlaybackURL || URL.createObjectURL(savedAudioBlob);
+            const mimeType = this._recordingMimeType || 'audio/webm';
             
-            // 先立刻发送消息（文字暂时为"语音识别中..."），让用户能马上看到并回放
-            const msgId = Date.now();
-            const tempText = '[语音识别中...]';
-            this.createAndSendVoiceMessage(duration, playbackURL, null, tempText, false, msgId);
-            
-            // 异步转码并发送给后端识别
-            this._resampleToWAV16k(savedAudioBlob).then(wavBase64 => {
-                console.log('[VoiceHandler] 移动端 16kHz WAV 转码成功，发送后端识别');
-                return this._backendSpeechToText(wavBase64);
-            }).then(recognizedText => {
-                console.log('[VoiceHandler] 后端语音识别结果:', recognizedText);
-                // 更新消息中的识别文字
-                this._updateVoiceMessageText(msgId, recognizedText || '[语音消息]');
-            }).catch(err => {
-                console.warn('[VoiceHandler] 移动端语音识别失败:', err);
-                this._updateVoiceMessageText(msgId, '[语音消息]');
-            });
+            // 将原始 Blob 转为 base64，保留原始格式
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const originalBase64 = reader.result; // data:audio/webm;base64,...
+                console.log('[VoiceHandler] 移动端原始音频 base64 已生成, MIME:', mimeType, '大小:', savedAudioBlob.size);
+                
+                // 发送消息：回放用 objectURL，AI 用原始 base64
+                this.createAndSendVoiceMessage(duration, playbackURL, originalBase64, '[语音消息]', false, null, mimeType);
+            };
+            reader.onerror = () => {
+                console.error('[VoiceHandler] 移动端音频 base64 转换失败');
+                // 降级：只有回放，没有 AI 音频数据
+                this.createAndSendVoiceMessage(duration, playbackURL, null, '[语音消息]', false);
+            };
+            reader.readAsDataURL(savedAudioBlob);
         } else if (savedAudioBlob) {
             // ===== 电脑端：保持原有逻辑 =====
             // 先将原始 Blob 转为 base64 用于回放
@@ -733,12 +733,13 @@ const VoiceHandler = {
      * 创建并发送语音消息
      * @param {number} duration - 语音时长
      * @param {string|null} audioData - 原始音频 base64 或 objectURL（用于本地回放）
-     * @param {string|null} audioDataForAI - 16kHz WAV base64（用于发送给 AI）
+     * @param {string|null} audioDataForAI - 音频 base64（用于发送给 AI，移动端为原始格式，电脑端为 16kHz WAV）
      * @param {string} text - 识别文本
      * @param {boolean} isFake - 是否伪造
      * @param {number} [customMsgId] - 自定义消息ID（移动端用于后续更新）
+     * @param {string} [audioMimeType] - 音频 MIME 类型（如 audio/webm, audio/mp4），移动端直传用
      */
-    createAndSendVoiceMessage: function(duration, audioData, audioDataForAI, text, isFake, customMsgId) {
+    createAndSendVoiceMessage: function(duration, audioData, audioDataForAI, text, isFake, customMsgId, audioMimeType) {
         const msg = {
             id: customMsgId || Date.now(),
             sender: 'user',
@@ -749,6 +750,7 @@ const VoiceHandler = {
                 duration: duration,
                 audioBase64: audioData,
                 audioBase64ForAI: audioDataForAI,
+                audioMimeType: audioMimeType || null,
                 isFake: isFake,
                 transcription: text
             }

@@ -602,16 +602,38 @@ const API = {
                         }
                     }
                 }
-                // 处理语音消息 - 将语音内容作为文字传递给AI
+                // 处理语音消息 - 优先直传音频给AI（多模态），否则用文字
                 else if (msg.type === 'voice') {
                     const voiceData = msg.voiceData || {};
                     const transcription = voiceData.transcription || msg.content || '';
                     const sender = msg.sender === 'user' ? '用户' : char.name;
-                    if (transcription && transcription !== '[语音消息]') {
-                        // 有识别出的文字内容，直接告诉AI用户说了什么
+                    
+                    // 如果有原始音频 base64 数据（移动端直传方案），使用多模态格式让 Gemini 直接听音频
+                    if (voiceData.audioBase64ForAI && voiceData.audioMimeType) {
+                        // 从 data URL 中提取纯 base64 数据
+                        const base64Data = voiceData.audioBase64ForAI.includes(',')
+                            ? voiceData.audioBase64ForAI.split(',')[1]
+                            : voiceData.audioBase64ForAI;
+                        // 从 MIME 类型中提取格式（如 audio/webm;codecs=opus -> webm, audio/mp4 -> mp4）
+                        const audioFormat = voiceData.audioMimeType.split('/')[1].split(';')[0];
+                        content = [
+                            {
+                                type: 'text',
+                                text: '[' + sender + '发送了一条语音消息，请仔细听取音频内容，理解用户说了什么，然后自然地回应。注意：请直接根据音频内容回复，不要说"我听到了你的语音"之类的话]'
+                            },
+                            {
+                                type: 'input_audio',
+                                input_audio: {
+                                    data: base64Data,
+                                    format: audioFormat
+                                }
+                            }
+                        ];
+                    } else if (transcription && transcription !== '[语音消息]' && transcription !== '[语音识别中...]') {
+                        // 有识别出的文字内容（电脑端前端ASR），直接告诉AI用户说了什么
                         content = '[' + sender + '发送了一条语音消息，说的是：「' + transcription + '」]';
                     } else {
-                        // 没有识别出文字，告诉AI用户发了语音但无法转文字
+                        // 没有识别出文字也没有音频数据，告诉AI用户发了语音但无法转文字
                         content = '[' + sender + '发送了一条语音消息，语音转文字失败，请根据上下文推测用户可能在说什么，并自然地回应]';
                     }
                 }
