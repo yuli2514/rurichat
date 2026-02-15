@@ -285,8 +285,10 @@ const API = {
             let userName = settings.userName || '用户';
             let userPersonaContent = '';
             
-            // 如果绑定了用户面具，获取面具内容作为用户人设信息
-            if (settings.userPersonaId) {
+            // 优先使用角色设置中的自定义人设内容（customPersonaContent），其次使用面具预设
+            if (settings.customPersonaContent) {
+                userPersonaContent = settings.customPersonaContent;
+            } else if (settings.userPersonaId) {
                 const personas = API.Profile.getPersonas();
                 const persona = personas.find(p => p.id === settings.userPersonaId);
                 if (persona) {
@@ -771,7 +773,10 @@ const API = {
             }
 
             // --- User Persona Integration ---
-            if (settings.userPersonaId) {
+            // 优先使用角色设置中的自定义人设内容（customPersonaContent），其次使用面具预设
+            if (settings.customPersonaContent) {
+                systemPrompt += '\n[User Persona/Info: ' + settings.customPersonaContent + ']';
+            } else if (settings.userPersonaId) {
                 const personas = API.Profile.getPersonas();
                 const persona = personas.find(p => p.id === settings.userPersonaId);
                 if (persona) {
@@ -1362,8 +1367,10 @@ const API = {
                 }
             }
 
-            // 用户面具集成
-            if (settings.userPersonaId) {
+            // 用户面具集成 - 优先使用自定义人设内容，其次使用面具预设
+            if (settings.customPersonaContent) {
+                systemPrompt += '\n[用户人设信息: ' + settings.customPersonaContent + ']';
+            } else if (settings.userPersonaId) {
                 const personas = API.Profile.getPersonas();
                 const persona = personas.find(p => p.id === settings.userPersonaId);
                 if (persona) {

@@ -88,13 +88,6 @@ const PersonaManager = {
 
         API.Profile.savePersonas(personas);
         
-        // 如果当前正在使用该面具，更新当前Profile
-        // 注意：这里简化处理，直接更新Profile的character字段可能不是必须的，
-        // 取决于系统设计。原代码有这行：
-        const profile = API.Profile.getProfile();
-        profile.character = content;
-        API.Profile.saveProfile(profile);
-        
         this.closeEditModal();
         this.renderList();
         

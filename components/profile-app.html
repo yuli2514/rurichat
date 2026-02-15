@@ -1,74 +1,22 @@
-<!-- ==================== PROFILE APP (INS Style) ==================== -->
+<!-- ==================== PROFILE APP (已废弃 - 暂时停用) ==================== -->
 <div id="profile-app" class="absolute inset-0 z-50 flex flex-col hidden bg-white">
     
-    <!-- Header Bar (Transparent) -->
-    <div class="absolute top-0 left-0 right-0 h-24 px-4 pt-10 flex items-center justify-between z-30">
-         <button onclick="ProfileManager.close()" class="w-9 h-9 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm text-white">
-            <i class="fa-solid fa-chevron-left"></i>
-        </button>
-        <button onclick="ProfileManager.saveAll()" class="w-16 h-8 flex items-center justify-center rounded-full bg-black text-white text-xs font-bold shadow-md active:scale-95 transition">
-            保存
-        </button>
+    <!-- Header Bar -->
+    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 shadow-sm">
+        <button onclick="ProfileManager.close()" class="text-gray-800"><i class="fa-solid fa-chevron-left text-lg"></i></button>
+        <h2 class="font-bold text-lg">我</h2>
+        <div class="w-6"></div>
     </div>
 
-    <!-- Header Image Area -->
-    <div class="relative w-full h-48 shrink-0 bg-gray-100 group cursor-pointer">
-        <div id="profile-bg-preview" class="w-full h-full bg-cover bg-center bg-gray-300 transition group-active:opacity-90"></div>
-        <!-- Full area label -->
-        <label for="profile-bg-upload" class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition cursor-pointer">
-             <div class="w-8 h-8 bg-black/50 backdrop-blur rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
-                <i class="fa-solid fa-camera text-xs"></i>
-            </div>
-        </label>
-        <input type="file" id="profile-bg-upload" class="hidden" accept="image/*">
-    </div>
-
-    <!-- Profile Avatar (Absolute Positioned to float over header) -->
-    <div class="absolute top-28 left-1/2 transform -translate-x-1/2 z-40">
-        <label for="profile-avatar-upload" class="relative block w-24 h-24 p-1 bg-white rounded-full shadow-lg cursor-pointer active:scale-95 transition">
-            <img id="profile-avatar-preview" src="https://ui-avatars.com/api/?name=User" class="w-full h-full rounded-full object-cover bg-gray-100">
-            <input type="file" id="profile-avatar-upload" class="hidden" accept="image/*">
-        </label>
-    </div>
-
-    <!-- Profile Content Area -->
-    <div class="flex-1 overflow-y-auto relative -mt-6 rounded-t-[30px] bg-white z-10 px-6 pt-16">
-        
-        <!-- Main Info (Centered) -->
-        <div class="flex flex-col items-center mb-6 mt-8">
-            <input type="text" id="profile-name" class="text-center text-xl font-black text-gray-900 bg-transparent focus:bg-gray-50 focus:outline-none rounded-lg px-2 py-1 w-full max-w-[80%]" placeholder="Name">
-            
-            <div class="inline-flex items-center justify-center text-gray-400 mt-1">
-                <i class="fa-solid fa-location-dot text-[10px]"></i>
-                <input type="text" id="profile-location" class="text-xs font-medium text-gray-500 bg-transparent focus:bg-gray-50 focus:outline-none rounded px-1 text-center" style="width: auto; min-width: 50px; max-width: 120px;" placeholder="Location" oninput="this.style.width = Math.max(50, (this.value.length + 2) * 7) + 'px'">
-            </div>
-
-            <input type="text" id="profile-signature" class="text-center text-xs text-gray-400 mt-2 bg-transparent focus:bg-gray-50 focus:outline-none rounded px-2 w-full" placeholder="Bio / Signature...">
+    <!-- 停用提示 -->
+    <div class="flex-1 flex items-center justify-center px-8">
+        <div class="text-center space-y-4">
+            <div class="text-6xl text-gray-300">🚧</div>
+            <h3 class="text-lg font-bold text-gray-500">此页面暂时停用</h3>
+            <p class="text-sm text-gray-400 leading-relaxed">
+                用户人设请在每个角色的「聊天信息 → 用户人设」中设置。<br>
+                此页面将在后续版本重新设计。
+            </p>
         </div>
-
-        <!-- Stats / Action Buttons (Ins Style) -->
-        <div class="flex gap-3 mb-6">
-            <button class="flex-1 bg-gray-100 text-gray-800 py-2 rounded-lg text-sm font-bold active:bg-gray-200 transition">编辑主页</button>
-            <button class="flex-1 bg-gray-100 text-gray-800 py-2 rounded-lg text-sm font-bold active:bg-gray-200 transition">分享</button>
-            <button onclick="ProfileManager.openPresetModal()" class="w-10 flex items-center justify-center bg-gray-100 text-gray-800 rounded-lg active:bg-gray-200 transition">
-                 <i class="fa-solid fa-user-gear"></i>
-            </button>
-        </div>
-
-        <!-- Character / System Prompt Section -->
-        <div class="space-y-3">
-            <div class="flex items-center gap-2 mb-1">
-                 <span class="text-xs font-bold text-gray-900 tracking-wide uppercase">System Prompt</span>
-                 <div class="h-px bg-gray-200 flex-1"></div>
-            </div>
-            
-            <div class="bg-gray-50 rounded-xl p-4">
-                <textarea id="profile-character" rows="10" class="w-full bg-transparent text-sm text-gray-700 focus:outline-none resize-none leading-relaxed placeholder-gray-400" placeholder="在此设定你的角色人设 (System Prompt)..."></textarea>
-            </div>
-            <p class="text-[10px] text-gray-400 text-center">Prompt will define how AI responds to you.</p>
-        </div>
-
-        <!-- Spacer -->
-        <div class="h-10"></div>
     </div>
 </div>

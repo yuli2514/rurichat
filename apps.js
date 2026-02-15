@@ -554,132 +554,13 @@ const WorldBookManager = {
     }
 };
 
-// ==================== PROFILE MANAGER UI ====================
+// ==================== PROFILE MANAGER UI (已废弃 - 暂时停用) ====================
 const ProfileManager = {
     open: function() {
         document.getElementById('profile-app').classList.remove('hidden');
-        this.loadProfile();
     },
 
     close: function() {
         document.getElementById('profile-app').classList.add('hidden');
-        this.saveAll(); 
-    },
-
-    loadProfile: function() {
-        const profile = API.Profile.getProfile();
-        
-        if (profile.name) document.getElementById('profile-name').value = profile.name;
-        if (profile.location) document.getElementById('profile-location').value = profile.location;
-        if (profile.signature) document.getElementById('profile-signature').value = profile.signature;
-        if (profile.character) {
-            const charInput = document.getElementById('profile-character');
-            if (charInput) charInput.value = profile.character;
-        }
-        if (profile.avatar) {
-            document.getElementById('profile-avatar-preview').src = profile.avatar;
-        }
-        if (profile.background) {
-            document.getElementById('profile-bg-preview').style.backgroundImage = 'url(' + profile.background + ')';
-        }
-
-        document.getElementById('profile-avatar-upload').onchange = (e) => this.handleAvatarUpload(e.target);
-        document.getElementById('profile-bg-upload').onchange = (e) => this.handleBgUpload(e.target);
-    },
-
-    handleAvatarUpload: function(input) {
-        const file = input.files[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                alert('图片大小不能超过 2MB');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const tempImg = new Image();
-                tempImg.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = tempImg.width;
-                    let height = tempImg.height;
-                    
-                    const MAX_SIZE = 300;
-                    if (width > height) {
-                        if (width > MAX_SIZE) {
-                            height *= MAX_SIZE / width;
-                            width = MAX_SIZE;
-                        }
-                    } else {
-                        if (height > MAX_SIZE) {
-                            width *= MAX_SIZE / height;
-                            height = MAX_SIZE;
-                        }
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(tempImg, 0, 0, width, height);
-                    
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                    
-                    try {
-                        let profile = API.Profile.getProfile();
-                        profile.avatar = dataUrl;
-                        API.Profile.saveProfile(profile);
-                        
-                        document.getElementById('profile-avatar-preview').src = dataUrl;
-                        
-                        this.saveAll();
-                        alert('个人主页头像已更新');
-                    } catch (err) {
-                        console.error('Storage failed:', err);
-                        alert('头像保存失败，可能是存储空间已满。请尝试更小的图片。');
-                    }
-                };
-                tempImg.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-    },
-
-    handleBgUpload: function(input) {
-        const file = input.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                document.getElementById('profile-bg-preview').style.backgroundImage = 'url(' + e.target.result + ')';
-                this.saveAll();
-            };
-            reader.readAsDataURL(file);
-        }
-    },
-
-    saveAll: function() {
-        const charInput = document.getElementById('profile-character');
-        const profile = {
-            name: document.getElementById('profile-name').value,
-            location: document.getElementById('profile-location').value,
-            signature: document.getElementById('profile-signature').value,
-            character: charInput ? charInput.value : '',
-            avatar: document.getElementById('profile-avatar-preview').src,
-            background: document.getElementById('profile-bg-preview').style.backgroundImage.replace(/^url\(['"]?|['"]?\)$/g, '')
-        };
-        API.Profile.saveProfile(profile);
-        
-        const personas = API.Profile.getPersonas();
-        const selectedPersonaId = document.getElementById('setting-user-persona-select')?.value;
-        if(selectedPersonaId) {
-            const personaIndex = personas.findIndex(p => p.id === selectedPersonaId);
-            if(personaIndex !== -1) {
-                personas[personaIndex].content = profile.character;
-                API.Profile.savePersonas(personas);
-            }
-        }
-    },
-
-    // Persona UI Methods
-    openPresetModal: function() {
-        document.getElementById('preset-modal').classList.remove('hidden');
     }
 };
