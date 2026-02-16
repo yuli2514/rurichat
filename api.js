@@ -491,7 +491,7 @@ const API = {
                     console.error('ruri_chars is not an array, resetting. Value type:', typeof parsed);
                     return [];
                 }
-                // 过滤掉无效的角色数据（必须有id），并从 AvatarStore 恢复头像
+                // 过滤掉无效的角色数据（必须有id），并从 AvatarStore 恢复头像和壁纸
                 const result = parsed.filter(c => c && typeof c === 'object' && c.id).map(c => {
                     if (c.avatar === 'idb') {
                         const cached = AvatarStore.get(c.id);
@@ -499,6 +499,15 @@ const API = {
                             c.avatar = cached;
                         } else {
                             c.avatar = 'icon.png';
+                        }
+                    }
+                    // 从 IndexedDB 恢复壁纸数据
+                    if (c.settings && c.settings.wallpaper === 'idb') {
+                        const cachedWp = AvatarStore.get('wallpaper_' + c.id);
+                        if (cachedWp) {
+                            c.settings.wallpaper = cachedWp;
+                        } else {
+                            c.settings.wallpaper = '';
                         }
                     }
                     return c;
@@ -521,7 +530,7 @@ const API = {
 
             const validChars = chars.filter(c => c && typeof c === 'object' && c.id);
 
-            // 剥离 base64 头像 → 存入 IndexedDB，localStorage 只保留 'idb' 标记
+            // 剥离 base64 头像和大型壁纸 → 存入 IndexedDB，localStorage 只保留 'idb' 标记
             const slimChars = validChars.map(c => {
                 const copy = { ...c };
                 if (copy.avatar && typeof copy.avatar === 'string' &&
@@ -529,6 +538,13 @@ const API = {
                     // 异步存入 IndexedDB（fire-and-forget）
                     AvatarStore.set(copy.id, copy.avatar);
                     copy.avatar = 'idb';
+                }
+                // 剥离大型壁纸数据 → 存入 IndexedDB，避免 localStorage 超限
+                if (copy.settings && copy.settings.wallpaper && typeof copy.settings.wallpaper === 'string' &&
+                    copy.settings.wallpaper.startsWith('data:') && copy.settings.wallpaper.length > 500) {
+                    copy.settings = { ...copy.settings };
+                    AvatarStore.set('wallpaper_' + copy.id, copy.settings.wallpaper);
+                    copy.settings.wallpaper = 'idb';
                 }
                 return copy;
             });
@@ -608,8 +624,9 @@ const API = {
             let chars = this.getChars();
             chars = chars.filter(c => c.id !== charId);
             this.saveChars(chars);
-            // 同时清理 IndexedDB 中的头像
+            // 同时清理 IndexedDB 中的头像和壁纸
             AvatarStore.remove(charId);
+            AvatarStore.remove('wallpaper_' + charId);
             localStorage.removeItem('ruri_chat_history_' + charId);
             delete this._cache.history[charId];
             localStorage.removeItem('ruri_memories_' + charId);

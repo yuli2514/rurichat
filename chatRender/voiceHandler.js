@@ -487,11 +487,10 @@ const VoiceHandler = {
         
         if (isMobile && savedAudioBlob) {
             // ===== 移动端：原生录制 + 直传 API 方案 =====
-            // 1. 用 objectURL 挂载回放（确保用户能听到清晰原声）
-            // 2. 将原始 Blob 转为 base64，直传给 Gemini API（多模态识别）
+            // 1. 将原始 Blob 转为 base64，用于回放和 AI 直传
+            // 2. 不使用 objectURL（blob: URL 在页面刷新后失效，导致退出后无法播放）
             // 3. 绝不使用 OfflineAudioContext 转码！绝不调用 Whisper API！
             
-            const playbackURL = savedPlaybackURL || URL.createObjectURL(savedAudioBlob);
             const mimeType = this._recordingMimeType || 'audio/webm';
             
             // 将原始 Blob 转为 base64，保留原始格式
@@ -500,8 +499,8 @@ const VoiceHandler = {
                 const originalBase64 = reader.result; // data:audio/webm;base64,...
                 console.log('[VoiceHandler] 移动端原始音频 base64 已生成, MIME:', mimeType, '大小:', savedAudioBlob.size);
                 
-                // 发送消息：回放用 objectURL，AI 用原始 base64
-                this.createAndSendVoiceMessage(duration, playbackURL, originalBase64, '[语音消息]', false, null, mimeType);
+                // 回放和 AI 都使用 base64（持久化，退出后仍可播放）
+                this.createAndSendVoiceMessage(duration, originalBase64, originalBase64, '[语音消息]', false, null, mimeType);
             };
             reader.onerror = () => {
                 console.error('[VoiceHandler] 移动端音频 base64 转换失败');
