@@ -84,11 +84,8 @@ const ChatInterface = {
     open: function(charId) {
         try {
             this.currentCharId = charId;
-            this.loadedMessageCount = 80;
-            
-            // 确保相机输入事件已绑定
-            this._bindCameraInput();
-            
+            this.loadedMessageCount = 30; // 初始只加载30条，减少首屏渲染量
+
             const char = API.Chat.getChar(charId);
             if (!char) {
                 console.error('Character not found');
@@ -154,9 +151,17 @@ const ChatInterface = {
                 }
             }
 
-            // 先渲染消息，表情包面板延迟渲染避免阻塞主线程
-            this.renderMessages();
-            setTimeout(() => this.renderEmojiGrid(), 300);
+            // 先清空消息区域，让界面立即显示
+            messagesArea.innerHTML = '';
+
+            // 延迟渲染消息，让界面先展示出来不卡顿
+            setTimeout(() => {
+                this.renderMessages();
+                // 确保相机输入事件已绑定
+                this._bindCameraInput();
+            }, 16);
+            // 表情包面板更晚渲染
+            setTimeout(() => this.renderEmojiGrid(), 500);
         } catch (e) {
             console.error('Error opening chat:', e);
             alert('打开聊天失败: ' + e.message);
@@ -166,6 +171,11 @@ const ChatInterface = {
     closeToList: function() {
         document.getElementById('super-chat-interface').classList.add('hidden');
         document.getElementById('chat-app').classList.remove('hidden');
+        // 刷新被延迟的列表渲染
+        if (typeof ChatManager !== 'undefined' && ChatManager._needsRefresh) {
+            ChatManager._needsRefresh = false;
+            ChatManager.renderList();
+        }
     },
 
     close: function() {
@@ -187,6 +197,7 @@ const ChatInterface = {
         const char = API.Chat.getChar(this.currentCharId);
         
         if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        if (this._batchTimer) { clearTimeout(this._batchTimer); this._batchTimer = null; }
         
         this._renderRAF = requestAnimationFrame(() => {
             const html = this._buildMessagesHtml(history, char);
@@ -204,12 +215,80 @@ const ChatInterface = {
         const char = API.Chat.getChar(this.currentCharId);
         
         if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        // 取消正在进行的分批渲染
+        if (this._batchTimer) { clearTimeout(this._batchTimer); this._batchTimer = null; }
         
         this._renderRAF = requestAnimationFrame(() => {
-            const html = this._buildMessagesHtml(history, char);
-            container.innerHTML = html;
-            this.scrollToBottom();
+            this._renderMessagesBatched(container, history, char);
         });
+    },
+
+    /**
+     * 分批渲染消息，避免长时间阻塞主线程
+     */
+    _renderMessagesBatched: function(container, history, char) {
+        const maxMessages = this.loadedMessageCount;
+        const startIndex = Math.max(0, history.length - maxMessages);
+        const renderedHistory = history.slice(startIndex);
+
+        const charSettings = char.settings || {};
+        const showAvatarTimestamp = charSettings.timestampAvatar || false;
+        const showBubbleTimestamp = charSettings.timestampBubble || false;
+
+        // 清空容器
+        container.innerHTML = '';
+
+        // 加载更多按钮
+        if (startIndex > 0) {
+            container.insertAdjacentHTML('beforeend', MessageBuilder.buildLoadMoreButton(startIndex));
+        }
+
+        const BATCH_SIZE = 15; // 每批渲染15条
+        let currentBatch = 0;
+        let lastTimestamp = 0;
+        const self = this;
+
+        const renderBatch = () => {
+            const from = currentBatch * BATCH_SIZE;
+            const to = Math.min(from + BATCH_SIZE, renderedHistory.length);
+            if (from >= renderedHistory.length) {
+                self.scrollToBottom();
+                return;
+            }
+
+            let batchHtml = '';
+            for (let i = from; i < to; i++) {
+                const msg = renderedHistory[i];
+                const index = startIndex + i;
+                const timeDiff = (msg.timestamp - lastTimestamp) / 1000 / 60;
+
+                if (i === 0 || timeDiff > 3) {
+                    batchHtml += MessageBuilder.buildTimestamp(msg.timestamp);
+                }
+
+                batchHtml += MessageBuilder.buildMessage({
+                    msg, index, char, history,
+                    deleteMode: self.deleteMode,
+                    selectedForDelete: self.selectedForDelete,
+                    showAvatarTimestamp, showBubbleTimestamp
+                });
+
+                lastTimestamp = msg.timestamp;
+            }
+
+            container.insertAdjacentHTML('beforeend', batchHtml);
+            currentBatch++;
+
+            if (currentBatch * BATCH_SIZE < renderedHistory.length) {
+                // 下一批用 setTimeout 让出主线程
+                self._batchTimer = setTimeout(renderBatch, 0);
+            } else {
+                self._batchTimer = null;
+                self.scrollToBottom();
+            }
+        };
+
+        renderBatch();
     },
 
     /**
@@ -264,6 +343,7 @@ const ChatInterface = {
         const scrollTop = container.scrollTop;
         
         if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
+        if (this._batchTimer) { clearTimeout(this._batchTimer); this._batchTimer = null; }
         
         this._renderRAF = requestAnimationFrame(() => {
             const html = this._buildMessagesHtml(history, char);

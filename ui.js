@@ -469,7 +469,16 @@ const ChatManager = {
         }
     },
 
+    _needsRefresh: false, // 标记列表是否需要刷新
+
     renderList: function() {
+        // 如果聊天界面正在显示，延迟到返回列表时再渲染
+        const superInterface = document.getElementById('super-chat-interface');
+        if (superInterface && !superInterface.classList.contains('hidden')) {
+            this._needsRefresh = true;
+            return;
+        }
+
         const listContainer = document.getElementById('chat-list-container');
         let chars = API.Chat.getChars();
 

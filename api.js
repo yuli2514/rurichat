@@ -467,7 +467,22 @@ const API = {
 
     // ==================== CHAT DATA & LOGIC ====================
     Chat: {
+        // 内存缓存层 - 避免重复 JSON.parse/stringify 导致卡顿
+        _cache: {
+            chars: null,        // 角色列表缓存
+            history: {},        // 聊天历史缓存 { charId: array }
+            _dirtyHistory: {},  // 标记哪些历史需要写入localStorage
+            _saveTimer: null    // 延迟写入定时器
+        },
+
+        // 清除缓存（外部修改localStorage后调用）
+        clearCache: function() {
+            this._cache.chars = null;
+            this._cache.history = {};
+        },
+
         getChars: function() {
+            if (this._cache.chars) return this._cache.chars;
             try {
                 const raw = localStorage.getItem('ruri_chars');
                 if (!raw || raw === 'undefined' || raw === 'null') return [];
@@ -477,18 +492,19 @@ const API = {
                     return [];
                 }
                 // 过滤掉无效的角色数据（必须有id），并从 AvatarStore 恢复头像
-                return parsed.filter(c => c && typeof c === 'object' && c.id).map(c => {
+                const result = parsed.filter(c => c && typeof c === 'object' && c.id).map(c => {
                     if (c.avatar === 'idb') {
                         const cached = AvatarStore.get(c.id);
                         if (cached) {
                             c.avatar = cached;
                         } else {
-                            // IndexedDB 中没有缓存，回退到默认头像
                             c.avatar = 'icon.png';
                         }
                     }
                     return c;
                 });
+                this._cache.chars = result;
+                return result;
             } catch (e) {
                 console.error('Error parsing chars:', e);
                 return [];
@@ -500,6 +516,9 @@ const API = {
                 console.error('saveChars: chars is not an array!');
                 chars = [];
             }
+            // 更新缓存
+            this._cache.chars = chars;
+
             const validChars = chars.filter(c => c && typeof c === 'object' && c.id);
 
             // 剥离 base64 头像 → 存入 IndexedDB，localStorage 只保留 'idb' 标记
@@ -592,13 +611,18 @@ const API = {
             // 同时清理 IndexedDB 中的头像
             AvatarStore.remove(charId);
             localStorage.removeItem('ruri_chat_history_' + charId);
+            delete this._cache.history[charId];
             localStorage.removeItem('ruri_memories_' + charId);
         },
 
         getHistory: function(charId) {
             if (!charId) return [];
+            // 优先从缓存读取
+            if (this._cache.history[charId]) return this._cache.history[charId];
             try {
-                return JSON.parse(localStorage.getItem('ruri_chat_history_' + charId) || '[]');
+                const result = JSON.parse(localStorage.getItem('ruri_chat_history_' + charId) || '[]');
+                this._cache.history[charId] = result;
+                return result;
             } catch (e) {
                 console.error('Error parsing history:', e);
                 return [];
@@ -607,21 +631,41 @@ const API = {
 
         saveHistory: function(charId, history) {
             if (!charId) return;
-            localStorage.setItem('ruri_chat_history_' + charId, JSON.stringify(history));
+            // 更新缓存
+            this._cache.history[charId] = history;
+            // 延迟写入localStorage，合并短时间内的多次写入
+            this._cache._dirtyHistory[charId] = true;
+            if (!this._cache._saveTimer) {
+                this._cache._saveTimer = setTimeout(() => {
+                    this._flushHistory();
+                }, 100);
+            }
             
-            // Update last message in char list
+            // Update last message in char list (使用缓存，不再重复解析)
             const lastMsg = history[history.length - 1];
             if (lastMsg) {
                 let chars = this.getChars();
                 const idx = chars.findIndex(c => c.id === charId);
                 if (idx !== -1) {
-                    chars[idx].lastMessage = lastMsg.type === 'image' ? '[图片]' : (lastMsg.type === 'emoji' ? '[表情包]' : lastMsg.content);
+                    chars[idx].lastMessage = lastMsg.type === 'image' ? '[图片]' : (lastMsg.type === 'emoji' ? '[表情包]' : (lastMsg.type === 'transfer' ? '[转账]' : lastMsg.content));
                     // Move to top
                     const updatedChar = chars.splice(idx, 1)[0];
                     chars.unshift(updatedChar);
                     this.saveChars(chars);
                 }
             }
+        },
+
+        // 将脏数据刷入localStorage
+        _flushHistory: function() {
+            this._cache._saveTimer = null;
+            const dirty = this._cache._dirtyHistory;
+            for (const charId in dirty) {
+                if (dirty[charId] && this._cache.history[charId]) {
+                    localStorage.setItem('ruri_chat_history_' + charId, JSON.stringify(this._cache.history[charId]));
+                }
+            }
+            this._cache._dirtyHistory = {};
         },
 
         addMessage: function(charId, msg) {
