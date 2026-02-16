@@ -363,25 +363,25 @@ const TransferHandler = {
             }
         };
         
-        API.Chat.addMessage(charId, transferMsg);
+        const updatedHistory = API.Chat.addMessage(charId, transferMsg);
         
         // 关闭所有面板
         this.closePasswordPanel();
         this.closeTransferPanel();
         
-        // 重新渲染消息
-        ChatInterface.renderMessages();
+        // 添加透明遮罩防止移动端点击穿透到发送按钮触发AI回复
+        const shield = document.createElement('div');
+        shield.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:transparent;';
+        document.body.appendChild(shield);
+        setTimeout(() => shield.remove(), 400);
+        
+        // 增量追加代替全量重渲染
+        ChatInterface.appendSingleMessage(transferMsg, updatedHistory.length - 1);
         
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
         }
         
-        // 触发AI回复，让角色自己判断是否领取转账
-        setTimeout(() => {
-            if (typeof AIHandler !== 'undefined' && AIHandler.triggerAI) {
-                AIHandler.triggerAI(ChatInterface);
-            }
-        }, 300);
     },
 
     /**
@@ -437,8 +437,9 @@ const TransferHandler = {
             }
         };
         
-        API.Chat.addMessage(charId, transferMsg);
-        ChatInterface.renderMessages();
+        const updatedHistory = API.Chat.addMessage(charId, transferMsg);
+        // 增量追加代替全量重渲染
+        ChatInterface.appendSingleMessage(transferMsg, updatedHistory.length - 1);
         
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();

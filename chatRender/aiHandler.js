@@ -203,8 +203,9 @@ const AIHandler = {
                         quote: quote
                     };
                 }
-                API.Chat.addMessage(chatInterface.currentCharId, msg);
-                chatInterface.renderMessages();
+                const updatedHistory = API.Chat.addMessage(chatInterface.currentCharId, msg);
+                // 使用增量追加代替全量重渲染，避免卡顿
+                chatInterface.appendSingleMessage(msg, updatedHistory.length - 1);
                 
                 // 实时更新角色列表
                 if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {

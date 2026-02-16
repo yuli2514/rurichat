@@ -154,8 +154,9 @@ const ChatInterface = {
                 }
             }
 
+            // 先渲染消息，表情包面板延迟渲染避免阻塞主线程
             this.renderMessages();
-            this.renderEmojiGrid();
+            setTimeout(() => this.renderEmojiGrid(), 300);
         } catch (e) {
             console.error('Error opening chat:', e);
             alert('打开聊天失败: ' + e.message);
@@ -209,6 +210,51 @@ const ChatInterface = {
             container.innerHTML = html;
             this.scrollToBottom();
         });
+    },
+
+    /**
+     * 增量追加单条消息到聊天区域（避免全量重渲染导致卡顿）
+     * @param {Object} msg - 消息对象
+     * @param {number} index - 消息在历史记录中的索引
+     */
+    appendSingleMessage: function(msg, index) {
+        const container = document.getElementById('chat-messages');
+        const char = API.Chat.getChar(this.currentCharId);
+        const history = API.Chat.getHistory(this.currentCharId);
+        if (!char || !container) return;
+
+        const charSettings = char.settings || {};
+        const showAvatarTimestamp = charSettings.timestampAvatar || false;
+        const showBubbleTimestamp = charSettings.timestampBubble || false;
+
+        // 检查是否需要时间戳分隔
+        let timestampHtml = '';
+        if (history.length <= 1) {
+            timestampHtml = MessageBuilder.buildTimestamp(msg.timestamp);
+        } else {
+            // 找前一条消息
+            const prevMsg = index > 0 ? history[index - 1] : null;
+            if (prevMsg) {
+                const timeDiff = (msg.timestamp - prevMsg.timestamp) / 1000 / 60;
+                if (timeDiff > 3) {
+                    timestampHtml = MessageBuilder.buildTimestamp(msg.timestamp);
+                }
+            }
+        }
+
+        const msgHtml = MessageBuilder.buildMessage({
+            msg,
+            index,
+            char,
+            history,
+            deleteMode: this.deleteMode,
+            selectedForDelete: this.selectedForDelete,
+            showAvatarTimestamp: showAvatarTimestamp,
+            showBubbleTimestamp: showBubbleTimestamp
+        });
+
+        container.insertAdjacentHTML('beforeend', timestampHtml + msgHtml);
+        this.scrollToBottom();
     },
 
     renderMessagesNoScroll: function() {
@@ -333,8 +379,9 @@ const ChatInterface = {
         };
         this.cancelQuote();
 
-        API.Chat.addMessage(this.currentCharId, msg);
-        this.renderMessages();
+        const updatedHistory = API.Chat.addMessage(this.currentCharId, msg);
+        // 增量追加代替全量重渲染
+        this.appendSingleMessage(msg, updatedHistory.length - 1);
         
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
@@ -393,8 +440,10 @@ const ChatInterface = {
     },
 
     sendEmoji: function(emojiUrl) {
-        EmojiPanel.sendEmoji(emojiUrl, this.currentCharId);
-        this.renderMessages();
+        const msg = EmojiPanel.sendEmoji(emojiUrl, this.currentCharId);
+        // 增量追加代替全量重渲染
+        const history = API.Chat.getHistory(this.currentCharId);
+        this.appendSingleMessage(msg, history.length - 1);
         if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
             ChatManager.renderList();
         }
