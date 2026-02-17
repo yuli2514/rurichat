@@ -305,7 +305,7 @@ const OfflineMode = {
         waitHtml += '<img src="' + charAvatar + '" class="rounded-full object-cover shadow-sm" style="width:' + avatarSize + 'px; height:' + avatarSize + 'px;">';
         waitHtml += '</div>';
         waitHtml += '<div class="w-full flex justify-center">';
-        waitHtml += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 flex items-center justify-center gap-2">';
+        waitHtml += '<div class="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100 flex items-center justify-center gap-2">';
         waitHtml += '<div class="flex gap-1">';
         waitHtml += '<span class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay:0s"></span>';
         waitHtml += '<span class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay:0.15s"></span>';
