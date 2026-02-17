@@ -1227,12 +1227,21 @@ const API = {
             if (settings.autoSummary) {
                 const history = this.getHistory(charId);
                 const freq = settings.summaryFreq || 10;
-                // 只有当历史消息数量达到freq的倍数时才触发总结
-                if (history.length > 0 && history.length % freq === 0) {
+                
+                // 使用记录的上次总结位置来判断，避免因消息数跳过倍数而永远不触发
+                const lastSummaryKey = 'ruri_last_summary_pos_' + charId;
+                const lastSummaryPos = parseInt(DataStore.get(lastSummaryKey) || '0') || 0;
+                const newMessageCount = history.length - lastSummaryPos;
+                
+                console.log('[AutoSummary] 检查自动总结 - 历史总数:', history.length, '上次总结位置:', lastSummaryPos, '新消息数:', newMessageCount, '频率:', freq);
+                
+                if (history.length > 0 && newMessageCount >= freq) {
                     try {
                         // 传入freq作为总结的轮数范围，确保根据用户设置的轮数来总结
                         const summary = await API.Memory.generateSummary(charId, char.name, history, settings.summaryPrompt, freq);
                         API.Memory.addMemory(charId, summary, 'auto');
+                        // 记录本次总结时的历史长度
+                        DataStore.set(lastSummaryKey, history.length);
                         console.log('[AutoSummary] 自动总结已生成, 角色:', char.name, '总结轮数:', freq, '历史总数:', history.length);
                     } catch (e) {
                         console.error('[AutoSummary] 自动总结失败:', e);
@@ -1659,10 +1668,20 @@ const API = {
             if (settings.autoSummary) {
                 const history = this.getHistory(charId);
                 const freq = settings.summaryFreq || 10;
-                if (history.length > 0 && history.length % freq === 0) {
+                
+                // 使用记录的上次总结位置来判断，避免因消息数跳过倍数而永远不触发
+                const lastSummaryKey = 'ruri_offline_last_summary_pos_' + charId;
+                const lastSummaryPos = parseInt(DataStore.get(lastSummaryKey) || '0') || 0;
+                const newMessageCount = history.length - lastSummaryPos;
+                
+                console.log('[Offline AutoSummary] 检查线下自动总结 - 历史总数:', history.length, '上次总结位置:', lastSummaryPos, '新消息数:', newMessageCount, '频率:', freq);
+                
+                if (history.length > 0 && newMessageCount >= freq) {
                     try {
                         const summary = await this.generateOfflineSummary(charId, char.name, history, settings.summaryPrompt);
                         this.addOfflineSummary(charId, summary);
+                        // 记录本次总结时的历史长度
+                        DataStore.set(lastSummaryKey, history.length);
                         console.log('[Offline] Auto summary generated for', char.name);
                     } catch (e) {
                         console.error('[Offline] Auto summary failed:', e);

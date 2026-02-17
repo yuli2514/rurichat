@@ -301,6 +301,15 @@ const MemoryApp = {
         const char = API.Chat.getChar(this.currentCharId);
         if (!char) return;
 
+        // 获取按钮并显示"正在总结..."状态
+        const btn = document.getElementById('trigger-summary-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn._originalText = btn.textContent;
+            btn.textContent = '正在总结...';
+            btn.classList.add('opacity-60');
+        }
+
         const history = API.Chat.getHistory(this.currentCharId);
         const summaryPrompt = char.settings && char.settings.summaryPrompt ? char.settings.summaryPrompt : null;
 
@@ -308,9 +317,21 @@ const MemoryApp = {
             const summary = await API.Memory.generateSummary(this.currentCharId, char.name, history, summaryPrompt);
             API.Memory.addMemory(this.currentCharId, summary, 'manual');
             this.renderMemories();
-            alert('记忆总结完成！');
+            if (btn) {
+                btn.textContent = '总结完成 ✓';
+                setTimeout(function() {
+                    btn.textContent = btn._originalText || '立即总结';
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60');
+                }, 1500);
+            }
         } catch (e) {
             alert('总结失败: ' + e.message);
+            if (btn) {
+                btn.textContent = btn._originalText || '立即总结';
+                btn.disabled = false;
+                btn.classList.remove('opacity-60');
+            }
         }
     },
     
