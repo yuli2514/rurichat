@@ -161,6 +161,188 @@ const AvatarStore = {
     }
 };
 
+/**
+ * DataStore - 通用数据存储在 IndexedDB，内存缓存同步读取
+ * 解决 localStorage 5MB 限制导致聊天记录/总结等数据无法保存的问题
+ * 设计模式与 AvatarStore 一致：启动时预加载到内存，读取同步，写入异步
+ */
+const DataStore = {
+    _db: null,
+    _cache: {},       // 内存缓存: { key: value }
+    _ready: false,
+    _readyPromise: null,
+    _dirty: {},       // 标记哪些 key 需要写入
+    _saveTimer: null,
+    DB_NAME: 'RuriDataDB',
+    STORE_NAME: 'data',
+
+    /** 打开 IndexedDB */
+    _openDB: function() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(this.DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+                    db.createObjectStore(this.STORE_NAME, { keyPath: 'id' });
+                }
+            };
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    /** 初始化：打开DB + 预加载所有数据到内存 */
+    init: async function() {
+        if (this._readyPromise) return this._readyPromise;
+        this._readyPromise = this._doInit();
+        return this._readyPromise;
+    },
+
+    _doInit: async function() {
+        try {
+            this._db = await this._openDB();
+            const all = await this._getAllFromDB();
+            all.forEach(item => {
+                this._cache[item.id] = item.data;
+            });
+            this._ready = true;
+            console.log('[DataStore] Ready, cached ' + Object.keys(this._cache).length + ' entries');
+        } catch (e) {
+            console.error('[DataStore] Init failed:', e);
+            this._ready = true;
+        }
+    },
+
+    /** 从 DB 读取所有记录 */
+    _getAllFromDB: function() {
+        return new Promise((resolve, reject) => {
+            if (!this._db) return resolve([]);
+            const tx = this._db.transaction(this.STORE_NAME, 'readonly');
+            const store = tx.objectStore(this.STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+        });
+    },
+
+    /** 同步获取数据（从内存缓存） */
+    get: function(key) {
+        return this._cache.hasOwnProperty(key) ? this._cache[key] : null;
+    },
+
+    /** 同步设置数据（更新内存缓存 + 标记脏数据延迟写入） */
+    set: function(key, value) {
+        this._cache[key] = value;
+        this._dirty[key] = true;
+        if (!this._saveTimer) {
+            this._saveTimer = setTimeout(() => this._flush(), 150);
+        }
+    },
+
+    /** 同步删除数据 */
+    remove: function(key) {
+        delete this._cache[key];
+        delete this._dirty[key];
+        if (!this._db) return;
+        try {
+            const tx = this._db.transaction(this.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(this.STORE_NAME);
+            store.delete(key);
+        } catch (e) {
+            console.error('[DataStore] Failed to remove:', key, e);
+        }
+    },
+
+    /** 将脏数据批量写入 IndexedDB */
+    _flush: function() {
+        this._saveTimer = null;
+        if (!this._db) return;
+        const dirtyKeys = Object.keys(this._dirty);
+        if (dirtyKeys.length === 0) return;
+        try {
+            const tx = this._db.transaction(this.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(this.STORE_NAME);
+            dirtyKeys.forEach(key => {
+                if (this._cache.hasOwnProperty(key)) {
+                    store.put({ id: key, data: this._cache[key] });
+                }
+            });
+            this._dirty = {};
+        } catch (e) {
+            console.error('[DataStore] Flush failed:', e);
+        }
+    },
+
+    /** 立即刷入（用于页面关闭前） */
+    flushSync: function() {
+        if (this._saveTimer) {
+            clearTimeout(this._saveTimer);
+            this._saveTimer = null;
+        }
+        this._flush();
+    },
+
+    /**
+     * 一次性迁移：从 localStorage 迁移数据到 IndexedDB
+     * 迁移后删除 localStorage 中的旧数据以释放空间
+     */
+    migrateFromLocalStorage: async function() {
+        const MIGRATION_KEY = 'ruri_datastore_migrated_v1';
+        if (localStorage.getItem(MIGRATION_KEY)) return;
+
+        console.log('[DataStore] Starting migration from localStorage...');
+        try {
+            let migrated = 0;
+            let totalSaved = 0;
+            const keysToRemove = [];
+
+            // 遍历所有 localStorage keys，迁移匹配的数据
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key) continue;
+
+                // 匹配需要迁移的 key 模式
+                if (key.startsWith('ruri_chat_history_') ||
+                    key.startsWith('ruri_offline_history_') ||
+                    key.startsWith('ruri_memories_') ||
+                    key.startsWith('ruri_offline_summaries_') ||
+                    key.startsWith('ruri_offline_settings_')) {
+                    
+                    const raw = localStorage.getItem(key);
+                    if (raw && raw.length > 2) { // 跳过空数组 '[]' 或空对象 '{}'
+                        try {
+                            const parsed = JSON.parse(raw);
+                            this._cache[key] = parsed;
+                            // 直接写入 IndexedDB
+                            if (this._db) {
+                                const tx = this._db.transaction(this.STORE_NAME, 'readwrite');
+                                const store = tx.objectStore(this.STORE_NAME);
+                                store.put({ id: key, data: parsed });
+                            }
+                            totalSaved += raw.length;
+                            migrated++;
+                        } catch (e) {
+                            console.warn('[DataStore] Skip invalid JSON key:', key);
+                        }
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+
+            // 迁移完成后删除 localStorage 中的旧数据
+            keysToRemove.forEach(key => {
+                try { localStorage.removeItem(key); } catch(e) {}
+            });
+
+            localStorage.setItem(MIGRATION_KEY, 'true');
+            console.log('[DataStore] Migration done: ' + migrated + ' entries moved to IndexedDB, freed ~' + Math.round(totalSaved / 1024) + 'KB from localStorage');
+        } catch (e) {
+            console.error('[DataStore] Migration failed:', e);
+            localStorage.setItem(MIGRATION_KEY, 'true');
+        }
+    }
+};
+
 const API = {
     // ==================== EMOJI DATA ====================
     Emoji: {
@@ -225,17 +407,12 @@ const API = {
     Memory: {
         getMemories: function(charId) {
             if (!charId) return [];
-            try {
-                return JSON.parse(localStorage.getItem('ruri_memories_' + charId) || '[]');
-            } catch (e) {
-                console.error('Error parsing memories:', e);
-                return [];
-            }
+            return DataStore.get('ruri_memories_' + charId) || [];
         },
 
         saveMemories: function(charId, memories) {
             if (!charId) return;
-            localStorage.setItem('ruri_memories_' + charId, JSON.stringify(memories));
+            DataStore.set('ruri_memories_' + charId, memories);
         },
 
         addMemory: function(charId, content, type = 'manual') {
@@ -470,9 +647,7 @@ const API = {
         // 内存缓存层 - 避免重复 JSON.parse/stringify 导致卡顿
         _cache: {
             chars: null,        // 角色列表缓存
-            history: {},        // 聊天历史缓存 { charId: array }
-            _dirtyHistory: {},  // 标记哪些历史需要写入localStorage
-            _saveTimer: null    // 延迟写入定时器
+            history: {}         // 聊天历史缓存 { charId: array }
         },
 
         // 清除缓存（外部修改localStorage后调用）
@@ -627,36 +802,28 @@ const API = {
             // 同时清理 IndexedDB 中的头像和壁纸
             AvatarStore.remove(charId);
             AvatarStore.remove('wallpaper_' + charId);
-            localStorage.removeItem('ruri_chat_history_' + charId);
+            // 清理 DataStore 中的聊天记录和记忆
+            DataStore.remove('ruri_chat_history_' + charId);
+            DataStore.remove('ruri_memories_' + charId);
             delete this._cache.history[charId];
-            localStorage.removeItem('ruri_memories_' + charId);
         },
 
         getHistory: function(charId) {
             if (!charId) return [];
-            // 优先从缓存读取
+            // 优先从内存缓存读取
             if (this._cache.history[charId]) return this._cache.history[charId];
-            try {
-                const result = JSON.parse(localStorage.getItem('ruri_chat_history_' + charId) || '[]');
-                this._cache.history[charId] = result;
-                return result;
-            } catch (e) {
-                console.error('Error parsing history:', e);
-                return [];
-            }
+            // 从 DataStore (IndexedDB) 读取
+            const result = DataStore.get('ruri_chat_history_' + charId) || [];
+            this._cache.history[charId] = result;
+            return result;
         },
 
         saveHistory: function(charId, history) {
             if (!charId) return;
-            // 更新缓存
+            // 更新内存缓存
             this._cache.history[charId] = history;
-            // 延迟写入localStorage，合并短时间内的多次写入
-            this._cache._dirtyHistory[charId] = true;
-            if (!this._cache._saveTimer) {
-                this._cache._saveTimer = setTimeout(() => {
-                    this._flushHistory();
-                }, 100);
-            }
+            // 写入 DataStore (IndexedDB)，自动延迟批量写入
+            DataStore.set('ruri_chat_history_' + charId, history);
             
             // Update last message in char list (使用缓存，不再重复解析)
             const lastMsg = history[history.length - 1];
@@ -671,18 +838,6 @@ const API = {
                     this.saveChars(chars);
                 }
             }
-        },
-
-        // 将脏数据刷入localStorage
-        _flushHistory: function() {
-            this._cache._saveTimer = null;
-            const dirty = this._cache._dirtyHistory;
-            for (const charId in dirty) {
-                if (dirty[charId] && this._cache.history[charId]) {
-                    localStorage.setItem('ruri_chat_history_' + charId, JSON.stringify(this._cache.history[charId]));
-                }
-            }
-            this._cache._dirtyHistory = {};
         },
 
         addMessage: function(charId, msg) {
@@ -720,14 +875,16 @@ const API = {
                 systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
             }
             
-            systemPrompt += '\n\n【聊天风格要求】';
-            systemPrompt += '\n1. 这是线上即时通讯聊天，请像真人发微信/QQ一样说话';
-            systemPrompt += '\n2. 每次回复至少说3句话以上，可以分多条消息发送（用换行分隔）';
-            systemPrompt += '\n3. 根据角色性格决定话多话少：活泼的角色可以说更多，冷淡的角色可以简短但也要有内容';
-            systemPrompt += '\n4. 只输出角色说的话，不要加任何动作描写、心理描写、场景描写、括号注释';
-            systemPrompt += '\n5. 可以使用表情符号emoji来表达情绪，比如😊😂🤔😅等';
-            systemPrompt += '\n6. 说话要自然口语化，可以用语气词如"嗯"、"啊"、"哈哈"、"emmm"等';
-            systemPrompt += '\n7. 可以发多条消息，每条消息用换行符分隔，模拟真实聊天节奏';
+            systemPrompt += '\n\n【聊天风格要求 - 线上聊天模式，必须严格遵守】';
+            systemPrompt += '\n⚠️ 你现在处于【线上聊天模式】，无论之前的聊天记录中是否有线下剧情内容，你现在必须立刻切换到线上聊天风格！';
+            systemPrompt += '\n1. 这是线上即时通讯聊天（类似微信/QQ），请像真人发消息一样说话';
+            systemPrompt += '\n2. 每条消息要简短自然，不要一次性说太多话！像真人聊天一样，一条消息就说一两句话';
+            systemPrompt += '\n3. 可以分多条消息发送（用换行分隔），模拟真实聊天节奏，比如先回应再追问';
+            systemPrompt += '\n4. 根据角色性格决定话多话少：活泼的角色可以多发几条，冷淡的角色可以简短';
+            systemPrompt += '\n5. 绝对禁止任何动作描写、心理描写、场景描写、环境描写、括号注释！只能输出角色说的话！';
+            systemPrompt += '\n6. 可以使用表情符号emoji来表达情绪，比如😊😂🤔😅等';
+            systemPrompt += '\n7. 说话要自然口语化，可以用语气词如"嗯"、"啊"、"哈哈"、"emmm"等';
+            systemPrompt += '\n8. 即使上下文中有线下剧情模式的对话记录（带有[线下剧情]标记），你也必须用线上聊天风格回复，不能写描写！';
             
             systemPrompt += '\n\n【错误示范 - 不要这样写】';
             systemPrompt += '\n❌ *微微一笑* 好的呀~ （这种带动作描写的不行）';
@@ -1135,17 +1292,12 @@ const API = {
     Offline: {
         getHistory: function(charId) {
             if (!charId) return [];
-            try {
-                return JSON.parse(localStorage.getItem('ruri_offline_history_' + charId) || '[]');
-            } catch (e) {
-                console.error('Error parsing offline history:', e);
-                return [];
-            }
+            return DataStore.get('ruri_offline_history_' + charId) || [];
         },
 
         saveHistory: function(charId, history) {
             if (!charId) return;
-            localStorage.setItem('ruri_offline_history_' + charId, JSON.stringify(history));
+            DataStore.set('ruri_offline_history_' + charId, history);
         },
 
         addMessage: function(charId, msg) {
@@ -1157,12 +1309,7 @@ const API = {
 
         getSettings: function(charId) {
             if (!charId) return {};
-            try {
-                return JSON.parse(localStorage.getItem('ruri_offline_settings_' + charId) || '{}');
-            } catch (e) {
-                console.error('Error parsing offline settings:', e);
-                return {};
-            }
+            return DataStore.get('ruri_offline_settings_' + charId) || {};
         },
 
         saveSettings: function(charId, update) {
@@ -1170,14 +1317,14 @@ const API = {
             const current = this.getSettings(charId);
             const merged = { ...current, ...update };
             
-            // 检查壁纸大小，大型图片存到 IndexedDB
+            // 检查壁纸大小，大型图片存到 IndexedDB（线下壁纸）
             if (merged.wallpaper && merged.wallpaper.length > 500000) {
                 const wallpaperData = merged.wallpaper;
-                merged.wallpaper = ''; // 清空 localStorage 中的大图
+                merged.wallpaper = ''; // 清空大图
                 this._saveWallpaperToIndexedDB(charId, wallpaperData);
             }
             
-            localStorage.setItem('ruri_offline_settings_' + charId, JSON.stringify(merged));
+            DataStore.set('ruri_offline_settings_' + charId, merged);
         },
 
         // ---- 全局预设管理（所有角色共用预设内容，每个角色单独启用） ----
@@ -1380,12 +1527,14 @@ const API = {
                 systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
             }
 
-            systemPrompt += '\n\n【写作要求】';
+            systemPrompt += '\n\n【写作要求 - 线下剧情模式，必须严格遵守】';
+            systemPrompt += '\n⚠️ 你现在处于【线下剧情描写模式】，无论之前的聊天记录中是否有线上聊天内容，你现在必须立刻切换到线下剧情描写风格！';
             systemPrompt += '\n1. 这是线下剧情描写模式，请用文学化的语言进行描写';
-            systemPrompt += '\n2. 可以包含动作描写、心理描写、场景描写、对话等';
+            systemPrompt += '\n2. 可以包含动作描写、心理描写、场景描写、对话等，充分展现角色魅力';
             systemPrompt += '\n3. 每次回复请写一段完整的剧情推进，字数在200-500字之间';
             systemPrompt += '\n4. 保持角色性格一致，注意剧情连贯性';
             systemPrompt += '\n5. 适当使用段落分隔，增强可读性';
+            systemPrompt += '\n6. 即使上下文中有线上聊天模式的对话记录（带有[线上聊天]标记），你也必须用线下剧情描写风格回复，要有描写！';
 
             // 加载线下模式预设
             const presets = this.getPresets(charId);
@@ -1578,17 +1727,12 @@ const API = {
         // 线下总结存储
         getOfflineSummaries: function(charId) {
             if (!charId) return [];
-            try {
-                return JSON.parse(localStorage.getItem('ruri_offline_summaries_' + charId) || '[]');
-            } catch (e) {
-                console.error('Error parsing offline summaries:', e);
-                return [];
-            }
+            return DataStore.get('ruri_offline_summaries_' + charId) || [];
         },
 
         saveOfflineSummaries: function(charId, summaries) {
             if (!charId) return;
-            localStorage.setItem('ruri_offline_summaries_' + charId, JSON.stringify(summaries));
+            DataStore.set('ruri_offline_summaries_' + charId, summaries);
         },
 
         addOfflineSummary: function(charId, content) {

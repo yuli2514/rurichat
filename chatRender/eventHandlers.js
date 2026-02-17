@@ -264,7 +264,20 @@ const ChatEventHandlers = {
             chatInterface.selectedForDelete.add(index);
         }
         this.updateDeleteCount(chatInterface.selectedForDelete.size);
-        chatInterface.renderMessagesNoScroll();
+        // 只更新被点击消息的复选框样式，避免全量重渲染导致卡顿
+        const checkbox = document.querySelector(`[data-delete-index="${index}"] .rounded-full`);
+        if (checkbox) {
+            const isSelected = chatInterface.selectedForDelete.has(index);
+            if (isSelected) {
+                checkbox.classList.add('bg-red-500', 'border-red-500');
+                checkbox.classList.remove('border-gray-300');
+                checkbox.innerHTML = '<i class="fa-solid fa-check text-white text-xs"></i>';
+            } else {
+                checkbox.classList.remove('bg-red-500', 'border-red-500');
+                checkbox.classList.add('border-gray-300');
+                checkbox.innerHTML = '';
+            }
+        }
     },
 
     /**

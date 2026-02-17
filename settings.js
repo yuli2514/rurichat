@@ -324,8 +324,8 @@ const SettingsManager = {
             localStorage.clear();
             console.log('[Settings] localStorage cleared');
 
-            // 清空 IndexedDB（线下模式壁纸等）
-            const dbNames = ['ruri_offline_db'];
+            // 清空 IndexedDB（头像、数据存储、线下模式壁纸等）
+            const dbNames = ['ruri_offline_db', 'RuriAvatarDB', 'RuriDataDB'];
             dbNames.forEach(dbName => {
                 try {
                     const deleteReq = indexedDB.deleteDatabase(dbName);

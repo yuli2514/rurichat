@@ -80,7 +80,12 @@ function initializeApp() {
             e.preventDefault();
         }, { passive: false });
 
-        // 6. 全局相机输入事件处理（移动端更可靠）
+        // 6. 页面关闭前刷入 DataStore 脏数据，防止数据丢失
+        window.addEventListener('beforeunload', () => {
+            if (typeof DataStore !== 'undefined') DataStore.flushSync();
+        });
+
+        // 7. 全局相机输入事件处理（移动端更可靠）
         setupGlobalCameraHandler();
 
     } catch (e) {
@@ -116,6 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function startApp() {
         await bootWithAvatarStore();
+        // 初始化 DataStore（通用数据存储），迁移 localStorage 数据到 IndexedDB
+        if (typeof DataStore !== 'undefined') {
+            try {
+                await DataStore.init();
+                await DataStore.migrateFromLocalStorage();
+            } catch (e) {
+                console.error('[main.js] DataStore boot failed:', e);
+            }
+        }
         initializeApp();
     }
 

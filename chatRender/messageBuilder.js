@@ -42,7 +42,7 @@ const MessageBuilder = {
     buildDeleteCheckbox: function(index, isSelected, deleteMode) {
         if (!deleteMode) return '';
         
-        return '<div onclick="ChatInterface.toggleDeleteSelection(' + index + ')" class="flex items-center justify-center w-6 h-6 shrink-0 cursor-pointer">' +
+        return '<div data-delete-index="' + index + '" onclick="ChatInterface.toggleDeleteSelection(' + index + ')" class="flex items-center justify-center w-6 h-6 shrink-0 cursor-pointer">' +
             '<div class="w-5 h-5 rounded-full border-2 ' + (isSelected ? 'bg-red-500 border-red-500' : 'border-gray-300') + ' flex items-center justify-center">' +
                 (isSelected ? '<i class="fa-solid fa-check text-white text-xs"></i>' : '') +
             '</div>' +
