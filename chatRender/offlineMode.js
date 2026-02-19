@@ -16,61 +16,44 @@ const OfflineMode = {
      * 打开线下模式
      */
     open: function() {
-        console.log('[OfflineMode] Opening offline mode');
-        
         const charId = ChatInterface.currentCharId;
         if (!charId) {
             alert('请先打开一个角色的聊天');
             return;
         }
 
+        const isSameChar = this.currentCharId === charId;
         this.currentCharId = charId;
         const char = API.Chat.getChar(charId);
         if (!char) return;
-
-        // 线下模式组件已在初始化时加载到DOM中，无需清除缓存
-        console.log('[OfflineMode] Opening offline mode for charId:', charId);
 
         // 设置顶栏角色名
         const headerName = document.getElementById('offline-header-name');
         if (headerName) headerName.textContent = char.remark || char.name;
 
-        // 隐藏主屏幕（home-screen）
+        // 隐藏主屏幕
         const homeScreen = document.getElementById('home-screen');
         if (homeScreen) homeScreen.classList.add('hidden');
 
-        // 隐藏线上聊天界面，确保线下模式是独立页面
+        // 隐藏线上聊天界面
         const onlineInterface = document.getElementById('super-chat-interface');
         if (onlineInterface) onlineInterface.classList.add('hidden');
 
         // 显示线下模式界面
         const offlineInterface = document.getElementById('offline-mode-interface');
-        if (offlineInterface) {
-            offlineInterface.classList.remove('hidden');
-            console.log('[OfflineMode] Offline interface shown');
-        }
+        if (offlineInterface) offlineInterface.classList.remove('hidden');
 
-        // 加载设置
+        // 加载设置（壁纸/字体/CSS）
         this.loadSettings();
 
-        // 渲染消息：如果容器已有内容（非空状态占位），跳过全量重建，只滚到底部
-        const offlineMsgContainer = document.getElementById('offline-messages');
-        const hasContent = offlineMsgContainer && offlineMsgContainer.children.length > 0 && !offlineMsgContainer.querySelector('.fa-book-open');
-        if (hasContent) {
+        // 同一角色重进：跳过全量重建，只滚到底部
+        if (isSameChar) {
             this._scrollToBottom();
         } else {
             this.renderMessages();
         }
-        
-        console.log('[OfflineMode] Messages rendered, checking for menu element');
-        const menu = document.getElementById('offline-longpress-menu');
-        if (menu) {
-            console.log('[OfflineMode] Long press menu element found');
-        } else {
-            console.error('[OfflineMode] Long press menu element NOT found!');
-        }
 
-        // 输入框不要回车发送，允许换行
+        // 输入框自动高度（只绑一次）
         const input = document.getElementById('offline-input');
         if (input && !input._offlineBound) {
             input._offlineBound = true;
@@ -87,11 +70,11 @@ const OfflineMode = {
     close: function() {
         document.getElementById('offline-mode-interface').classList.add('hidden');
         
-        // 重新显示线上聊天界面（不显示主屏幕）
+        // 重新显示线上聊天界面
         const onlineInterface = document.getElementById('super-chat-interface');
         if (onlineInterface) onlineInterface.classList.remove('hidden');
         
-        this.currentCharId = null;
+        // 不清空 currentCharId，下次重进同一角色可跳过重建
     },
 
     /**
@@ -645,13 +628,29 @@ const OfflineMode = {
         update[key] = value;
         API.Offline.saveSettings(this.currentCharId, update);
 
+        // 直接更新DOM，避免全量重建
         if (key === 'avatarSize') {
-            document.getElementById('val-offline-avatar-size').textContent = value + 'px';
+            const el = document.getElementById('val-offline-avatar-size');
+            if (el) el.textContent = value + 'px';
+            // 直接更新所有头像尺寸
+            document.querySelectorAll('#offline-messages img.rounded-full').forEach(img => {
+                img.style.width = value + 'px';
+                img.style.height = value + 'px';
+            });
         } else if (key === 'fontSize') {
-            document.getElementById('val-offline-font-size').textContent = value + 'px';
+            const el = document.getElementById('val-offline-font-size');
+            if (el) el.textContent = value + 'px';
+            // 直接更新所有消息文字大小
+            document.querySelectorAll('#offline-messages .offline-bubble p, #offline-messages .offline-bubble div[style]').forEach(p => {
+                p.style.fontSize = value + 'px';
+            });
+        } else if (key === 'fontFamily') {
+            // 字体变化通过 _applyFontCss 处理，不需要重建
+            this._applyFontCss(value);
+        } else {
+            // 其他设置（壁纸等）才需要重建
+            this.renderMessages();
         }
-
-        this.renderMessages();
     },
 
     // ==================== 字体预设 ====================
