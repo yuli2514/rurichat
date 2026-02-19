@@ -92,10 +92,15 @@ const CssManager = {
         if (!name) return;
         
         let presets = API.Settings.getCssPresets();
-        presets.push({ name, css });
+        const existingIdx = presets.findIndex(p => p.name === name);
+        if (existingIdx !== -1) {
+            presets[existingIdx].css = css;
+        } else {
+            presets.push({ name, css });
+        }
         API.Settings.saveCssPresets(presets);
         this.renderCssPresets();
-        alert('预设已保存');
+        alert(existingIdx !== -1 ? '预设已覆盖' : '预设已保存');
     },
 
     // 打开CSS预设弹窗

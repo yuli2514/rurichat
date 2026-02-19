@@ -53,8 +53,14 @@ const OfflineMode = {
         // 加载设置
         this.loadSettings();
 
-        // 渲染消息
-        this.renderMessages();
+        // 渲染消息：如果容器已有内容（非空状态占位），跳过全量重建，只滚到底部
+        const offlineMsgContainer = document.getElementById('offline-messages');
+        const hasContent = offlineMsgContainer && offlineMsgContainer.children.length > 0 && !offlineMsgContainer.querySelector('.fa-book-open');
+        if (hasContent) {
+            this._scrollToBottom();
+        } else {
+            this.renderMessages();
+        }
         
         console.log('[OfflineMode] Messages rendered, checking for menu element');
         const menu = document.getElementById('offline-longpress-menu');
