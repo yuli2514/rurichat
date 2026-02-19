@@ -91,6 +91,77 @@ const OfflineMode = {
     /**
      * 渲染消息列表
      */
+    /**
+     * 构建单条消息的 HTML 字符串
+     */
+    _buildMsgHtml: function(msg, index, avatarSize, fontSize, fontFamily, userAvatar, charAvatar) {
+        const isUser = msg.sender === 'user';
+        const avatar = isUser ? userAvatar : charAvatar;
+        const fontStyle = 'font-size:' + fontSize + 'px;' + (fontFamily ? 'font-family:' + fontFamily + ';' : '');
+
+        let html = '<div class="flex flex-col items-center mb-6">';
+        html += '<div class="flex flex-col items-center shrink-0 mb-2">';
+        html += '<img src="' + avatar + '" class="rounded-full object-cover shadow-sm" style="width:' + avatarSize + 'px; height:' + avatarSize + 'px;">';
+        html += '</div>';
+        html += '<div class="w-full flex justify-center">';
+        if (isUser) {
+            html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '">';
+            html += '<p class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="' + fontStyle + '">' + this._escapeHtml(msg.content) + '</p>';
+            html += '</div>';
+        } else {
+            html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '">';
+            html += '<div class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="' + fontStyle + '">' + this._formatContent(msg.content) + '</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+        html += '</div>';
+        return html;
+    },
+
+    /**
+     * 绑定容器事件委托（只绑定一次）
+     */
+    _bindContainerEvents: function(container) {
+        if (container._offlineEventsBound) return;
+        container._offlineEventsBound = true;
+        const self = this;
+
+        const findBubble = (target) => {
+            let el = target;
+            while (el && el !== container) {
+                if (el.classList && el.classList.contains('offline-bubble')) return el;
+                el = el.parentElement;
+            }
+            return null;
+        };
+
+        container.addEventListener('touchstart', function(e) {
+            const bubble = findBubble(e.target);
+            if (!bubble) return;
+            self.handleTouchStart(e, parseInt(bubble.getAttribute('data-msg-index')));
+        }, { passive: true });
+
+        container.addEventListener('touchmove', function(e) {
+            self.handleTouchMove(e);
+        }, { passive: true });
+
+        container.addEventListener('touchend', function(e) {
+            self.handleTouchEnd(e);
+        }, { passive: true });
+
+        container.addEventListener('mousedown', function(e) {
+            const bubble = findBubble(e.target);
+            if (!bubble) return;
+            self.handleMouseDown(e, parseInt(bubble.getAttribute('data-msg-index')));
+        });
+
+        container.addEventListener('contextmenu', function(e) {
+            const bubble = findBubble(e.target);
+            if (!bubble) return;
+            self.handleBubbleContextMenu(e, parseInt(bubble.getAttribute('data-msg-index')));
+        });
+    },
+
     renderMessages: function() {
         const container = document.getElementById('offline-messages');
         if (!container) return;
@@ -109,148 +180,52 @@ const OfflineMode = {
             return;
         }
 
-        let html = '';
         const settings = API.Offline.getSettings(this.currentCharId);
         const avatarSize = settings.avatarSize || 32;
         const fontSize = settings.fontSize || 14;
-        
-        // 获取用户头像：优先使用角色单独设置的用户头像，否则使用全局用户头像
+        const fontFamily = settings.fontFamily || '';
+
         const charSettings = char ? (char.settings || {}) : {};
-        const perCharUserAvatar = charSettings.userAvatar || null;
-        const globalUserAvatar = profile.avatar || 'https://ui-avatars.com/api/?name=Me&background=0D8ABC&color=fff';
-        const userAvatarForOffline = perCharUserAvatar || globalUserAvatar;
+        const userAvatar = charSettings.userAvatar || profile.avatar || 'https://ui-avatars.com/api/?name=Me&background=0D8ABC&color=fff';
 
+        let html = '';
         history.forEach((msg, index) => {
-            const isUser = msg.sender === 'user';
-            const avatar = isUser ? userAvatarForOffline : charAvatar;
-
-            // 头像在气泡上面中间的布局
-            html += '<div class="flex flex-col items-center mb-6">';
-            
-            // 头像在上面
-            html += '<div class="flex flex-col items-center shrink-0 mb-2">';
-            html += '<img src="' + avatar + '" class="rounded-full object-cover shadow-sm" style="width:' + avatarSize + 'px; height:' + avatarSize + 'px;">';
-            html += '</div>';
-            
-            // 消息气泡
-            html += '<div class="w-full flex justify-center">';
-            if (isUser) {
-                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '">';
-                html += '<p class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._escapeHtml(msg.content) + '</p>';
-                html += '</div>';
-            } else {
-                html += '<div class="bg-white/70 backdrop-blur-md rounded-2xl px-5 py-4 shadow-sm border border-white/30 offline-bubble max-w-xs" data-msg-index="' + index + '">';
-                html += '<div class="text-gray-800 leading-relaxed whitespace-pre-wrap" style="font-size:' + fontSize + 'px;">' + this._formatContent(msg.content) + '</div>';
-                html += '</div>';
-            }
-            html += '</div>';
-            html += '</div>';
+            html += this._buildMsgHtml(msg, index, avatarSize, fontSize, fontFamily, userAvatar, charAvatar);
         });
 
         container.innerHTML = html;
-        
-        console.log('[OfflineMode] renderMessages: HTML injected, bubble count:', html.match(/offline-bubble/g)?.length || 0);
-        
-        // 使用事件委托处理气泡事件
-        const self = this;
-        
-        // 移除旧的事件监听器（如果存在）
-        if (this._containerEventListeners) {
-            console.log('[OfflineMode] Removing old event listeners, count:', this._containerEventListeners.length);
-            this._containerEventListeners.forEach(({ event, handler }) => {
-                container.removeEventListener(event, handler);
-            });
+        this._bindContainerEvents(container);
+        this._scrollToBottom();
+    },
+
+    /**
+     * 追加单条消息气泡（不重建整个列表，避免卡顿）
+     */
+    _appendMsgBubble: function(msg) {
+        const container = document.getElementById('offline-messages');
+        if (!container) return;
+
+        // 如果当前显示的是空状态占位，先清空
+        if (container.querySelector('.fa-book-open')) {
+            container.innerHTML = '';
         }
-        
-        this._containerEventListeners = [];
-        console.log('[OfflineMode] Attaching new event listeners to container');
-        
-        // 触摸开始
-        const touchStartHandler = function(e) {
-            // 查找气泡，从当前元素向上查找
-            let bubble = e.target;
-            while (bubble && bubble !== container) {
-                if (bubble.classList && bubble.classList.contains('offline-bubble')) {
-                    break;
-                }
-                bubble = bubble.parentElement;
-            }
-            
-            if (!bubble || bubble === container) {
-                console.log('[OfflineMode] touchstart: bubble not found');
-                return;
-            }
-            
-            const index = parseInt(bubble.getAttribute('data-msg-index'));
-            console.log('[OfflineMode] touchstart on bubble index:', index);
-            self.handleTouchStart(e, index);
-        };
-        container.addEventListener('touchstart', touchStartHandler, { passive: true });
-        this._containerEventListeners.push({ event: 'touchstart', handler: touchStartHandler });
-        
-        // 触摸移动
-        const touchMoveHandler = function(e) {
-            self.handleTouchMove(e);
-        };
-        container.addEventListener('touchmove', touchMoveHandler, { passive: true });
-        this._containerEventListeners.push({ event: 'touchmove', handler: touchMoveHandler });
-        
-        // 触摸结束
-        const touchEndHandler = function(e) {
-            self.handleTouchEnd(e);
-        };
-        container.addEventListener('touchend', touchEndHandler, { passive: true });
-        this._containerEventListeners.push({ event: 'touchend', handler: touchEndHandler });
-        
-        // 鼠标按下
-        const mouseDownHandler = function(e) {
-            // 查找气泡，从当前元素向上查找
-            let bubble = e.target;
-            while (bubble && bubble !== container) {
-                if (bubble.classList && bubble.classList.contains('offline-bubble')) {
-                    break;
-                }
-                bubble = bubble.parentElement;
-            }
-            
-            if (!bubble || bubble === container) {
-                console.log('[OfflineMode] mousedown: bubble not found');
-                return;
-            }
-            
-            const index = parseInt(bubble.getAttribute('data-msg-index'));
-            console.log('[OfflineMode] mousedown on bubble index:', index);
-            self.handleMouseDown(e, index);
-        };
-        container.addEventListener('mousedown', mouseDownHandler);
-        this._containerEventListeners.push({ event: 'mousedown', handler: mouseDownHandler });
-        console.log('[OfflineMode] mousedown listener attached');
-        
-        // 右键菜单
-        const contextMenuHandler = function(e) {
-            // 查找气泡，从当前元素向上查找
-            let bubble = e.target;
-            while (bubble && bubble !== container) {
-                if (bubble.classList && bubble.classList.contains('offline-bubble')) {
-                    break;
-                }
-                bubble = bubble.parentElement;
-            }
-            
-            if (!bubble || bubble === container) {
-                console.log('[OfflineMode] contextmenu: bubble not found');
-                return;
-            }
-            
-            const index = parseInt(bubble.getAttribute('data-msg-index'));
-            console.log('[OfflineMode] contextmenu on bubble index:', index);
-            self.handleBubbleContextMenu(e, index);
-        };
-        container.addEventListener('contextmenu', contextMenuHandler);
-        this._containerEventListeners.push({ event: 'contextmenu', handler: contextMenuHandler });
-        console.log('[OfflineMode] contextmenu listener attached');
-        
-        console.log('[OfflineMode] All event listeners attached successfully');
+
+        const history = API.Offline.getHistory(this.currentCharId);
+        const index = history.length - 1; // 刚追加的消息在末尾
+
+        const char = API.Chat.getChar(this.currentCharId);
+        const profile = API.Profile.getProfile();
+        const charAvatar = char ? char.avatar : 'https://placehold.co/40x40/dbeafe/3b82f6?text=AI';
+        const settings = API.Offline.getSettings(this.currentCharId);
+        const avatarSize = settings.avatarSize || 32;
+        const fontSize = settings.fontSize || 14;
+        const fontFamily = settings.fontFamily || '';
+        const charSettings = char ? (char.settings || {}) : {};
+        const userAvatar = charSettings.userAvatar || profile.avatar || 'https://ui-avatars.com/api/?name=Me&background=0D8ABC&color=fff';
+
+        const html = this._buildMsgHtml(msg, index, avatarSize, fontSize, fontFamily, userAvatar, charAvatar);
+        container.insertAdjacentHTML('beforeend', html);
+        this._bindContainerEvents(container);
         this._scrollToBottom();
     },
 
@@ -272,7 +247,7 @@ const OfflineMode = {
         };
 
         API.Offline.addMessage(this.currentCharId, msg);
-        
+
         // 同时添加到线上聊天记录（互通）
         API.Chat.addMessage(this.currentCharId, {
             ...msg,
@@ -281,7 +256,9 @@ const OfflineMode = {
 
         input.value = '';
         input.style.height = 'auto';
-        this.renderMessages();
+
+        // 直接追加气泡，不重建整个列表
+        this._appendMsgBubble(msg);
 
         // 自动触发AI回复
         this._triggerAI();
@@ -292,14 +269,14 @@ const OfflineMode = {
      */
     _triggerAI: async function() {
         const container = document.getElementById('offline-messages');
-        
+
         // 显示等待气泡
         const waitingId = 'waiting-bubble-' + Date.now();
         const char = API.Chat.getChar(this.currentCharId);
         const charAvatar = char ? char.avatar : 'https://placehold.co/40x40/dbeafe/3b82f6?text=AI';
         const settings = API.Offline.getSettings(this.currentCharId);
         const avatarSize = settings.avatarSize || 32;
-        
+
         let waitHtml = '<div id="' + waitingId + '" class="flex flex-col items-center mb-6">';
         waitHtml += '<div class="flex flex-col items-center shrink-0 mb-2">';
         waitHtml += '<img src="' + charAvatar + '" class="rounded-full object-cover shadow-sm" style="width:' + avatarSize + 'px; height:' + avatarSize + 'px;">';
@@ -315,7 +292,7 @@ const OfflineMode = {
         waitHtml += '</div>';
         waitHtml += '</div>';
         waitHtml += '</div>';
-        
+
         container.insertAdjacentHTML('beforeend', waitHtml);
         this._scrollToBottom();
 
@@ -348,18 +325,19 @@ const OfflineMode = {
                 ChatManager.renderList();
             }
 
-            this.renderMessages();
+            // 直接追加AI气泡，不重建整个列表
+            this._appendMsgBubble(aiMsg);
 
             // 触发自动总结（如果启用）
             API.Offline.autoSummarizeOfflineChat(this.currentCharId);
-         } catch (e) {
-             // 移除等待气泡
-             const waitEl = document.getElementById(waitingId);
-             if (waitEl) waitEl.remove();
-             
-             alert('AI 请求失败: ' + e.message);
-         }
-     },
+        } catch (e) {
+            // 移除等待气泡
+            const waitEl = document.getElementById(waitingId);
+            if (waitEl) waitEl.remove();
+
+            alert('AI 请求失败: ' + e.message);
+        }
+    },
 
     /**
      * 重回（重新生成最后一条AI回复）
@@ -513,7 +491,7 @@ const OfflineMode = {
      */
     openSettings: function() {
         const settings = API.Offline.getSettings(this.currentCharId);
-        
+
         document.getElementById('offline-wallpaper-input').value = settings.wallpaper || '';
         document.getElementById('val-offline-avatar-size').textContent = (settings.avatarSize || 32) + 'px';
         document.querySelector('input[oninput*="avatarSize"]').value = settings.avatarSize || 32;
@@ -521,7 +499,83 @@ const OfflineMode = {
         document.querySelector('input[oninput*="fontSize"]').value = settings.fontSize || 14;
         document.getElementById('offline-custom-css').value = settings.customCss || '';
 
+        // 字体输入框：优先显示原始URL，没有URL则显示字体名
+        const fontInput = document.getElementById('offline-font-family');
+        if (fontInput) fontInput.value = settings.fontUrl || settings.fontFamily || '';
+
+        // 渲染字体预设列表
+        this.renderFontPresetList();
+        // 重置CSS预设编辑状态
+        this._editingCssPresetId = null;
+
         document.getElementById('offline-settings-modal').classList.remove('hidden');
+    },
+
+    /**
+     * 应用字体输入框中的字体（支持字体名、ttf/woff2 URL）
+     */
+    applyFontInput: function() {
+        const fontInput = document.getElementById('offline-font-family');
+        if (!fontInput) return;
+        const val = fontInput.value.trim();
+        if (!val) return;
+
+        let fontName = val;
+
+        // 检测是否为字体文件URL（ttf / woff2 / woff / otf）
+        if (/\.(ttf|woff2?|otf)(\?.*)?$/i.test(val)) {
+            fontName = 'offline-custom-font';
+            this._injectFontFace(fontName, val);
+            API.Offline.saveSettings(this.currentCharId, { fontUrl: val });
+        } else {
+            API.Offline.saveSettings(this.currentCharId, { fontUrl: '' });
+        }
+
+        // 直接注入 CSS 强制覆盖所有子元素字体
+        this._applyFontCss(fontName);
+        // 同时保存 fontFamily 供下次 renderMessages 使用
+        API.Offline.saveSettings(this.currentCharId, { fontFamily: fontName });
+    },
+
+    /**
+     * 通过注入 CSS 把字体强制应用到整个线下界面（排除图标元素）
+     */
+    _applyFontCss: function(fontFamily) {
+        let style = document.getElementById('offline-font-style');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'offline-font-style';
+            document.head.appendChild(style);
+        }
+        if (fontFamily) {
+            // 排除 <i> 图标和 fa-* class，避免 Font Awesome 乱码
+            style.textContent = `#offline-mode-interface *:not(i):not([class*="fa-"]) { font-family: "${fontFamily}" !important; }`;
+        } else {
+            style.textContent = '';
+        }
+    },
+
+    /**
+     * 清除线下模式字体，恢复默认
+     */
+    clearFont: function() {
+        API.Offline.saveSettings(this.currentCharId, { fontFamily: '', fontUrl: '' });
+        this._applyFontCss('');
+        const fontInput = document.getElementById('offline-font-family');
+        if (fontInput) fontInput.value = '';
+    },
+
+    /**
+     * 注入 @font-face 到 <head>
+     */
+    _injectFontFace: function(fontName, url) {
+        let faceStyle = document.getElementById('offline-font-face-style');
+        if (!faceStyle) {
+            faceStyle = document.createElement('style');
+            faceStyle.id = 'offline-font-face-style';
+            document.head.appendChild(faceStyle);
+        }
+        faceStyle.textContent = `@font-face { font-family: "${fontName}"; src: url("${url}"); }`;
     },
 
     closeSettings: function() {
@@ -544,6 +598,14 @@ const OfflineMode = {
          offlineEl.style.left = '0';
          offlineEl.style.right = '0';
          offlineEl.style.bottom = '0';
+
+         // 如果保存了字体URL，重新注入 @font-face
+         if (settings.fontUrl) {
+             this._injectFontFace('offline-custom-font', settings.fontUrl);
+         }
+
+         // 通过 CSS 强制应用字体到整个界面
+         this._applyFontCss(settings.fontFamily || '');
 
          // 应用自定义 CSS
          this._applyCss(settings.customCss || '');
@@ -576,14 +638,151 @@ const OfflineMode = {
         const update = {};
         update[key] = value;
         API.Offline.saveSettings(this.currentCharId, update);
-        
+
         if (key === 'avatarSize') {
             document.getElementById('val-offline-avatar-size').textContent = value + 'px';
         } else if (key === 'fontSize') {
             document.getElementById('val-offline-font-size').textContent = value + 'px';
         }
-        
+
         this.renderMessages();
+    },
+
+    // ==================== 字体预设 ====================
+
+    /**
+     * 渲染字体预设列表
+     */
+    renderFontPresetList: function() {
+        const list = document.getElementById('offline-font-preset-list');
+        if (!list) return;
+        const presets = API.Offline.getFontPresets();
+        if (presets.length === 0) {
+            list.innerHTML = '<p class="text-xs text-gray-400 text-center py-2">暂无字体预设</p>';
+            return;
+        }
+        list.innerHTML = presets.map(p => `
+            <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                <span class="flex-1 text-sm text-gray-800 truncate" style="font-family:${this._escapeHtml(p.fontFamily)}">${this._escapeHtml(p.name)}</span>
+                <button onclick="OfflineMode.applyFontPreset(${p.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs font-bold hover:bg-blue-200 active:scale-90 transition">应用</button>
+                <button onclick="OfflineMode.deleteFontPreset(${p.id})" class="w-6 h-6 flex items-center justify-center rounded bg-red-100 text-red-500 hover:bg-red-200 active:scale-90 transition">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            </div>
+        `).join('');
+    },
+
+    /**
+     * 保存当前字体为预设
+     */
+    saveFontPreset: function() {
+        const name = document.getElementById('offline-font-preset-name').value.trim();
+        const fontFamily = document.getElementById('offline-font-family').value.trim();
+        if (!name) return alert('请输入预设名称');
+        if (!fontFamily) return alert('请先输入字体');
+        // 同名覆盖
+        const existing = API.Offline.getFontPresets().find(p => p.name === name);
+        if (existing) {
+            API.Offline.updateFontPreset(existing.id, { fontFamily });
+        } else {
+            API.Offline.addFontPreset({ name, fontFamily });
+        }
+        document.getElementById('offline-font-preset-name').value = '';
+        this.renderFontPresetList();
+    },
+
+    /**
+     * 应用字体预设
+     */
+    applyFontPreset: function(id) {
+        const presets = API.Offline.getFontPresets();
+        const p = presets.find(x => x.id === id);
+        if (!p) return;
+        const input = document.getElementById('offline-font-family');
+        if (input) input.value = p.fontFamily;
+        this.updateSetting('fontFamily', p.fontFamily);
+    },
+
+    /**
+     * 删除字体预设
+     */
+    deleteFontPreset: function(id) {
+        if (!confirm('确定删除这个字体预设？')) return;
+        API.Offline.deleteFontPreset(id);
+        this.renderFontPresetList();
+    },
+
+    // ==================== CSS 预设 ====================
+
+    _editingCssPresetId: null,
+
+    /**
+     * 打开CSS预设选择弹窗
+     */
+    openCssPresetModal: function() {
+        const modal = document.getElementById('offline-css-preset-modal');
+        if (!modal) return;
+        this._renderCssPresetModalList();
+        modal.classList.remove('hidden');
+    },
+
+    closeCssPresetModal: function() {
+        const modal = document.getElementById('offline-css-preset-modal');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    _renderCssPresetModalList: function() {
+        const list = document.getElementById('offline-css-preset-modal-list');
+        if (!list) return;
+        const presets = API.Offline.getCssPresets();
+        if (presets.length === 0) {
+            list.innerHTML = '<span class="text-xs text-gray-400 block text-center py-4">暂无预设</span>';
+            return;
+        }
+        list.innerHTML = presets.map(p => `
+            <div class="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition">
+                <span class="flex-1 text-sm text-gray-700 truncate">${this._escapeHtml(p.name)}</span>
+                <button onclick="OfflineMode.applyCssPreset(${p.id})" class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold active:scale-95 transition">应用</button>
+                <button onclick="OfflineMode.deleteCssPreset(${p.id})" class="text-[10px] bg-red-50 text-red-400 px-2 py-0.5 rounded font-bold active:scale-95 transition">删除</button>
+            </div>
+        `).join('');
+    },
+
+    /**
+     * 保存CSS预设（弹出输入框命名）
+     */
+    saveCssPreset: function() {
+        const css = document.getElementById('offline-custom-css').value.trim();
+        if (!css) return alert('请先输入CSS内容');
+        const name = prompt('请输入预设名称：');
+        if (!name || !name.trim()) return;
+        const trimmedName = name.trim();
+        const existing = API.Offline.getCssPresets().find(p => p.name === trimmedName);
+        if (existing) {
+            API.Offline.updateCssPreset(existing.id, { name: trimmedName, css });
+        } else {
+            API.Offline.addCssPreset({ name: trimmedName, css });
+        }
+    },
+
+    /**
+     * 应用CSS预设（填入textarea并关闭弹窗）
+     */
+    applyCssPreset: function(id) {
+        const presets = API.Offline.getCssPresets();
+        const p = presets.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById('offline-custom-css').value = p.css;
+        this.closeCssPresetModal();
+    },
+
+    /**
+     * 删除CSS预设
+     */
+    deleteCssPreset: function(id) {
+        if (!confirm('确定删除这个CSS预设？')) return;
+        API.Offline.deleteCssPreset(id);
+        this._renderCssPresetModalList();
     },
 
     uploadWallpaper: function() {

@@ -25,6 +25,7 @@ const AIHandler = {
         const originalColor = headerName.style.color;
         headerName.textContent = '对方正在输入中...';
         headerName.style.color = '#9CA3AF';
+        headerName.classList.add('typing-indicator');
         
         try {
             const bubbles = await API.Chat.generateReply(chatInterface.currentCharId);
@@ -238,6 +239,7 @@ const AIHandler = {
             btn.classList.remove('animate-pulse');
             headerName.textContent = originalName;
             headerName.style.color = originalColor;
+            headerName.classList.remove('typing-indicator');
         }
     },
 

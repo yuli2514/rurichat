@@ -1506,6 +1506,72 @@ const API = {
             console.log('[Offline] Presets migrated to global storage');
         },
 
+        // ==================== 字体预设 ====================
+
+        getFontPresets: function() {
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_font_presets') || '[]');
+            } catch (e) { return []; }
+        },
+
+        saveFontPresets: function(presets) {
+            localStorage.setItem('ruri_offline_font_presets', JSON.stringify(presets));
+        },
+
+        addFontPreset: function(preset) {
+            const presets = this.getFontPresets();
+            presets.push({ id: Date.now(), name: preset.name, fontFamily: preset.fontFamily });
+            this.saveFontPresets(presets);
+        },
+
+        updateFontPreset: function(id, update) {
+            const presets = this.getFontPresets();
+            const idx = presets.findIndex(p => p.id === id);
+            if (idx !== -1) {
+                if (update.name !== undefined) presets[idx].name = update.name;
+                if (update.fontFamily !== undefined) presets[idx].fontFamily = update.fontFamily;
+                this.saveFontPresets(presets);
+            }
+        },
+
+        deleteFontPreset: function(id) {
+            const presets = this.getFontPresets().filter(p => p.id !== id);
+            this.saveFontPresets(presets);
+        },
+
+        // ==================== CSS 预设 ====================
+
+        getCssPresets: function() {
+            try {
+                return JSON.parse(localStorage.getItem('ruri_offline_css_presets') || '[]');
+            } catch (e) { return []; }
+        },
+
+        saveCssPresets: function(presets) {
+            localStorage.setItem('ruri_offline_css_presets', JSON.stringify(presets));
+        },
+
+        addCssPreset: function(preset) {
+            const presets = this.getCssPresets();
+            presets.push({ id: Date.now(), name: preset.name, css: preset.css });
+            this.saveCssPresets(presets);
+        },
+
+        updateCssPreset: function(id, update) {
+            const presets = this.getCssPresets();
+            const idx = presets.findIndex(p => p.id === id);
+            if (idx !== -1) {
+                if (update.name !== undefined) presets[idx].name = update.name;
+                if (update.css !== undefined) presets[idx].css = update.css;
+                this.saveCssPresets(presets);
+            }
+        },
+
+        deleteCssPreset: function(id) {
+            const presets = this.getCssPresets().filter(p => p.id !== id);
+            this.saveCssPresets(presets);
+        },
+
         /**
          * 生成线下模式AI回复
          */

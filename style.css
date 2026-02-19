@@ -463,6 +463,17 @@
             animation: breathe-opacity 4s infinite ease-in-out;
         }
 
+        /* Typing indicator fade animation */
+        @keyframes typing-fade {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        .typing-indicator {
+            animation: typing-fade 1.6s ease-in-out infinite;
+            font-weight: normal !important;
+        }
+
         /* Emoji Grid - Prevent Stacking on Mobile - CRITICAL FIX */
         #emoji-grid {
             display: grid !important;
