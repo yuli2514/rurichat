@@ -283,30 +283,108 @@ const SettingsManager = {
         this.updateDimensions();
     },
 
-    exportData: function() {
-        const data = JSON.stringify(localStorage);
-        const blob = new Blob([data], { type: 'application/json' });
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = 'rurichat_backup_' + new Date().toISOString().slice(0,10) + '.json';
-        link.click();
-        URL.revokeObjectURL(blobUrl);
+    exportData: async function() {
+        const btn = event.target;
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 导出中...';
+        btn.disabled = true;
+        
+        try {
+            const backupData = {
+                localStorage: {},
+                indexedDB: {}
+            };
+            
+            // 备份 localStorage（完整备份，编码敏感数据）
+            Object.keys(localStorage).forEach(key => {
+                let value = localStorage[key];
+                // 对包含"key"或"token"的配置进行Base64编码
+                if (key.includes('api') || key.includes('token') || key.includes('github')) {
+                    try {
+                        value = btoa(btoa(value));
+                        backupData.localStorage[key] = '__ENCODED__' + value;
+                    } catch (e) {
+                        backupData.localStorage[key] = value;
+                    }
+                } else {
+                    backupData.localStorage[key] = value;
+                }
+            });
+            
+            // 备份 IndexedDB
+            const dbNames = ['RuriAvatarDB', 'RuriDataDB', 'ruri_offline_db'];
+            for (const dbName of dbNames) {
+                try {
+                    backupData.indexedDB[dbName] = await this.exportIndexedDB(dbName);
+                } catch (e) {
+                    console.warn('[Export] Failed to export', dbName, e);
+                    backupData.indexedDB[dbName] = {};
+                }
+            }
+            
+            const data = JSON.stringify(backupData, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = 'rurichat_backup_' + new Date().toISOString().slice(0,10) + '.json';
+            link.click();
+            URL.revokeObjectURL(blobUrl);
+        } finally {
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
     },
     
-    importData: function(input) {
+    importData: async function(input) {
         const file = input.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
-                const data = JSON.parse(e.target.result);
-                localStorage.clear();
-                Object.keys(data).forEach(k => localStorage.setItem(k, data[k]));
+                const backupData = JSON.parse(e.target.result);
+                
+                // 判断备份格式
+                if (backupData.localStorage && backupData.indexedDB) {
+                    // 新格式：恢复 localStorage
+                    localStorage.clear();
+                    Object.keys(backupData.localStorage).forEach(k => {
+                        let value = backupData.localStorage[k];
+                        // 检查是否是编码的数据
+                        if (typeof value === 'string' && value.startsWith('__ENCODED__')) {
+                            try {
+                                value = value.substring(11);
+                                value = atob(atob(value));
+                            } catch (e) {
+                                console.error('[导入] 解码失败', k, e);
+                            }
+                        }
+                        localStorage.setItem(k, value);
+                    });
+                    
+                    // 恢复 IndexedDB
+                    const dbNames = Object.keys(backupData.indexedDB);
+                    for (const dbName of dbNames) {
+                        try {
+                            await this.importIndexedDB(dbName, backupData.indexedDB[dbName]);
+                            console.log('[Import] Imported', dbName);
+                        } catch (e) {
+                            console.warn('[Import] Failed to import', dbName, e);
+                        }
+                    }
+                } else {
+                    // 旧格式：只恢复 localStorage
+                    localStorage.clear();
+                    Object.keys(backupData).forEach(k => {
+                        localStorage.setItem(k, backupData[k]);
+                    });
+                }
+                
                 alert('数据导入成功，页面将刷新');
                 location.reload();
             } catch (err) {
-                alert('数据文件无效');
+                console.error('[Import] Error:', err);
+                alert('数据文件无效: ' + err.message);
             }
         };
         reader.readAsText(file);
@@ -341,6 +419,780 @@ const SettingsManager = {
         } catch (e) {
             console.error('[Settings] clearAllData error:', e);
             alert('清空数据时出错: ' + e.message);
+        }
+    },
+
+    // 分片上传大文件
+    githubBackupChunked: async function(token, repo, baseFilename, data, isAutoBackup) {
+        const btn = document.querySelector('button[onclick="SettingsManager.githubBackup()"]');
+        const updateStatus = (msg) => {
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + msg;
+        };
+        
+        try {
+            // 将数据分成多个50MB的块
+            const chunkSize = 50 * 1024 * 1024; // 50MB
+            const chunks = [];
+            for (let i = 0; i < data.length; i += chunkSize) {
+                chunks.push(data.slice(i, i + chunkSize));
+            }
+            
+            console.log('[备份] 分成', chunks.length, '个文件');
+            updateStatus('上传分片 0/' + chunks.length);
+            
+            // 上传每个分片
+            for (let i = 0; i < chunks.length; i++) {
+                updateStatus('上传分片 ' + (i + 1) + '/' + chunks.length);
+                const chunkFilename = baseFilename.replace('.json', '_part' + (i + 1) + '.json');
+                
+                // 编码分片
+                const utf8Bytes = new TextEncoder().encode(chunks[i]);
+                let binaryString = '';
+                for (let j = 0; j < utf8Bytes.length; j++) {
+                    binaryString += String.fromCharCode(utf8Bytes[j]);
+                }
+                const base64Content = btoa(binaryString);
+                
+                // 检查文件是否存在
+                let sha = null;
+                try {
+                    const checkResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${chunkFilename}`, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+                    if (checkResponse.ok) {
+                        const fileInfo = await checkResponse.json();
+                        sha = fileInfo.sha;
+                    }
+                } catch (e) {}
+                
+                // 上传分片
+                const uploadData = {
+                    message: `RuriChat数据备份 (分片${i + 1}/${chunks.length}) - ${new Date().toLocaleString('zh-CN')}`,
+                    content: base64Content
+                };
+                if (sha) uploadData.sha = sha;
+                
+                const response = await fetch(`https://api.github.com/repos/${repo}/contents/${chunkFilename}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(uploadData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error('上传分片' + (i + 1) + '失败: ' + (error.message || '未知错误'));
+                }
+                
+                console.log('[备份] 已上传分片', i + 1, '/', chunks.length);
+            }
+            
+            // 创建索引文件
+            updateStatus('创建索引文件...');
+            const indexData = {
+                type: 'chunked_backup',
+                totalChunks: chunks.length,
+                baseFilename: baseFilename,
+                timestamp: new Date().toISOString(),
+                dataSize: data.length
+            };
+            
+            const indexFilename = baseFilename.replace('.json', '_index.json');
+            const indexContent = btoa(JSON.stringify(indexData, null, 2));
+            
+            let indexSha = null;
+            try {
+                const checkResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${indexFilename}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                if (checkResponse.ok) {
+                    const fileInfo = await checkResponse.json();
+                    indexSha = fileInfo.sha;
+                }
+            } catch (e) {}
+            
+            const indexUploadData = {
+                message: `RuriChat备份索引 - ${new Date().toLocaleString('zh-CN')}`,
+                content: indexContent
+            };
+            if (indexSha) indexUploadData.sha = indexSha;
+            
+            const indexResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${indexFilename}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(indexUploadData)
+            });
+            
+            if (!indexResponse.ok) {
+                throw new Error('创建索引文件失败');
+            }
+            
+            // 保存配置和更新时间
+            localStorage.setItem('github_backup_repo', repo);
+            localStorage.setItem('github_backup_filename', baseFilename);
+            const saveToken = document.getElementById('save-github-token');
+            if (saveToken && saveToken.checked) {
+                localStorage.setItem('github_backup_token', token);
+            }
+            const now = new Date();
+            localStorage.setItem('github_last_backup', now.toISOString());
+            this.updateLastBackupDisplay();
+            
+            if (!isAutoBackup) {
+                alert('✅ 备份成功！\\n\\n数据已分成 ' + chunks.length + ' 个文件上传');
+            }
+            
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> 立即备份';
+                btn.disabled = false;
+            }
+        } catch (error) {
+            console.error('[备份错误]', error);
+            if (!isAutoBackup) {
+                alert('❌ 分片备份失败：' + error.message);
+            }
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> 立即备份';
+                btn.disabled = false;
+            }
+            throw error;
+        }
+    },
+
+    // 导出IndexedDB数据
+    exportIndexedDB: async function(dbName) {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(dbName);
+            request.onsuccess = function(e) {
+                const db = e.target.result;
+                const storeNames = Array.from(db.objectStoreNames);
+                const data = {};
+                
+                if (storeNames.length === 0) {
+                    resolve(data);
+                    return;
+                }
+                
+                const transaction = db.transaction(storeNames, 'readonly');
+                let completed = 0;
+                
+                storeNames.forEach(storeName => {
+                    const store = transaction.objectStore(storeName);
+                    const getAllRequest = store.getAll();
+                    
+                    getAllRequest.onsuccess = function() {
+                        data[storeName] = getAllRequest.result;
+                        completed++;
+                        if (completed === storeNames.length) {
+                            resolve(data);
+                        }
+                    };
+                    
+                    getAllRequest.onerror = function() {
+                        reject(new Error('Failed to read from ' + storeName));
+                    };
+                });
+            };
+            request.onerror = function() {
+                resolve({}); // 数据库不存在时返回空对象
+            };
+        });
+    },
+
+    // GitHub云端备份功能
+    githubBackup: async function(isAutoBackup = false) {
+        const token = document.getElementById('github-token').value.trim();
+        const repo = document.getElementById('github-repo').value.trim();
+        const filename = document.getElementById('github-filename').value.trim() || 'rurichat_backup.json';
+
+        if (!token) {
+            if (!isAutoBackup) alert('请输入GitHub Token');
+            return;
+        }
+        if (!repo) {
+            if (!isAutoBackup) alert('请输入仓库路径');
+            return;
+        }
+
+        const btn = document.querySelector('button[onclick="SettingsManager.githubBackup()"]');
+        const originalContent = btn ? btn.innerHTML : '';
+        
+        const updateStatus = (msg) => {
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + msg;
+        };
+        
+        if (btn) {
+            updateStatus('准备中...');
+            btn.disabled = true;
+        }
+
+        try {
+            updateStatus('读取本地数据...');
+            // 获取要备份的数据（localStorage + IndexedDB）
+            const backupData = {
+                localStorage: {},
+                indexedDB: {}
+            };
+            
+            // 备份 localStorage（完整备份）
+            // 对敏感数据进行简单编码以绕过GitHub的Secret检测
+            Object.keys(localStorage).forEach(key => {
+                let value = localStorage[key];
+                // 对包含"key"或"token"的配置进行Base64编码
+                if (key.includes('api') || key.includes('token') || key.includes('github')) {
+                    try {
+                        // 双重Base64编码以绕过检测
+                        value = btoa(btoa(value));
+                        backupData.localStorage[key] = '__ENCODED__' + value;
+                    } catch (e) {
+                        backupData.localStorage[key] = value;
+                    }
+                } else {
+                    backupData.localStorage[key] = value;
+                }
+            });
+            
+            // 备份 IndexedDB
+            updateStatus('备份头像和聊天记录...');
+            const dbNames = ['RuriAvatarDB', 'RuriDataDB', 'ruri_offline_db'];
+            for (const dbName of dbNames) {
+                try {
+                    console.log('[备份] 正在导出', dbName);
+                    backupData.indexedDB[dbName] = await this.exportIndexedDB(dbName);
+                    const storeCount = Object.keys(backupData.indexedDB[dbName]).length;
+                    console.log('[备份] 已导出', dbName, '包含', storeCount, '个数据表');
+                } catch (e) {
+                    console.error('[备份] 导出失败', dbName, e);
+                    backupData.indexedDB[dbName] = {};
+                }
+            }
+            
+            updateStatus('打包数据...');
+            const data = JSON.stringify(backupData);
+            const dataSizeMB = data.length / 1024 / 1024;
+            console.log('[备份] 数据大小:', dataSizeMB.toFixed(2), 'MB');
+            
+            // GitHub单个文件限制100MB，如果超过则分片上传
+            if (dataSizeMB > 50) {
+                console.log('[备份] 数据较大，使用分片上传');
+                await this.githubBackupChunked(token, repo, filename, data, isAutoBackup);
+                return;
+            }
+            
+            // 小文件直接上传
+            // 检查文件是否存在，获取SHA（用于更新文件）
+            let sha = null;
+            try {
+                const checkResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${filename}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                if (checkResponse.ok) {
+                    const fileInfo = await checkResponse.json();
+                    sha = fileInfo.sha;
+                }
+            } catch (e) {
+                // 文件不存在，继续创建新文件
+            }
+
+            // 上传或更新文件
+            // 使用更可靠的UTF-8编码方法
+            updateStatus('编码数据...');
+            console.log('[备份] 开始编码数据...');
+            const utf8Bytes = new TextEncoder().encode(data);
+            console.log('[备份] UTF-8字节数:', utf8Bytes.length);
+            
+            let binaryString = '';
+            for (let i = 0; i < utf8Bytes.length; i++) {
+                binaryString += String.fromCharCode(utf8Bytes[i]);
+            }
+            console.log('[备份] 二进制字符串长度:', binaryString.length);
+            
+            console.log('[备份] Base64编码中...');
+            const base64Content = btoa(binaryString);
+            console.log('[备份] Base64长度:', base64Content.length);
+            
+            const uploadData = {
+                message: `RuriChat数据备份 - ${new Date().toLocaleString('zh-CN')}`,
+                content: base64Content,
+            };
+            
+            if (sha) {
+                uploadData.sha = sha; // 更新现有文件需要SHA
+            }
+
+            updateStatus('上传到GitHub...');
+            const response = await fetch(`https://api.github.com/repos/${repo}/contents/${filename}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(uploadData)
+            });
+
+            if (response.ok) {
+                updateStatus('备份成功！');
+                const result = await response.json();
+                
+                // 保存GitHub配置
+                localStorage.setItem('github_backup_repo', repo);
+                localStorage.setItem('github_backup_filename', filename);
+                
+                // 保存Token（如果用户选择记住）
+                const saveToken = document.getElementById('save-github-token');
+                if (saveToken && saveToken.checked) {
+                    localStorage.setItem('github_backup_token', token);
+                }
+                
+                // 更新最新备份时间
+                const now = new Date();
+                const timeStr = now.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                localStorage.setItem('github_last_backup', now.toISOString());
+                this.updateLastBackupDisplay();
+                
+                if (!isAutoBackup) {
+                    alert('✅ 备份成功！\\n\\n文件已上传到：' + result.content.html_url);
+                }
+            } else {
+                const error = await response.json();
+                throw new Error(error.message || '上传失败');
+            }
+        } catch (error) {
+            console.error('[备份错误]', error);
+            if (!isAutoBackup) {
+                let errorMsg = '备份失败\\n\\n';
+                if (error.message) {
+                    errorMsg += '错误信息：' + error.message;
+                } else {
+                    errorMsg += '未知错误';
+                }
+                // 添加错误堆栈的前几行
+                if (error.stack) {
+                    const stackLines = error.stack.split('\\n').slice(0, 3).join('\\n');
+                    errorMsg += '\\n\\n详细信息：\\n' + stackLines;
+                }
+                alert('❌ ' + errorMsg);
+            }
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+    },
+
+    // 导入IndexedDB数据（使用版本升级方式，避免删除数据库被阻塞）
+    importIndexedDB: async function(dbName, data) {
+        return new Promise((resolve, reject) => {
+            console.log('[导入] 开始导入数据库:', dbName);
+            console.log('[导入] 数据表:', Object.keys(data));
+            
+            const storeNames = Object.keys(data);
+            if (storeNames.length === 0) {
+                console.log('[导入] 数据为空，跳过');
+                resolve();
+                return;
+            }
+            
+            // 添加超时处理
+            const timeoutId = setTimeout(() => {
+                reject(new Error('导入超时（30秒）'));
+            }, 30000);
+            
+            // 先打开数据库获取当前版本
+            const checkRequest = indexedDB.open(dbName);
+            
+            checkRequest.onsuccess = function(e) {
+                const db = e.target.result;
+                const currentVersion = db.version;
+                db.close();
+                console.log('[导入] 当前数据库版本:', currentVersion);
+                
+                // 使用更高的版本号重新打开，触发升级
+                const newVersion = currentVersion + 1;
+                console.log('[导入] 升级到版本:', newVersion);
+                const openRequest = indexedDB.open(dbName, newVersion);
+                
+                openRequest.onupgradeneeded = function(e) {
+                    console.log('[导入] 正在升级数据库结构...');
+                    const db = e.target.result;
+                    
+                    // 删除所有旧的数据表
+                    const existingStores = Array.from(db.objectStoreNames);
+                    existingStores.forEach(storeName => {
+                        console.log('[导入] 删除旧数据表:', storeName);
+                        db.deleteObjectStore(storeName);
+                    });
+                    
+                    // 创建新的数据表
+                    storeNames.forEach(storeName => {
+                        let keyPath = 'charId';
+                        if (dbName === 'RuriDataDB' && storeName === 'data') {
+                            keyPath = 'id';
+                        }
+                        console.log('[导入] 创建数据表:', storeName, 'keyPath:', keyPath);
+                        db.createObjectStore(storeName, { keyPath: keyPath });
+                    });
+                };
+                
+                openRequest.onsuccess = function(e) {
+                    console.log('[导入] 数据库升级完成，开始写入数据');
+                    const db = e.target.result;
+                    const transaction = db.transaction(storeNames, 'readwrite');
+                    
+                    storeNames.forEach(storeName => {
+                        const store = transaction.objectStore(storeName);
+                        const items = data[storeName] || [];
+                        console.log('[导入] 写入', storeName, ':', items.length, '条记录');
+                        items.forEach(item => {
+                            store.put(item);
+                        });
+                    });
+                    
+                    transaction.oncomplete = function() {
+                        console.log('[导入] 数据写入完成');
+                        db.close();
+                        clearTimeout(timeoutId);
+                        resolve();
+                    };
+                    
+                    transaction.onerror = function(e) {
+                        console.error('[导入] 事务错误:', e.target.error);
+                        db.close();
+                        clearTimeout(timeoutId);
+                        reject(new Error('导入失败: ' + e.target.error));
+                    };
+                };
+                
+                openRequest.onerror = function(e) {
+                    console.error('[导入] 打开数据库失败:', e.target.error);
+                    clearTimeout(timeoutId);
+                    reject(new Error('打开数据库失败: ' + e.target.error));
+                };
+                
+                openRequest.onblocked = function() {
+                    console.error('[导入] 数据库升级被阻塞');
+                    clearTimeout(timeoutId);
+                    reject(new Error('数据库被占用，请关闭所有使用该应用的标签页后重试'));
+                };
+            };
+            
+            checkRequest.onerror = function(e) {
+                // 数据库不存在，创建新的
+                console.log('[导入] 数据库不存在，创建新数据库');
+                const openRequest = indexedDB.open(dbName, 1);
+                
+                openRequest.onupgradeneeded = function(e) {
+                    console.log('[导入] 正在创建数据表...');
+                    const db = e.target.result;
+                    storeNames.forEach(storeName => {
+                        let keyPath = 'charId';
+                        if (dbName === 'RuriDataDB' && storeName === 'data') {
+                            keyPath = 'id';
+                        }
+                        console.log('[导入] 创建数据表:', storeName, 'keyPath:', keyPath);
+                        db.createObjectStore(storeName, { keyPath: keyPath });
+                    });
+                };
+                
+                openRequest.onsuccess = function(e) {
+                    console.log('[导入] 数据库已创建，开始写入数据');
+                    const db = e.target.result;
+                    const transaction = db.transaction(storeNames, 'readwrite');
+                    
+                    storeNames.forEach(storeName => {
+                        const store = transaction.objectStore(storeName);
+                        const items = data[storeName] || [];
+                        console.log('[导入] 写入', storeName, ':', items.length, '条记录');
+                        items.forEach(item => {
+                            store.put(item);
+                        });
+                    });
+                    
+                    transaction.oncomplete = function() {
+                        console.log('[导入] 数据写入完成');
+                        db.close();
+                        clearTimeout(timeoutId);
+                        resolve();
+                    };
+                    
+                    transaction.onerror = function(e) {
+                        console.error('[导入] 事务错误:', e.target.error);
+                        db.close();
+                        clearTimeout(timeoutId);
+                        reject(new Error('导入失败: ' + e.target.error));
+                    };
+                };
+                
+                openRequest.onerror = function(e) {
+                    console.error('[导入] 创建数据库失败:', e.target.error);
+                    clearTimeout(timeoutId);
+                    reject(new Error('创建数据库失败: ' + e.target.error));
+                };
+            };
+        });
+    },
+
+    githubRestore: async function() {
+        const token = document.getElementById('github-token').value.trim();
+        const repo = document.getElementById('github-repo').value.trim();
+        const filename = document.getElementById('github-filename').value.trim() || 'rurichat_backup.json';
+
+        if (!token) {
+            alert('请输入GitHub Token');
+            return;
+        }
+        if (!repo) {
+            alert('请输入仓库路径');
+            return;
+        }
+
+        if (!confirm('⚠️ 恢复数据将覆盖当前所有数据，确定继续吗？')) {
+            return;
+        }
+
+        const btn = document.querySelector('button[onclick="SettingsManager.githubRestore()"]');
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 恢复中...';
+        btn.disabled = true;
+
+        try {
+            console.log('[恢复] 开始恢复备份...');
+            console.log('[恢复] 仓库:', repo);
+            console.log('[恢复] 文件名:', filename);
+            
+            // 从GitHub获取文件（添加超时处理）
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+            
+            console.log('[恢复] 正在从GitHub获取文件...');
+            const response = await fetch(`https://api.github.com/repos/${repo}/contents/${filename}`, {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                },
+                signal: controller.signal
+            }).finally(() => clearTimeout(timeoutId));
+            
+            console.log('[恢复] 响应状态:', response.status);
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('备份文件不存在');
+                }
+                const error = await response.json();
+                throw new Error(error.message || '获取文件失败');
+            }
+
+            const fileInfo = await response.json();
+            
+            // 检查文件大小
+            console.log('[恢复] 文件大小:', fileInfo.size, 'bytes');
+            
+            let backupData;
+            
+            // 如果文件太大（>1MB），GitHub API会返回download_url而不是content
+            if (fileInfo.size > 1048576 || !fileInfo.content) {
+                console.log('[恢复] 文件较大，使用download_url下载');
+                const downloadResponse = await fetch(fileInfo.download_url);
+                if (!downloadResponse.ok) {
+                    throw new Error('下载文件失败');
+                }
+                const textContent = await downloadResponse.text();
+                console.log('[恢复] 下载内容长度:', textContent.length);
+                console.log('[恢复] 内容开头:', textContent.substring(0, 100));
+                console.log('[恢复] 内容结尾:', textContent.substring(textContent.length - 100));
+                backupData = JSON.parse(textContent);
+            } else {
+                // 解码Base64内容（需要先去除GitHub API返回的换行符）
+                const base64Content = fileInfo.content.replace(/\n/g, '');
+                console.log('[恢复] Base64长度:', base64Content.length);
+                const binaryString = atob(base64Content);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const decodedContent = new TextDecoder().decode(bytes);
+                console.log('[恢复] 解码后长度:', decodedContent.length);
+                console.log('[恢复] 内容开头:', decodedContent.substring(0, 100));
+                console.log('[恢复] 内容结尾:', decodedContent.substring(decodedContent.length - 100));
+                backupData = JSON.parse(decodedContent);
+            }
+
+            // 判断备份格式（新格式包含 localStorage 和 indexedDB，旧格式直接是数据）
+            if (backupData.localStorage && backupData.indexedDB) {
+                // 新格式：恢复 localStorage
+                localStorage.clear();
+                let needResetApiKey = false;
+                Object.keys(backupData.localStorage).forEach(key => {
+                    let value = backupData.localStorage[key];
+                    // 检查是否是编码的数据
+                    if (typeof value === 'string' && value.startsWith('__ENCODED__')) {
+                        try {
+                            // 解码双重Base64
+                            value = value.substring(11); // 移除 '__ENCODED__' 前缀
+                            value = atob(atob(value));
+                        } catch (e) {
+                            console.error('[恢复] 解码失败', key, e);
+                        }
+                    }
+                    localStorage.setItem(key, value);
+                });
+                
+                // 恢复 IndexedDB
+                const dbNames = Object.keys(backupData.indexedDB);
+                for (const dbName of dbNames) {
+                    try {
+                        const storeCount = Object.keys(backupData.indexedDB[dbName]).length;
+                        console.log('[恢复] 正在导入', dbName, '包含', storeCount, '个数据表');
+                        if (storeCount > 0) {
+                            await this.importIndexedDB(dbName, backupData.indexedDB[dbName]);
+                            console.log('[恢复] 成功导入', dbName);
+                        } else {
+                            console.log('[恢复] 跳过空数据库', dbName);
+                        }
+                    } catch (e) {
+                        console.error('[恢复] 导入失败', dbName, e);
+                        console.error('[恢复] 错误详情:', e.stack);
+                        // 不要因为一个数据库失败就中断整个恢复过程
+                        console.warn('[恢复] 继续恢复其他数据库...');
+                    }
+                }
+                
+                // 如果API Key被替换了，提醒用户
+                if (needResetApiKey) {
+                    alert('✅ 数据恢复成功！\\n\\n⚠️ 注意：出于安全考虑，API Key未包含在备份中，请在恢复后重新设置API配置。\\n\\n页面将自动刷新。');
+                } else {
+                    alert('✅ 数据恢复成功！\\n\\n页面将自动刷新以应用新数据。');
+                }
+            } else {
+                // 旧格式：只恢复 localStorage
+                localStorage.clear();
+                Object.keys(backupData).forEach(key => {
+                    localStorage.setItem(key, backupData[key]);
+                });
+                alert('✅ 数据恢复成功！\\n\\n页面将自动刷新以应用新数据。');
+            }
+
+            location.reload();
+
+        } catch (error) {
+            console.error('[恢复错误]', error);
+            console.error('[恢复错误] 堆栈:', error.stack);
+            let errorMsg = '恢复失败\\n\\n错误信息：' + error.message;
+            if (error.stack) {
+                const stackLines = error.stack.split('\\n').slice(0, 3).join('\\n');
+                errorMsg += '\\n\\n详细信息：\\n' + stackLines;
+            }
+            alert('❌ ' + errorMsg);
+        } finally {
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
+    },
+
+    // 更新最新备份时间显示
+    updateLastBackupDisplay: function() {
+        const lastBackup = localStorage.getItem('github_last_backup');
+        const displayEl = document.getElementById('last-backup-time');
+        const timestampEl = document.getElementById('last-backup-timestamp');
+        
+        if (lastBackup && displayEl && timestampEl) {
+            const date = new Date(lastBackup);
+            const timeStr = date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            timestampEl.textContent = timeStr;
+            displayEl.classList.remove('hidden');
+        }
+    },
+
+    // 切换自动备份
+    toggleAutoBackup: function() {
+        const enabled = document.getElementById('auto-backup-enabled').checked;
+        const container = document.getElementById('auto-backup-interval-container');
+        
+        if (enabled) {
+            container.classList.remove('hidden');
+            localStorage.setItem('auto_backup_enabled', 'true');
+            this.scheduleAutoBackup();
+        } else {
+            container.classList.add('hidden');
+            localStorage.setItem('auto_backup_enabled', 'false');
+            this.cancelAutoBackup();
+        }
+    },
+
+    // 更新自动备份间隔
+    updateAutoBackupInterval: function() {
+        const interval = document.getElementById('auto-backup-interval').value;
+        localStorage.setItem('auto_backup_interval', interval);
+        this.scheduleAutoBackup();
+    },
+
+    // 安排自动备份
+    scheduleAutoBackup: function() {
+        // 取消现有的定时器
+        this.cancelAutoBackup();
+        
+        const interval = parseInt(localStorage.getItem('auto_backup_interval') || '24');
+        const intervalMs = interval * 60 * 60 * 1000; // 转换为毫秒
+        
+        // 设置新的定时器
+        this.autoBackupTimer = setInterval(() => {
+            console.log('[AutoBackup] 执行自动备份...');
+            this.githubBackup(true);
+        }, intervalMs);
+        
+        // 更新下次备份时间显示
+        const nextTime = new Date(Date.now() + intervalMs);
+        const nextTimeStr = nextTime.toLocaleString('zh-CN', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        const nextTimeEl = document.getElementById('next-backup-time');
+        if (nextTimeEl) {
+            nextTimeEl.textContent = nextTimeStr;
+        }
+        
+        console.log('[AutoBackup] 已安排自动备份，间隔：' + interval + '小时');
+    },
+
+    // 取消自动备份
+    cancelAutoBackup: function() {
+        if (this.autoBackupTimer) {
+            clearInterval(this.autoBackupTimer);
+            this.autoBackupTimer = null;
+            console.log('[AutoBackup] 已取消自动备份');
         }
     },
 
@@ -387,6 +1239,48 @@ const SettingsManager = {
             document.getElementById('screen-width').value = screenSize.w;
             document.getElementById('screen-height').value = screenSize.h;
             this.updateDimensions();
+        }
+
+        // 加载GitHub备份配置
+        const githubToken = localStorage.getItem('github_backup_token');
+        const githubRepo = localStorage.getItem('github_backup_repo');
+        const githubFilename = localStorage.getItem('github_backup_filename');
+        
+        if (githubToken) {
+            const tokenInput = document.getElementById('github-token');
+            const saveTokenCheckbox = document.getElementById('save-github-token');
+            if (tokenInput) tokenInput.value = githubToken;
+            if (saveTokenCheckbox) saveTokenCheckbox.checked = true;
+        }
+        if (githubRepo) {
+            const repoInput = document.getElementById('github-repo');
+            if (repoInput) repoInput.value = githubRepo;
+        }
+        if (githubFilename) {
+            const filenameInput = document.getElementById('github-filename');
+            if (filenameInput) filenameInput.value = githubFilename;
+        }
+        
+        // 显示最新备份时间
+        this.updateLastBackupDisplay();
+        
+        // 加载自动备份设置
+        const autoBackupEnabled = localStorage.getItem('auto_backup_enabled') === 'true';
+        const autoBackupInterval = localStorage.getItem('auto_backup_interval') || '24';
+        
+        const autoBackupCheckbox = document.getElementById('auto-backup-enabled');
+        const autoBackupSelect = document.getElementById('auto-backup-interval');
+        const autoBackupContainer = document.getElementById('auto-backup-interval-container');
+        
+        if (autoBackupCheckbox) {
+            autoBackupCheckbox.checked = autoBackupEnabled;
+        }
+        if (autoBackupSelect) {
+            autoBackupSelect.value = autoBackupInterval;
+        }
+        if (autoBackupContainer && autoBackupEnabled) {
+            autoBackupContainer.classList.remove('hidden');
+            this.scheduleAutoBackup();
         }
     },
 

@@ -256,25 +256,106 @@
             <h1 class="font-bold text-lg absolute left-1/2 transform -translate-x-1/2">数据备份</h1>
             <div class="w-12"></div>
         </div>
-        <div class="p-8 flex flex-col gap-4 justify-center h-[calc(100%-3rem)]">
+        <div class="p-4 space-y-6 overflow-y-auto h-[calc(100%-6rem)]">
             
-            <div class="text-center mb-8">
-                <i class="fa-solid fa-cloud-arrow-down text-5xl text-blue-500 mb-4"></i>
-                <h2 class="text-xl font-bold text-gray-800">备份与恢复</h2>
-                <p class="text-sm text-gray-500 mt-2">将您的所有设置、壁纸和数据导出为 JSON 文件，或从文件恢复。</p>
+            <!-- 本地备份区域 -->
+            <div class="bg-white rounded-xl p-4 shadow-sm">
+                <div class="text-center mb-4">
+                    <i class="fa-solid fa-hard-drive text-3xl text-blue-500 mb-2"></i>
+                    <h3 class="text-lg font-bold text-gray-800">本地备份</h3>
+                    <p class="text-xs text-gray-500 mt-1">导出/导入本地JSON文件</p>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="SettingsManager.exportData()" class="w-full bg-blue-500 text-white font-bold py-3 rounded-lg shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i> 导出数据
+                    </button>
+
+                    <label class="w-full bg-white text-gray-800 border border-gray-300 font-bold py-3 rounded-lg shadow-sm active:bg-gray-50 transition flex items-center justify-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-upload text-gray-500"></i> 导入数据
+                        <input type="file" class="hidden" accept=".json" onchange="SettingsManager.importData(this)">
+                    </label>
+                </div>
             </div>
 
-            <button onclick="SettingsManager.exportData()" class="w-full bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-3">
-                <i class="fa-solid fa-download"></i> 导出数据
-            </button>
+            <!-- GitHub云端备份区域 -->
+            <div class="bg-white rounded-xl p-4 shadow-sm">
+                <div class="text-center mb-4">
+                    <i class="fa-brands fa-github text-3xl text-gray-800 mb-2"></i>
+                    <h3 class="text-lg font-bold text-gray-800">GitHub云端备份</h3>
+                    <p class="text-xs text-gray-500 mt-1">将数据备份到GitHub仓库</p>
+                </div>
 
-            <label class="w-full bg-white text-gray-800 border border-gray-300 font-bold py-4 rounded-xl shadow-sm active:bg-gray-50 transition flex items-center justify-center gap-3 cursor-pointer">
-                <i class="fa-solid fa-upload text-gray-500"></i> 导入数据
-                <input type="file" class="hidden" accept=".json" onchange="SettingsManager.importData(this)">
-            </label>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 uppercase font-bold mb-1">GitHub Token</label>
+                        <input type="password" id="github-token" class="w-full bg-gray-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="ghp_xxxxxxxxxxxx">
+                        <div class="flex items-center justify-between mt-1">
+                            <p class="text-xs text-gray-400">需要repo权限的Personal Access Token</p>
+                            <label class="flex items-center gap-1 cursor-pointer">
+                                <input type="checkbox" id="save-github-token" class="w-3 h-3 accent-blue-500">
+                                <span class="text-xs text-gray-500">记住Token</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs text-gray-500 uppercase font-bold mb-1">仓库路径</label>
+                        <input type="text" id="github-repo" class="w-full bg-gray-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="username/repository">
+                        <p class="text-xs text-gray-400 mt-1">格式：用户名/仓库名</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs text-gray-500 uppercase font-bold mb-1">备份文件名</label>
+                        <input type="text" id="github-filename" class="w-full bg-gray-100 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="rurichat_backup.json" value="rurichat_backup.json">
+                        <p class="text-xs text-gray-400 mt-1">同名文件将被覆盖</p>
+                    </div>
 
-            <div class="border-t border-gray-200 pt-6 mt-4">
-                <button onclick="SettingsManager.clearAllData()" class="w-full bg-red-500 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-3">
+                    <div class="flex gap-2">
+                        <button onclick="SettingsManager.githubBackup()" class="flex-1 bg-green-500 text-white font-bold py-3 rounded-lg shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> 立即备份
+                        </button>
+                        
+                        <button onclick="SettingsManager.githubRestore()" class="flex-1 bg-orange-500 text-white font-bold py-3 rounded-lg shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> 恢复数据
+                        </button>
+                    </div>
+
+                    <!-- 最新备份时间显示 -->
+                    <div id="last-backup-time" class="text-xs text-gray-400 text-center py-1 hidden">
+                        最新备份：<span id="last-backup-timestamp"></span>
+                    </div>
+
+                    <!-- 自动备份设置 -->
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm font-medium text-gray-700">自动备份</label>
+                            <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" id="auto-backup-enabled" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300" onchange="SettingsManager.toggleAutoBackup()"/>
+                                <label for="auto-backup-enabled" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                            </div>
+                        </div>
+                        <div id="auto-backup-interval-container" class="hidden">
+                            <label class="block text-xs text-gray-500 mb-1">备份间隔</label>
+                            <select id="auto-backup-interval" class="w-full bg-white rounded-lg p-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="SettingsManager.updateAutoBackupInterval()">
+                                <option value="6">每6小时</option>
+                                <option value="12">每12小时</option>
+                                <option value="24">每24小时</option>
+                            </select>
+                            <p class="text-xs text-gray-400 mt-1">下次备份：<span id="next-backup-time">--</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 危险操作区域 -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border-l-4 border-red-500">
+                <div class="text-center mb-4">
+                    <i class="fa-solid fa-triangle-exclamation text-3xl text-red-500 mb-2"></i>
+                    <h3 class="text-lg font-bold text-red-600">危险操作</h3>
+                </div>
+                
+                <button onclick="SettingsManager.clearAllData()" class="w-full bg-red-500 text-white font-bold py-3 rounded-lg shadow-md active:scale-95 transition flex items-center justify-center gap-2">
                     <i class="fa-solid fa-trash-can"></i> 清空所有数据
                 </button>
                 <p class="text-xs text-red-400 text-center mt-2">⚠️ 此操作将永久删除所有数据，不可恢复！</p>
