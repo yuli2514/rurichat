@@ -15,7 +15,7 @@ const AIHandler = {
      */
     triggerAI: async function(chatInterface) {
         const input = document.getElementById('chat-input');
-        if (input.value.trim()) chatInterface.sendUserMessage();
+        if (input.value.trim()) ChatInterface.sendUserMessage();
 
         const btn = document.querySelector('button[onclick="ChatInterface.triggerAI()"]');
         btn.classList.add('animate-pulse');
@@ -28,11 +28,11 @@ const AIHandler = {
         headerName.classList.add('typing-indicator');
         
         try {
-            const bubbles = await API.Chat.generateReply(chatInterface.currentCharId);
-            const history = API.Chat.getHistory(chatInterface.currentCharId);
-            
+            const bubbles = await API.Chat.generateReply(ChatInterface.currentCharId);
+            const history = API.Chat.getHistory(ChatInterface.currentCharId);
+
             // 获取表情包映射（含义 -> URL）
-            const char = API.Chat.getChar(chatInterface.currentCharId);
+            const char = API.Chat.getChar(ChatInterface.currentCharId);
             const settings = char && char.settings ? char.settings : {};
             let emojiMeaningToUrl = {};
             if (settings.emojiGroupId) {
@@ -78,7 +78,7 @@ const AIHandler = {
                 if (receiveTransferMatch) {
                     isReceiveTransfer = true;
                     // 查找最近一条用户发送的待领取转账
-                    const history = API.Chat.getHistory(chatInterface.currentCharId);
+                    const history = API.Chat.getHistory(ChatInterface.currentCharId);
                     for (let i = history.length - 1; i >= 0; i--) {
                         const msg = history[i];
                         if (msg.type === 'transfer' && msg.transferData &&
@@ -110,7 +110,7 @@ const AIHandler = {
                     if (imageDescMatch) {
                         const imageDescription = imageDescMatch[1];
                         // 使用 Canvas 生成白底文字卡片
-                        text = chatInterface.generateTextImageCard(imageDescription);
+                        text = ChatInterface.generateTextImageCard(imageDescription);
                         isTextImageCard = true;
                     }
                 }
@@ -161,7 +161,7 @@ const AIHandler = {
                 let msg;
                 if (isTransferMessage) {
                     // AI转账消息
-                    const char = API.Chat.getChar(chatInterface.currentCharId);
+                    const char = API.Chat.getChar(ChatInterface.currentCharId);
                     msg = {
                         id: msgId,
                         sender: 'char',
@@ -204,9 +204,9 @@ const AIHandler = {
                         quote: quote
                     };
                 }
-                const updatedHistory = API.Chat.addMessage(chatInterface.currentCharId, msg);
+                const updatedHistory = API.Chat.addMessage(ChatInterface.currentCharId, msg);
                 // 使用增量追加代替全量重渲染，避免卡顿
-                chatInterface.appendSingleMessage(msg, updatedHistory.length - 1);
+                ChatInterface.appendSingleMessage(msg, updatedHistory.length - 1);
                 
                 // 实时更新角色列表
                 if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
@@ -216,13 +216,13 @@ const AIHandler = {
                 // 如果需要撤回，等待2秒后撤回
                 if (isRecall) {
                     await new Promise(r => setTimeout(r, 2000));
-                    const currentHistory = API.Chat.getHistory(chatInterface.currentCharId);
+                    const currentHistory = API.Chat.getHistory(ChatInterface.currentCharId);
                     const msgIndex = currentHistory.findIndex(m => m.id === msgId);
                     if (msgIndex !== -1) {
                         currentHistory[msgIndex].recalled = true;
                         currentHistory[msgIndex].recalledAt = Date.now();
-                        API.Chat.saveHistory(chatInterface.currentCharId, currentHistory);
-                        chatInterface.renderMessages();
+                        API.Chat.saveHistory(ChatInterface.currentCharId, currentHistory);
+                        ChatInterface.renderMessages();
                         ChatManager.renderList();
                     }
                 }
@@ -231,7 +231,7 @@ const AIHandler = {
                 await new Promise(r => setTimeout(r, 1200));
             }
 
-            API.Chat.checkAutoSummary(chatInterface.currentCharId);
+            API.Chat.checkAutoSummary(ChatInterface.currentCharId);
 
         } catch (e) {
             alert('AI 请求失败: ' + e.message);
@@ -247,8 +247,8 @@ const AIHandler = {
      * 重回功能 - 重新生成AI回复
      * @param {Object} chatInterface - ChatInterface引用
      */
-    regenerateLastAI: async function(chatInterface) {
-        const history = API.Chat.getHistory(chatInterface.currentCharId);
+    regenerateLastAI: async function() {
+        const history = API.Chat.getHistory(ChatInterface.currentCharId);
         if (history.length === 0) return;
 
         // 检查最后一条消息是否是AI的
@@ -270,8 +270,10 @@ const AIHandler = {
 
         if (removeCount > 0) {
             history.splice(history.length - removeCount, removeCount);
-            API.Chat.saveHistory(chatInterface.currentCharId, history);
-            chatInterface.renderMessages();
+            API.Chat.saveHistory(ChatInterface.currentCharId, history);
+            
+            // 优化：只移除对应数量的消息气泡，避免全量重建
+            this._removeLastMessageBubbles(removeCount);
             ChatManager.renderList();
         }
 
@@ -280,6 +282,32 @@ const AIHandler = {
 
         // 自动触发AI重新生成
         await this.triggerAI(chatInterface);
+    },
+
+    /**
+     * 移除最后几个消息气泡（避免全量重建）
+     * @param {Object} chatInterface - ChatInterface引用
+     * @param {number} count - 要移除的消息数量
+     */
+    _removeLastMessageBubbles: function(count) {
+        const container = document.getElementById('chat-messages');
+        if (!container) {
+            // 如果找不到容器，回退到全量重建
+            ChatInterface.renderMessages();
+            return;
+        }
+        
+        // 移除最后count个消息气泡
+        for (let i = 0; i < count; i++) {
+            const lastBubble = container.lastElementChild;
+            if (lastBubble) {
+                lastBubble.remove();
+            } else {
+                // 如果DOM结构不符合预期，回退到全量重建
+                ChatInterface.renderMessages();
+                break;
+            }
+        }
     }
 };
 

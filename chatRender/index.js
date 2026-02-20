@@ -568,7 +568,7 @@ const ChatInterface = {
     },
 
     regenerateLastAI: async function() {
-        await AIHandler.regenerateLastAI(this);
+        await AIHandler.regenerateLastAI();
     },
 
     // ==================== 媒体处理代理 ====================
@@ -648,6 +648,66 @@ const ChatInterface = {
 
     playVoice: function(msgIndex) {
         VoiceHandler.playVoice(msgIndex);
+    },
+
+    // ==================== 编辑消息功能 ====================
+    _editingMessageIndex: null,
+    
+    openEditMessage: function(index) {
+        this._editingMessageIndex = index;
+        const history = API.Chat.getHistory(this.currentCharId);
+        const message = history[index];
+        
+        if (!message) return;
+        
+        const modal = document.getElementById('edit-message-modal');
+        const textarea = modal.querySelector('textarea');
+        
+        // 设置当前消息内容
+        textarea.value = message.content;
+        
+        // 显示模态框
+        modal.classList.remove('hidden');
+        
+        // 聚焦到文本区域
+        setTimeout(() => {
+            textarea.focus();
+            // 将光标移到文本末尾
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }, 100);
+    },
+    
+    cancelEditMessage: function() {
+        const modal = document.getElementById('edit-message-modal');
+        modal.classList.add('hidden');
+        this._editingMessageIndex = null;
+    },
+    
+    confirmEditMessage: function() {
+        if (this._editingMessageIndex === null) return;
+        
+        const modal = document.getElementById('edit-message-modal');
+        const textarea = modal.querySelector('textarea');
+        const newContent = textarea.value.trim();
+        
+        if (!newContent) {
+            alert('消息内容不能为空');
+            return;
+        }
+        
+        // 更新消息内容
+        const history = API.Chat.getHistory(this.currentCharId);
+        if (history[this._editingMessageIndex]) {
+            history[this._editingMessageIndex].content = newContent;
+            API.Chat.saveHistory(this.currentCharId, history);
+            
+            // 重新渲染消息列表
+            this.renderMessages();
+        }
+        
+        // 关闭模态框
+        modal.classList.add('hidden');
+        this._editingMessageIndex = null;
     }
 };
 

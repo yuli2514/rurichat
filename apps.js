@@ -281,14 +281,58 @@ const MemoryApp = {
         ).join('');
     },
 
+    // ==================== 编辑记忆功能 ====================
+    _editingMemoryIndex: null,
+    
     editMemory: function(index) {
+        this._editingMemoryIndex = index;
         const memories = API.Memory.getMemories(this.currentCharId);
         const memory = memories[index];
-        const newContent = prompt('编辑记忆内容:', memory.content);
-        if (newContent !== null && newContent.trim()) {
-            API.Memory.updateMemory(this.currentCharId, index, newContent.trim());
-            this.renderMemories();
+        
+        if (!memory) return;
+        
+        const modal = document.getElementById('memory-edit-modal');
+        const textarea = modal.querySelector('textarea');
+        
+        // 设置当前记忆内容
+        textarea.value = memory.content;
+        
+        // 显示模态框
+        modal.classList.remove('hidden');
+        
+        // 聚焦到文本区域
+        setTimeout(() => {
+            textarea.focus();
+            // 将光标移到文本末尾
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }, 100);
+    },
+    
+    cancelEditMemory: function() {
+        const modal = document.getElementById('memory-edit-modal');
+        modal.classList.add('hidden');
+        this._editingMemoryIndex = null;
+    },
+    
+    confirmEditMemory: function() {
+        if (this._editingMemoryIndex === null) return;
+        
+        const modal = document.getElementById('memory-edit-modal');
+        const textarea = modal.querySelector('textarea');
+        const newContent = textarea.value.trim();
+        
+        if (!newContent) {
+            alert('记忆内容不能为空');
+            return;
         }
+        
+        // 更新记忆内容
+        API.Memory.updateMemory(this.currentCharId, this._editingMemoryIndex, newContent);
+        this.renderMemories();
+        
+        // 关闭模态框
+        modal.classList.add('hidden');
+        this._editingMemoryIndex = null;
     },
 
     deleteMemory: function(index) {

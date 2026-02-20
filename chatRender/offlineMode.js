@@ -27,6 +27,19 @@ const OfflineMode = {
         const char = API.Chat.getChar(charId);
         if (!char) return;
 
+        // 立即显示界面，避免用户感知到延迟
+        this._showInterface(char);
+
+        // 异步加载设置和消息，提升响应速度
+        requestAnimationFrame(() => {
+            this._initializeAsync(isSameChar);
+        });
+    },
+
+    /**
+     * 立即显示界面（同步操作）
+     */
+    _showInterface: function(char) {
         // 设置顶栏角色名
         const headerName = document.getElementById('offline-header-name');
         if (headerName) headerName.textContent = char.remark || char.name;
@@ -42,18 +55,45 @@ const OfflineMode = {
         // 显示线下模式界面
         const offlineInterface = document.getElementById('offline-mode-interface');
         if (offlineInterface) offlineInterface.classList.remove('hidden');
+    },
 
-        // 加载设置（壁纸/字体/CSS）
-        this.loadSettings();
+    /**
+     * 异步初始化（避免阻塞UI）
+     */
+    _initializeAsync: function(isSameChar) {
+        // 分批处理初始化任务，避免长时间阻塞
+        const tasks = [
+            () => this.loadSettings(),
+            () => {
+                if (isSameChar) {
+                    this._scrollToBottom();
+                } else {
+                    this.renderMessages();
+                }
+            },
+            () => this._bindInputEvents()
+        ];
 
-        // 同一角色重进：跳过全量重建，只滚到底部
-        if (isSameChar) {
-            this._scrollToBottom();
-        } else {
-            this.renderMessages();
-        }
+        // 使用 setTimeout 分批执行任务
+        let taskIndex = 0;
+        const executeNextTask = () => {
+            if (taskIndex < tasks.length) {
+                try {
+                    tasks[taskIndex]();
+                } catch (e) {
+                    console.error('[OfflineMode] Task execution error:', e);
+                }
+                taskIndex++;
+                setTimeout(executeNextTask, 10); // 10ms间隔，保持UI响应
+            }
+        };
+        executeNextTask();
+    },
 
-        // 输入框自动高度（只绑一次）
+    /**
+     * 绑定输入框事件（只绑一次）
+     */
+    _bindInputEvents: function() {
         const input = document.getElementById('offline-input');
         if (input && !input._offlineBound) {
             input._offlineBound = true;
@@ -237,12 +277,6 @@ const OfflineMode = {
 
         API.Offline.addMessage(this.currentCharId, msg);
 
-        // 同时添加到线上聊天记录（互通）
-        API.Chat.addMessage(this.currentCharId, {
-            ...msg,
-            content: '[线下剧情] ' + text
-        });
-
         input.value = '';
         input.style.height = 'auto';
 
@@ -303,12 +337,6 @@ const OfflineMode = {
             };
             API.Offline.addMessage(this.currentCharId, aiMsg);
 
-            // 同时添加到线上聊天记录（互通）
-            API.Chat.addMessage(this.currentCharId, {
-                ...aiMsg,
-                content: '[线下剧情] ' + reply.substring(0, 50) + '...'
-            });
-
             // 更新角色列表
             if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
                 ChatManager.renderList();
@@ -345,10 +373,25 @@ const OfflineMode = {
         // 删除最后一条AI消息
         history.pop();
         API.Offline.saveHistory(this.currentCharId, history);
-        this.renderMessages();
+        
+        // 优化：只移除最后一个消息气泡，不重建整个列表
+        this._removeLastMessageBubble();
 
         // 重新生成
         this._triggerAI();
+    },
+
+    /**
+     * 移除最后一个消息气泡（避免全量重建）
+     */
+    _removeLastMessageBubble: function() {
+        const container = document.getElementById('offline-messages');
+        if (!container) return;
+        
+        const lastBubble = container.lastElementChild;
+        if (lastBubble && lastBubble.classList.contains('flex')) {
+            lastBubble.remove();
+        }
     },
 
     /**
@@ -876,9 +919,33 @@ const OfflineMode = {
 
     applyCustomCss: function() {
         const css = document.getElementById('offline-custom-css').value.trim();
-        this.updateSetting('customCss', css);
-        this._applyCss(css);
-        alert('CSS 已应用');
+        
+        // 防抖处理，避免频繁应用CSS导致卡顿
+        if (this._cssApplyTimer) {
+            clearTimeout(this._cssApplyTimer);
+        }
+        
+        this._cssApplyTimer = setTimeout(() => {
+            try {
+                this.updateSetting('customCss', css);
+                this._applyCss(css);
+                
+                // 移动端友好的提示，避免阻塞UI
+                const indicator = document.createElement('div');
+                indicator.textContent = 'CSS 已应用';
+                indicator.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-3 py-1 rounded-lg text-sm z-[9999]';
+                document.body.appendChild(indicator);
+                
+                setTimeout(() => {
+                    if (indicator.parentNode) {
+                        indicator.parentNode.removeChild(indicator);
+                    }
+                }, 2000);
+            } catch (e) {
+                console.error('[OfflineMode] CSS应用失败:', e);
+                alert('CSS 应用失败: ' + e.message);
+            }
+        }, 300);
     },
 
     clearCustomCss: function() {
@@ -1273,9 +1340,13 @@ const OfflineMode = {
         msg.edited = true;
         msg.editedAt = Date.now();
         
-        API.Offline.saveHistory(this.currentCharId, history);
-        this.renderMessages();
+        // 异步保存，避免阻塞UI
+        setTimeout(() => {
+            API.Offline.saveHistory(this.currentCharId, history);
+        }, 0);
 
+        // 立即更新DOM中对应的消息气泡，避免全量重建
+        this._updateMessageBubble(index, newText);
         this.cancelEditMessage();
     },
 
@@ -1290,8 +1361,74 @@ const OfflineMode = {
         
         history.splice(index, 1);
         
-        API.Offline.saveHistory(this.currentCharId, history);
-        this.renderMessages();
+        // 异步保存，避免阻塞UI
+        setTimeout(() => {
+            API.Offline.saveHistory(this.currentCharId, history);
+        }, 0);
+
+        // 立即移除DOM中对应的消息气泡，避免全量重建
+        this._removeMessageBubble(index);
+        
+        // 更新后续消息的索引
+        this._updateMessageIndices(index);
+    },
+
+    /**
+     * 更新指定消息气泡的内容（避免全量重建）
+     */
+    _updateMessageBubble: function(index, newContent) {
+        const container = document.getElementById('offline-messages');
+        if (!container) return;
+        
+        const bubble = container.querySelector(`[data-msg-index="${index}"]`);
+        if (!bubble) {
+            // 如果找不到对应气泡，回退到全量重建
+            this.renderMessages();
+            return;
+        }
+        
+        const contentEl = bubble.querySelector('p, div[style]');
+        if (contentEl) {
+            contentEl.textContent = newContent;
+        }
+    },
+
+    /**
+     * 移除指定消息气泡（避免全量重建）
+     */
+    _removeMessageBubble: function(index) {
+        const container = document.getElementById('offline-messages');
+        if (!container) return;
+        
+        const bubble = container.querySelector(`[data-msg-index="${index}"]`);
+        if (bubble) {
+            // 找到包含气泡的完整消息容器（包括头像）
+            let messageContainer = bubble;
+            while (messageContainer && !messageContainer.classList.contains('mb-6')) {
+                messageContainer = messageContainer.parentElement;
+            }
+            if (messageContainer) {
+                messageContainer.remove();
+            } else {
+                bubble.remove();
+            }
+        }
+    },
+
+    /**
+     * 更新删除消息后的索引（避免索引错乱）
+     */
+    _updateMessageIndices: function(deletedIndex) {
+        const container = document.getElementById('offline-messages');
+        if (!container) return;
+        
+        const bubbles = container.querySelectorAll('[data-msg-index]');
+        bubbles.forEach(bubble => {
+            const currentIndex = parseInt(bubble.getAttribute('data-msg-index'));
+            if (currentIndex > deletedIndex) {
+                bubble.setAttribute('data-msg-index', currentIndex - 1);
+            }
+        });
     }
 };
 

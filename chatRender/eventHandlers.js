@@ -168,7 +168,7 @@ const ChatEventHandlers = {
         const index = this.currentContextMenuMsgIndex;
         if (index === null) return;
         
-        const history = API.Chat.getHistory(chatInterface.currentCharId);
+        const history = API.Chat.getHistory(ChatInterface.currentCharId);
         const msg = history[index];
         if (!msg) return;
 
@@ -181,26 +181,17 @@ const ChatEventHandlers = {
         if (action === 'copy') {
             navigator.clipboard.writeText(msg.content).then(() => alert('已复制'));
         } else if (action === 'quote') {
-            chatInterface.startQuote(index);
+            ChatInterface.startQuote(index);
         } else if (action === 'edit') {
-            const senderName = msg.sender === 'user' ? '我' : API.Chat.getChar(chatInterface.currentCharId).remark;
-            const newText = prompt('编辑 ' + senderName + ' 的消息:', msg.content);
-            if (newText !== null && newText.trim()) {
-                history[index].content = newText.trim();
-                history[index].edited = true;
-                history[index].editedAt = Date.now();
-                API.Chat.saveHistory(chatInterface.currentCharId, history);
-                chatInterface.renderMessages();
-                ChatManager.renderList();
-            }
+            ChatInterface.openEditMessage(index);
         } else if (action === 'recall') {
             history[index].recalled = true;
             history[index].recalledAt = Date.now();
-            API.Chat.saveHistory(chatInterface.currentCharId, history);
-            chatInterface.renderMessages();
+            API.Chat.saveHistory(ChatInterface.currentCharId, history);
+            ChatInterface.renderMessages();
             ChatManager.renderList();
         } else if (action === 'delete') {
-            chatInterface.enterDeleteMode(index);
+            ChatEventHandlers.enterDeleteMode(index, ChatInterface);
         }
     },
 
