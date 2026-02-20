@@ -568,7 +568,14 @@ const ChatInterface = {
     },
 
     regenerateLastAI: async function() {
-        await AIHandler.regenerateLastAI();
+        console.log('[ChatInterface] 重回按钮被点击');
+        try {
+            await AIHandler.regenerateLastAI();
+            console.log('[ChatInterface] 重回功能执行完成');
+        } catch (error) {
+            console.error('[ChatInterface] 重回功能执行失败:', error);
+            alert('重回功能执行失败: ' + error.message);
+        }
     },
 
     // ==================== 媒体处理代理 ====================
