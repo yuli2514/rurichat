@@ -281,7 +281,7 @@ const AIHandler = {
         document.getElementById('panel-container').classList.add('hidden');
 
         // 自动触发AI重新生成
-        await this.triggerAI(chatInterface);
+        await this.triggerAI(ChatInterface);
     },
 
     /**
