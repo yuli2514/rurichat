@@ -72,6 +72,34 @@ const AIHandler = {
                     }
                 }
                 
+                // AI换头像：检测 [换头像] 或 [CHANGE_AVATAR] 格式
+                let isChangeAvatar = false;
+                const changeAvatarMatch = text.match(/^\[(?:换头像|更换头像|CHANGE_AVATAR)\]$/i);
+                if (changeAvatarMatch) {
+                    isChangeAvatar = true;
+                    // 查找最近一条用户发送的图片（真实图片，非表情包）
+                    const history = API.Chat.getHistory(ChatInterface.currentCharId);
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        const msg = history[i];
+                        // 只处理用户发送的真实图片（isVisionImage标记），不处理表情包
+                        if (msg.sender === 'user' && msg.type === 'image' && msg.isVisionImage &&
+                            msg.content && msg.content.startsWith('data:image/')) {
+                            // 更新角色头像
+                            API.Chat.updateChar(ChatInterface.currentCharId, { avatar: msg.content });
+                            // 更新界面显示
+                            const headerAvatar = document.getElementById('chat-header-avatar');
+                            if (headerAvatar) headerAvatar.src = msg.content;
+                            // 刷新聊天列表
+                            if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                                ChatManager.renderList();
+                            }
+                            console.log('[AIHandler] 角色头像已更换');
+                            break;
+                        }
+                    }
+                    continue; // 跳过这条消息，不显示
+                }
+                
                 // AI领取转账：检测 [领取转账] 或 [收下转账] 格式
                 let isReceiveTransfer = false;
                 const receiveTransferMatch = text.match(/^\[(?:领取转账|收下转账|接受转账|RECEIVE_TRANSFER)\]$/i);

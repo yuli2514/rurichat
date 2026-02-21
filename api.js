@@ -894,8 +894,9 @@ const API = {
             systemPrompt += '\n[语音:内容] - 语音消息（单独一行）';
             systemPrompt += '\n[转账:金额:备注] - 转账（单独一行，不重复发）';
             systemPrompt += '\n[领取转账] - 领取用户转账（已领取不重复）';
+            systemPrompt += '\n[换头像] - 当用户提到换头像并发送图片时，使用此指令将用户发送的图片设为你的新头像（单独一行）';
             
-            systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账必须单独一行！';
+            systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账/换头像必须单独一行！';
 
             // --- Memory Integration (强化版) ---
             const memories = API.Memory.getMemories(charId);
