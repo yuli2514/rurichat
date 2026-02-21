@@ -875,95 +875,27 @@ const API = {
                 systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
             }
             
-            systemPrompt += '\n\n【聊天风格要求 - 线上聊天模式，必须严格遵守】';
-            systemPrompt += '\n⚠️ 你现在处于【线上聊天模式】，无论之前的聊天记录中是否有线下剧情内容，你现在必须立刻切换到线上聊天风格！';
-            systemPrompt += '\n1. 这是线上即时通讯聊天（类似微信/QQ），请像真人发消息一样说话';
-            systemPrompt += '\n2. 每条消息要简短自然，不要一次性说太多话！像真人聊天一样，一条消息就说一两句话';
-            systemPrompt += '\n3. 可以分多条消息发送（用换行分隔），模拟真实聊天节奏，比如先回应再追问';
-            systemPrompt += '\n4. 根据角色性格决定话多话少：活泼的角色可以多发几条，冷淡的角色可以简短';
-            systemPrompt += '\n5. 绝对禁止任何动作描写、心理描写、场景描写、环境描写、括号注释！只能输出角色说的话！';
-            systemPrompt += '\n6. 可以使用表情符号emoji来表达情绪，比如😊😂🤔😅等';
-            systemPrompt += '\n7. 说话要自然口语化，可以用语气词如"嗯"、"啊"、"哈哈"、"emmm"等';
-            systemPrompt += '\n8. 即使上下文中有线下剧情模式的对话记录（带有[线下剧情]标记），你也必须用线上聊天风格回复，不能写描写！';
+            systemPrompt += '\n\n【线上聊天模式 - 核心规则】';
+            systemPrompt += '\n⚠️ 你现在是【线上聊天】，不是线下剧情！';
+            systemPrompt += '\n1. 像真人发微信/QQ一样说话，每条消息1-2句话（20-30字内）';
+            systemPrompt += '\n2. 可分多条发送（换行分隔），模拟真实节奏';
+            systemPrompt += '\n3. 禁止任何描写（动作/心理/场景/括号注释），只说话！';
+            systemPrompt += '\n4. 禁止主动发emoji（😊😂等），可发表情包URL';
+            systemPrompt += '\n5. 口语化，用"嗯""啊""哈哈""emmm"等语气词';
             
-            systemPrompt += '\n\n【错误示范 - 不要这样写】';
-            systemPrompt += '\n❌ *微微一笑* 好的呀~ （这种带动作描写的不行）';
-            systemPrompt += '\n❌ 「好开心」她说道。（这种带叙述的不行）';
-            systemPrompt += '\n❌ (内心很高兴) 好啊！（这种带心理描写的不行）';
+            systemPrompt += '\n\n❌ 错误：*微微一笑* 好的呀~';
+            systemPrompt += '\n✅ 正确：好的呀~';
             
-            systemPrompt += '\n\n【正确示范 - 应该这样写】';
-            systemPrompt += '\n✅ 好的呀~';
-            systemPrompt += '\n✅ 哈哈哈好啊！';
-            systemPrompt += '\n✅ emmm让我想想';
-            systemPrompt += '\n✅ 你在干嘛呢😊';
+            // 特殊功能指令（精简版）
+            systemPrompt += '\n\n【特殊指令】';
+            systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复';
+            systemPrompt += '\n消息[RECALL] - 撤回（说错话时用）';
+            systemPrompt += '\n[图片:描述] - 文字传图（单独一行）';
+            systemPrompt += '\n[语音:内容] - 语音消息（单独一行）';
+            systemPrompt += '\n[转账:金额:备注] - 转账（单独一行，不重复发）';
+            systemPrompt += '\n[领取转账] - 领取用户转账（已领取不重复）';
             
-            // Add special commands instruction - more detailed and emphasized
-            systemPrompt += '\n\n【特殊功能指令】';
-            systemPrompt += '\n你可以使用以下指令增强聊天体验：';
-            systemPrompt += '\n';
-            systemPrompt += '\n★ 引用回复 [QUOTE:xxx]：';
-            systemPrompt += '\n  格式：[QUOTE:关键词]你的回复';
-            systemPrompt += '\n  示例：[QUOTE:好累]怎么了？工作太忙了吗？';
-            systemPrompt += '\n';
-            systemPrompt += '\n★ 撤回消息 [RECALL]：';
-            systemPrompt += '\n  格式：消息内容[RECALL]';
-            systemPrompt += '\n  用途：说错话或表现犹豫时使用';
-            systemPrompt += '\n';
-            systemPrompt += '\n★ 文字意念传图 [图片:描述]：';
-            systemPrompt += '\n  格式：[图片:你想描述的画面内容]';
-            systemPrompt += '\n  用途：当你想分享一张图片、描述一个场景、或展示某个画面时使用';
-            systemPrompt += '\n  效果：会生成一张白底卡片，上面显示你描述的文字';
-            systemPrompt += '\n  示例：[图片:窗外的夕阳，金色的光芒洒在云层上，美极了]';
-            systemPrompt += '\n  示例：[图片:刚做好的蛋糕，上面有草莓和奶油装饰]';
-            systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起';
-            systemPrompt += '\n';
-            systemPrompt += '\n★ 语音消息 [语音:内容]：';
-            systemPrompt += '\n  格式：[语音:你想说的话]';
-            systemPrompt += '\n  用途：当你想发送语音消息时使用，会显示为语音气泡';
-            systemPrompt += '\n  示例：[语音:哈喽~在干嘛呢]';
-            systemPrompt += '\n  示例：[语音:好的好的，我知道啦]';
-            systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起';
-            systemPrompt += '\n';
-            systemPrompt += '\n★ 转账消息 [转账:金额] 或 [转账:金额:备注]：';
-            systemPrompt += '\n  格式：[转账:100] 或 [转账:100:给你买奶茶]';
-            systemPrompt += '\n  用途：当你想给用户转账/发红包时使用，会显示为粉色转账卡片';
-            systemPrompt += '\n  示例：[转账:520:爱你哦]';
-            systemPrompt += '\n  示例：[转账:88.88:生日快乐]';
-            systemPrompt += '\n  注意：这是单独一条消息，不要和其他文字混在一起，不要用[图片:]来描述转账';
-            systemPrompt += '\n  ⚠️ 重要：如果聊天记录中已经有你发过的转账记录，不要重复发送新转账！除非用户明确要求你再转一次。';
-            systemPrompt += '\n';
-            systemPrompt += '\n★ 领取转账 [领取转账]：';
-            systemPrompt += '\n  格式：[领取转账]';
-            systemPrompt += '\n  用途：当用户给你转账后，你想收下时使用';
-            systemPrompt += '\n  注意：根据角色性格和剧情决定是否领取，可以拒绝或犹豫';
-            systemPrompt += '\n  ⚠️ 重要：如果聊天记录显示你已经领取了某笔转账，不要重复领取。已领取的转账会标注"已经领取"。';
-
-
-            systemPrompt += '\\n\\n【⚠️ 格式严格要求 - 必须遵守】';
-            systemPrompt += '\\n以下格式必须严格遵守，每种特殊消息必须单独占一行，不能和普通文字混在同一行：';
-            systemPrompt += '\\n';
-            systemPrompt += '\\n1. 表情包格式：必须单独一行输出完整URL，不加任何修饰';
-            systemPrompt += '\\n   ✅ 正确：https://example.com/emoji.png';
-            systemPrompt += '\\n   ❌ 错误：![表情](https://example.com/emoji.png)';
-            systemPrompt += '\\n   ❌ 错误：[表情](https://example.com/emoji.png)';
-            systemPrompt += '\\n   ❌ 错误：看这个表情 https://example.com/emoji.png';
-            systemPrompt += '\\n';
-            systemPrompt += '\\n2. 语音格式：[语音:内容] 必须单独一行';
-            systemPrompt += '\\n   ✅ 正确（单独一行）：[语音:你好呀~]';
-            systemPrompt += '\\n   ❌ 错误（混在文字里）：我想说[语音:你好呀~]给你听';
-            systemPrompt += '\\n';
-            systemPrompt += '\\n3. 图片格式：[图片:描述] 必须单独一行';
-            systemPrompt += '\\n   ✅ 正确（单独一行）：[图片:窗外的夕阳]';
-            systemPrompt += '\\n   ❌ 错误（混在文字里）：你看[图片:窗外的夕阳]好美';
-            systemPrompt += '\\n';
-            systemPrompt += '\\n4. 转账格式：[转账:金额] 或 [转账:金额:备注] 必须单独一行';
-            systemPrompt += '\\n   ✅ 正确（单独一行）：[转账:100:请你喝奶茶]';
-            systemPrompt += '\\n   ❌ 错误（混在文字里）：给你[转账:100]买东西';
-            systemPrompt += '\\n';
-            systemPrompt += '\\n5. 引用格式：[QUOTE:关键词] 必须在行首，后面紧跟回复内容';
-            systemPrompt += '\\n   ✅ 正确：[QUOTE:好累]怎么了？';
-            systemPrompt += '\\n';
-            systemPrompt += '\\n⚠️ 再次强调：语音、图片、转账、表情包URL 都必须单独占一行，绝对不能和其他文字混在一起！';
+            systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账必须单独一行！';
 
             // --- Memory Integration (强化版) ---
             const memories = API.Memory.getMemories(charId);
@@ -1038,7 +970,10 @@ const API = {
             fullHistory.forEach(msg => {
                 // 跳过从线下同步过来的摘要消息（以 [线下剧情] 开头的），避免重复
                 if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('[线下剧情] ')) return;
-                if (!msg.recalled) {
+                // 保留撤回的消息，但标记为撤回状态，让AI知道自己撤回了什么
+                if (msg.recalled && msg.recalledContent) {
+                    mergedHistory.push({ ...msg, _source: 'online', _isRecalled: true });
+                } else if (!msg.recalled) {
                     mergedHistory.push({ ...msg, _source: 'online' });
                 }
             });
@@ -1146,6 +1081,11 @@ const API = {
                     }
                 } else {
                     content = msg.content;
+                }
+                
+                // 处理撤回的消息 - 让AI知道自己撤回了什么
+                if (msg._isRecalled && msg.recalledContent && typeof content === 'string') {
+                    content = '[你之前发送了这条消息但立即撤回了：「' + msg.recalledContent + '」]';
                 }
 
                 // 如果是线下模式的消息，添加标记让AI知道这是线下剧情对话
@@ -1602,14 +1542,12 @@ const API = {
                 systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
             }
 
-            systemPrompt += '\n\n【写作要求 - 线下剧情模式，必须严格遵守】';
-            systemPrompt += '\n⚠️ 你现在处于【线下剧情描写模式】，无论之前的聊天记录中是否有线上聊天内容，你现在必须立刻切换到线下剧情描写风格！';
-            systemPrompt += '\n1. 这是线下剧情描写模式，请用文学化的语言进行描写';
-            systemPrompt += '\n2. 可以包含动作描写、心理描写、场景描写、对话等，充分展现角色魅力';
-            systemPrompt += '\n3. 每次回复请写一段完整的剧情推进，字数在200-500字之间';
-            systemPrompt += '\n4. 保持角色性格一致，注意剧情连贯性';
-            systemPrompt += '\n5. 适当使用段落分隔，增强可读性';
-            systemPrompt += '\n6. 即使上下文中有线上聊天模式的对话记录（带有[线上聊天]标记），你也必须用线下剧情描写风格回复，要有描写！';
+            systemPrompt += '\n\n【线下剧情模式 - 核心规则】';
+            systemPrompt += '\n⚠️ 你现在是【线下剧情描写】，不是线上聊天！';
+            systemPrompt += '\n1. 用文学化语言描写，包含动作/心理/场景/对话';
+            systemPrompt += '\n2. 每次回复200-500字，完整推进剧情';
+            systemPrompt += '\n3. 保持角色性格一致，剧情连贯';
+            systemPrompt += '\n4. 适当分段，增强可读性';
 
             // 加载线下模式预设
             const presets = this.getPresets(charId);

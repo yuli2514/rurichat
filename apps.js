@@ -249,6 +249,9 @@ const MemoryApp = {
         
         // 默认激活普通记忆 Tab
         this.switchTab('memories');
+        
+        // 更新token统计
+        this.updateTokenCount();
     },
 
     backToCharSelect: function() {
@@ -267,7 +270,7 @@ const MemoryApp = {
             return;
         }
 
-        container.innerHTML = memories.map((m, idx) => 
+        container.innerHTML = memories.map((m, idx) =>
             '<div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">' +
                 '<div class="flex justify-between items-start mb-2">' +
                     '<span class="text-xs text-gray-400">' + new Date(m.timestamp).toLocaleString() + '</span>' +
@@ -279,6 +282,9 @@ const MemoryApp = {
                 '<p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">' + m.content + '</p>' +
             '</div>'
         ).join('');
+        
+        // 更新token统计
+        this.updateTokenCount();
     },
 
     // ==================== 编辑记忆功能 ====================
@@ -339,6 +345,7 @@ const MemoryApp = {
         if (!confirm('确定要删除这条记忆吗？')) return;
         API.Memory.deleteMemory(this.currentCharId, index);
         this.renderMemories();
+        this.updateTokenCount();
     },
 
     triggerSummary: async function() {
@@ -472,6 +479,387 @@ const MemoryApp = {
         if (!confirm('确定要删除这条线下总结吗？')) return;
         API.Offline.deleteOfflineSummary(this.currentCharId, index);
         this.renderOfflineSummaries();
+    },
+
+    // ==================== Token统计功能 ====================
+    
+    /**
+     * 简单的token估算函数（中文按字符数，英文按单词数*1.3）
+     */
+    estimateTokens: function(text) {
+        if (!text || typeof text !== 'string') return 0;
+        // 中文字符
+        const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+        // 英文单词（简单估算）
+        const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
+        // 英文和空格字符
+        const englishAndSpaces = (text.match(/[a-zA-Z\s]/g) || []).length;
+        // 其他字符
+        const otherChars = text.length - chineseChars - englishAndSpaces;
+        
+        return Math.ceil(chineseChars * 1.5 + englishWords * 1.3 + otherChars * 0.5);
+    },
+
+    /**
+     * 计算角色的总token数
+     */
+    calculateTotalTokens: function() {
+        if (!this.currentCharId) {
+            console.warn('[MemoryApp] calculateTotalTokens: currentCharId is null');
+            return { total: 0, breakdown: {} };
+        }
+
+        const char = API.Chat.getChar(this.currentCharId);
+        if (!char) {
+            console.warn('[MemoryApp] calculateTotalTokens: char not found for id', this.currentCharId);
+            return { total: 0, breakdown: {} };
+        }
+
+        const breakdown = {};
+        let total = 0;
+
+        // 1. 角色设定（包括角色名称和角色提示词）
+        const charName = char.name || '';
+        const charPrompt = char.prompt || '';
+        breakdown.charSetting = this.estimateTokens(charName) + this.estimateTokens(charPrompt);
+        total += breakdown.charSetting;
+
+        // 2. 系统设定（固定的系统提示词模板，估算约500 tokens）
+        // 包括线上聊天规则、特殊指令、格式要求等
+        breakdown.systemSetting = 500;
+        total += breakdown.systemSetting;
+
+        // 3. 上下文（最近的聊天记录）
+        const settings = char.settings || {};
+        const ctxLength = settings.contextLength || 20;
+        const history = API.Chat.getHistory(this.currentCharId);
+        const recentHistory = history.slice(-ctxLength);
+        let contextTokens = 0;
+        recentHistory.forEach(msg => {
+            if (msg.content) {
+                // 处理多模态内容（数组格式）
+                if (Array.isArray(msg.content)) {
+                    msg.content.forEach(part => {
+                        if (part.type === 'text' && part.text) {
+                            contextTokens += this.estimateTokens(part.text);
+                        }
+                    });
+                } else if (typeof msg.content === 'string') {
+                    contextTokens += this.estimateTokens(msg.content);
+                }
+            }
+        });
+        breakdown.context = contextTokens;
+        total += contextTokens;
+
+        // 4. 记忆
+        const memories = API.Memory.getMemories(this.currentCharId);
+        let memoryTokens = 0;
+        memories.forEach(m => {
+            memoryTokens += this.estimateTokens(m.content || '');
+        });
+        breakdown.memories = memoryTokens;
+        total += memoryTokens;
+
+        // 5. 用户人设
+        let personaTokens = 0;
+        if (settings.customPersonaContent) {
+            personaTokens = this.estimateTokens(settings.customPersonaContent);
+        } else if (settings.userPersonaId) {
+            const personas = API.Profile.getPersonas();
+            const persona = personas.find(p => p.id === settings.userPersonaId);
+            if (persona) {
+                personaTokens = this.estimateTokens(persona.content || '');
+            }
+        }
+        breakdown.userPersona = personaTokens;
+        total += personaTokens;
+
+        // 6. 关联世界书
+        const worldBookIds = settings.worldBookIds || (settings.worldBookId ? [settings.worldBookId] : []);
+        let worldBookTokens = 0;
+        if (worldBookIds.length > 0) {
+            const books = API.WorldBook.getBooks();
+            const selectedBooks = books.filter(b => worldBookIds.includes(b.id));
+            selectedBooks.forEach(wb => {
+                worldBookTokens += this.estimateTokens(wb.title || '');
+                worldBookTokens += this.estimateTokens(wb.content || '');
+            });
+        }
+        breakdown.worldBook = worldBookTokens;
+        total += worldBookTokens;
+
+        // 7. 关联表情包（只计算表情包含义文本）
+        const emojiGroupIds = settings.emojiGroupIds || (settings.emojiGroupId ? [settings.emojiGroupId] : []);
+        let emojiTokens = 0;
+        if (emojiGroupIds.length > 0) {
+            emojiGroupIds.forEach(groupId => {
+                const emojis = API.Emoji.getGroupEmojis(groupId);
+                emojis.forEach(e => {
+                    emojiTokens += this.estimateTokens(e.meaning || '');
+                    emojiTokens += this.estimateTokens(e.url || '');
+                });
+            });
+        }
+        breakdown.emoji = emojiTokens;
+        total += emojiTokens;
+
+        console.log('[MemoryApp] Token breakdown:', breakdown, 'Total:', total);
+        return { total, breakdown };
+    },
+
+    /**
+     * 更新token显示
+     */
+    updateTokenCount: function() {
+        const result = this.calculateTotalTokens();
+        const countEl = document.getElementById('total-token-count');
+        if (countEl) {
+            // 简化显示：1000以下显示完整数字，1000以上显示k
+            let displayText;
+            if (result.total < 1000) {
+                displayText = result.total.toString();
+            } else if (result.total < 10000) {
+                displayText = (result.total / 1000).toFixed(1) + 'k';
+            } else {
+                displayText = Math.floor(result.total / 1000) + 'k';
+            }
+            countEl.textContent = displayText;
+        }
+    },
+
+    /**
+     * 显示token详情
+     */
+    showTokenDetails: function() {
+        const result = this.calculateTotalTokens();
+        const modal = document.getElementById('token-details-modal');
+        const content = document.getElementById('token-details-content');
+        
+        if (!modal || !content) {
+            console.error('[MemoryApp] Token details modal elements not found');
+            return;
+        }
+
+        const labels = {
+            charSetting: '角色设定',
+            systemSetting: '系统设定',
+            context: '上下文（聊天记录）',
+            memories: '记忆',
+            userPersona: '用户人设',
+            worldBook: '关联世界书',
+            emoji: '关联表情包'
+        };
+
+        let html = '<div class="bg-gradient-to-r from-purple-100 to-blue-100 rounded-xl p-4 mb-4">';
+        html += '<div class="text-center">';
+        html += '<div class="text-3xl font-bold text-purple-600">' + result.total.toLocaleString() + '</div>';
+        html += '<div class="text-sm text-gray-600 mt-1">总Token数</div>';
+        html += '</div></div>';
+
+        html += '<div class="space-y-2">';
+        Object.keys(result.breakdown).forEach(key => {
+            const value = result.breakdown[key];
+            const percentage = result.total > 0 ? ((value / result.total) * 100).toFixed(1) : 0;
+            html += '<div class="bg-gray-50 rounded-lg p-3">';
+            html += '<div class="flex justify-between items-center mb-1">';
+            html += '<span class="text-sm font-medium text-gray-700">' + labels[key] + '</span>';
+            html += '<span class="text-sm font-bold text-gray-900">' + value.toLocaleString() + '</span>';
+            html += '</div>';
+            html += '<div class="w-full bg-gray-200 rounded-full h-2">';
+            html += '<div class="bg-purple-500 h-2 rounded-full" style="width: ' + percentage + '%"></div>';
+            html += '</div>';
+            html += '<div class="text-xs text-gray-500 mt-1">' + percentage + '%</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+
+        content.innerHTML = html;
+        modal.classList.remove('hidden');
+    },
+
+    /**
+     * 关闭token详情
+     */
+    closeTokenDetails: function() {
+        document.getElementById('token-details-modal').classList.add('hidden');
+    },
+
+    // ==================== 精简记忆功能 ====================
+    
+    /**
+     * 打开精简记忆模态框
+     */
+    openSimplifyModal: function() {
+        const memories = API.Memory.getMemories(this.currentCharId);
+        if (memories.length === 0) {
+            alert('暂无记忆可精简');
+            return;
+        }
+
+        const modal = document.getElementById('simplify-memory-modal');
+        document.getElementById('simplify-from').value = 1;
+        document.getElementById('simplify-to').value = memories.length;
+        document.getElementById('simplify-to').max = memories.length;
+        document.getElementById('simplify-from').max = memories.length;
+        document.getElementById('simplify-count').value = 1;
+        document.getElementById('simplify-count').max = memories.length;
+        
+        modal.classList.remove('hidden');
+    },
+
+    /**
+     * 取消精简
+     */
+    cancelSimplify: function() {
+        document.getElementById('simplify-memory-modal').classList.add('hidden');
+    },
+
+    /**
+     * 开始精简记忆
+     */
+    startSimplify: async function() {
+        const from = parseInt(document.getElementById('simplify-from').value);
+        const to = parseInt(document.getElementById('simplify-to').value);
+        const count = parseInt(document.getElementById('simplify-count').value);
+        const prompt = document.getElementById('simplify-prompt').value.trim();
+
+        if (!prompt) {
+            alert('请输入精简提示词');
+            return;
+        }
+
+        if (from < 1 || to < 1 || from > to) {
+            alert('请输入有效的记忆范围');
+            return;
+        }
+
+        if (count < 1) {
+            alert('请输入有效的精简数量');
+            return;
+        }
+
+        const memories = API.Memory.getMemories(this.currentCharId);
+        if (to > memories.length) {
+            alert('记忆范围超出实际记忆数量');
+            return;
+        }
+
+        // 获取要精简的记忆（注意：数组索引从0开始）
+        const selectedMemories = memories.slice(from - 1, to);
+        
+        if (selectedMemories.length === 0) {
+            alert('没有选中任何记忆');
+            return;
+        }
+
+        // 显示加载状态
+        const modal = document.getElementById('simplify-memory-modal');
+        const startBtn = modal.querySelector('button[onclick="MemoryApp.startSimplify()"]');
+        if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.textContent = '正在精简...';
+            startBtn.classList.add('opacity-60');
+        }
+
+        try {
+            // 调用API精简记忆
+            const simplified = await this.simplifyMemories(selectedMemories, count, prompt);
+            
+            // 删除原来的记忆（从后往前删除，避免索引变化）
+            for (let i = to - 1; i >= from - 1; i--) {
+                memories.splice(i, 1);
+            }
+            
+            // 在原位置插入精简后的记忆
+            simplified.forEach((content, idx) => {
+                memories.splice(from - 1 + idx, 0, {
+                    id: 'mem_' + Date.now() + '_' + idx,
+                    content: content,
+                    timestamp: Date.now(),
+                    type: 'simplified'
+                });
+            });
+            
+            // 保存更新后的记忆
+            API.Memory.saveMemories(this.currentCharId, memories);
+            
+            // 刷新显示
+            this.renderMemories();
+            
+            // 关闭模态框
+            modal.classList.add('hidden');
+            
+            alert('精简完成！已将第' + from + '-' + to + '条记忆精简为' + count + '条');
+        } catch (e) {
+            alert('精简失败: ' + e.message);
+        } finally {
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = '开始精简';
+                startBtn.classList.remove('opacity-60');
+            }
+        }
+    },
+
+    /**
+     * 调用API精简记忆
+     */
+    simplifyMemories: async function(memories, targetCount, prompt) {
+        const config = API.Settings.getApiConfig();
+        if (!config.endpoint || !config.key) {
+            throw new Error('请先在设置中配置 API');
+        }
+
+        // 构建要精简的记忆文本
+        const memoryText = memories.map((m, idx) =>
+            '记忆' + (idx + 1) + ': ' + m.content
+        ).join('\n\n');
+
+        // 构建系统提示词
+        let systemContent = prompt;
+        systemContent += '\n\n请将以下' + memories.length + '条记忆精简为' + targetCount + '条记忆。';
+        systemContent += '\n要求：';
+        systemContent += '\n1. 保留最重要的信息';
+        systemContent += '\n2. 每条记忆独立完整';
+        systemContent += '\n3. 按原有顺序组织';
+        systemContent += '\n4. 直接输出精简后的记忆，每条记忆用换行符分隔';
+        systemContent += '\n5. 不要添加序号、标题或其他格式';
+
+        const response = await fetch(config.endpoint + '/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + config.key
+            },
+            body: JSON.stringify({
+                model: config.model || 'gpt-3.5-turbo',
+                messages: [
+                    { role: 'system', content: systemContent },
+                    { role: 'user', content: memoryText }
+                ],
+                temperature: 0.3
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('API请求失败');
+        }
+
+        const data = await response.json();
+        const result = data.choices[0].message.content;
+        
+        // 解析结果，按换行符分割
+        const simplified = result.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .slice(0, targetCount); // 确保不超过目标数量
+
+        if (simplified.length === 0) {
+            throw new Error('精简结果为空');
+        }
+
+        return simplified;
     }
 };
 

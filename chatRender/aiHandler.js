@@ -219,8 +219,10 @@ const AIHandler = {
                     const currentHistory = API.Chat.getHistory(ChatInterface.currentCharId);
                     const msgIndex = currentHistory.findIndex(m => m.id === msgId);
                     if (msgIndex !== -1) {
+                        // 保存撤回的消息内容，让AI知道自己撤回了什么
                         currentHistory[msgIndex].recalled = true;
                         currentHistory[msgIndex].recalledAt = Date.now();
+                        currentHistory[msgIndex].recalledContent = text; // 保存撤回的内容
                         API.Chat.saveHistory(ChatInterface.currentCharId, currentHistory);
                         ChatInterface.renderMessages();
                         ChatManager.renderList();

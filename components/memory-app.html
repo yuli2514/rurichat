@@ -18,17 +18,30 @@
     <!-- Memory Timeline (After selecting character) -->
     <div id="memory-timeline" class="hidden flex-1 flex flex-col overflow-hidden">
         <!-- Character Header with Avatar (Only Header) -->
-        <div class="h-24 bg-white px-6 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
+        <div class="h-20 bg-white px-4 pt-8 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
             <button onclick="MemoryApp.backToCharSelect()" class="text-gray-600 w-8 h-8 flex items-center justify-center"><i class="fa-solid fa-chevron-left text-base"></i></button>
-            <div class="flex items-center gap-3 flex-1 ml-3">
-                <img id="memory-current-avatar" src="" class="w-10 h-10 rounded-full object-cover">
+            <div class="flex items-center gap-2 flex-1 ml-2">
+                <img id="memory-current-avatar" src="" class="w-9 h-9 rounded-full object-cover">
                 <div>
                     <h3 id="memory-current-name" class="font-bold text-gray-800 text-sm"></h3>
-                    <p class="text-xs text-gray-400">记忆总数: <span id="memory-count">0</span></p>
+                    <p class="text-xs text-gray-400">记忆: <span id="memory-count">0</span></p>
                 </div>
             </div>
-            <button id="add-memory-btn" onclick="MemoryApp.addManualMemory()" class="text-gray-400 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition"><i class="fa-solid fa-plus text-base"></i></button>
-            <button id="trigger-summary-btn" onclick="MemoryApp.triggerSummary()" class="bg-blue-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition ml-3">立即总结</button>
+            <div class="flex items-center gap-1">
+                <button id="token-count-btn" onclick="MemoryApp.showTokenDetails()" class="relative text-purple-600 hover:bg-purple-50 w-8 h-8 rounded-lg flex items-center justify-center active:scale-95 transition" title="Token统计">
+                    <i class="fa-solid fa-coins text-sm"></i>
+                    <span id="total-token-count" class="absolute -top-1 -right-1 bg-purple-600 text-white text-[8px] px-1 rounded-full min-w-[16px] text-center">0</span>
+                </button>
+                <button id="add-memory-btn" onclick="MemoryApp.addManualMemory()" class="text-gray-500 hover:bg-gray-100 w-8 h-8 rounded-lg flex items-center justify-center active:scale-95 transition" title="添加记忆">
+                    <i class="fa-solid fa-plus text-sm"></i>
+                </button>
+                <button id="simplify-memory-btn" onclick="MemoryApp.openSimplifyModal()" class="text-orange-600 hover:bg-orange-50 w-8 h-8 rounded-lg flex items-center justify-center active:scale-95 transition" title="精简记忆">
+                    <i class="fa-solid fa-compress text-sm"></i>
+                </button>
+                <button id="trigger-summary-btn" onclick="MemoryApp.triggerSummary()" class="text-blue-600 hover:bg-blue-50 w-8 h-8 rounded-lg flex items-center justify-center active:scale-95 transition" title="立即总结">
+                    <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Tab Selector -->
@@ -56,6 +69,52 @@
             <div class="flex gap-2 mt-4">
                 <button onclick="MemoryApp.cancelEditMemory()" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium">取消</button>
                 <button onclick="MemoryApp.confirmEditMemory()" class="flex-1 py-2 bg-blue-500 text-white rounded-xl font-medium">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Token详情模态框 -->
+    <div id="token-details-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div class="bg-white rounded-2xl p-5 w-[90%] max-w-[500px] max-h-[80vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Token统计详情</h3>
+                <button onclick="MemoryApp.closeTokenDetails()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-3" id="token-details-content">
+                <!-- Token details will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 精简记忆模态框 -->
+    <div id="simplify-memory-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div class="bg-white rounded-2xl p-5 w-[90%] max-w-[500px] shadow-2xl">
+            <h3 class="text-lg font-bold mb-4 text-center">精简记忆</h3>
+            
+            <div class="mb-4">
+                <label class="text-sm text-gray-600 mb-2 block">选择记忆范围</label>
+                <div class="flex gap-2 items-center">
+                    <span class="text-sm">从第</span>
+                    <input type="number" id="simplify-from" min="1" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" value="1">
+                    <span class="text-sm">条到第</span>
+                    <input type="number" id="simplify-to" min="1" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" value="1">
+                    <span class="text-sm">条</span>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="text-sm text-gray-600 mb-2 block">精简为几条记忆</label>
+                <input type="number" id="simplify-count" min="1" class="w-full px-3 py-2 border border-gray-300 rounded" value="1">
+            </div>
+
+            <div class="mb-4">
+                <label class="text-sm text-gray-600 mb-2 block">精简提示词</label>
+                <textarea id="simplify-prompt" class="w-full h-24 p-3 border border-gray-300 rounded resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm" placeholder="输入精简提示词...">精简记忆，第三人称客观记录事件，每条记忆字数不多于100</textarea>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="MemoryApp.cancelSimplify()" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium">取消</button>
+                <button onclick="MemoryApp.startSimplify()" class="flex-1 py-2 bg-orange-500 text-white rounded-xl font-medium">开始精简</button>
             </div>
         </div>
     </div>

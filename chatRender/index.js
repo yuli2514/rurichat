@@ -84,7 +84,7 @@ const ChatInterface = {
     open: function(charId) {
         try {
             this.currentCharId = charId;
-            this.loadedMessageCount = 30; // 初始只加载30条，减少首屏渲染量
+            this.loadedMessageCount = 50; // 初始加载50条，平衡性能和体验
 
             const char = API.Chat.getChar(charId);
             if (!char) {
@@ -187,11 +187,16 @@ const ChatInterface = {
     loadMoreMessages: function() {
         const container = document.getElementById('chat-messages');
         const scrollHeightBefore = container.scrollHeight;
+        const scrollTopBefore = container.scrollTop;
         this.loadedMessageCount += this.messageLoadStep;
-        this.renderMessagesKeepPosition(scrollHeightBefore);
+        
+        // 使用 requestAnimationFrame 优化渲染性能
+        requestAnimationFrame(() => {
+            this.renderMessagesKeepPosition(scrollHeightBefore, scrollTopBefore);
+        });
     },
 
-    renderMessagesKeepPosition: function(scrollHeightBefore) {
+    renderMessagesKeepPosition: function(scrollHeightBefore, scrollTopBefore) {
         const container = document.getElementById('chat-messages');
         const history = API.Chat.getHistory(this.currentCharId);
         const char = API.Chat.getChar(this.currentCharId);
@@ -199,13 +204,15 @@ const ChatInterface = {
         if (this._renderRAF) cancelAnimationFrame(this._renderRAF);
         if (this._batchTimer) { clearTimeout(this._batchTimer); this._batchTimer = null; }
         
+        // 使用 DocumentFragment 减少 DOM 操作
         this._renderRAF = requestAnimationFrame(() => {
             const html = this._buildMessagesHtml(history, char);
             container.innerHTML = html;
             
-            // 保持滚动位置
+            // 保持滚动位置（更精确的计算）
             const scrollHeightAfter = container.scrollHeight;
-            container.scrollTop = scrollHeightAfter - scrollHeightBefore;
+            const scrollDiff = scrollHeightAfter - scrollHeightBefore;
+            container.scrollTop = scrollTopBefore + scrollDiff;
         });
     },
 
@@ -224,7 +231,7 @@ const ChatInterface = {
     },
 
     /**
-     * 分批渲染消息，避免长时间阻塞主线程
+     * 分批渲染消息，避免长时间阻塞主线程（优化版）
      */
     _renderMessagesBatched: function(container, history, char) {
         const maxMessages = this.loadedMessageCount;
@@ -243,7 +250,9 @@ const ChatInterface = {
             container.insertAdjacentHTML('beforeend', MessageBuilder.buildLoadMoreButton(startIndex));
         }
 
-        const BATCH_SIZE = 15; // 每批渲染15条
+        // 根据消息数量动态调整批次大小
+        const totalMessages = renderedHistory.length;
+        const BATCH_SIZE = totalMessages > 200 ? 30 : (totalMessages > 100 ? 20 : 15);
         let currentBatch = 0;
         let lastTimestamp = 0;
         const self = this;
@@ -280,8 +289,12 @@ const ChatInterface = {
             currentBatch++;
 
             if (currentBatch * BATCH_SIZE < renderedHistory.length) {
-                // 下一批用 setTimeout 让出主线程
-                self._batchTimer = setTimeout(renderBatch, 0);
+                // 使用 requestIdleCallback 或 setTimeout 让出主线程
+                if (window.requestIdleCallback) {
+                    self._batchTimer = requestIdleCallback(renderBatch, { timeout: 50 });
+                } else {
+                    self._batchTimer = setTimeout(renderBatch, 0);
+                }
             } else {
                 self._batchTimer = null;
                 self.scrollToBottom();
