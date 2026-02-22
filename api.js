@@ -899,9 +899,8 @@ const API = {
             systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账/换头像必须单独一行！';
 
             // --- 身份隔离铁律 ---
-            systemPrompt += '\n\n[CRITICAL: 你必须严格区分 User 和 You 的身份。User 发出的表情和情绪仅属于 User，严禁你（You）在回复中认领这些情绪或复读 User 的表情描述。]';
-            systemPrompt += '\n[记忆准则：历史记录中的 [发件人: User] 标记仅供你理解上下文，严禁在你的回复中输出这些标记。]';
-            systemPrompt += '\n[严禁复读任何带中括号的系统说明文本，如"[用户发送了一个表情包...]"等，这些是系统内部标注，不是对话内容。]';
+            systemPrompt += '\n\n[CRITICAL: 你必须严格区分用户和你自己的身份。用户发出的表情和情绪仅属于用户，严禁你在回复中认领这些情绪或复读用户的表情描述。]';
+            systemPrompt += '\n[严禁复读任何带中括号的系统说明文本，如"[表情: xxx]""[用户发送了...]"等，这些是系统内部标注，不是对话内容。]';
 
             // --- Memory Integration (强化版) ---
             const memories = API.Memory.getMemories(charId);
@@ -1132,20 +1131,6 @@ const API = {
                     }
                 }
                 
-                // --- 身份显式化：在文本内容前添加身份标识 ---
-                const senderTag = msg.sender === 'user' ? '[发件人: User] ' : '[发件人: You] ';
-                if (typeof content === 'string') {
-                    content = senderTag + content;
-                } else if (Array.isArray(content)) {
-                    // 多模态内容（图片/音频），在第一个text元素前添加身份标识
-                    for (let i = 0; i < content.length; i++) {
-                        if (content[i].type === 'text') {
-                            content[i].text = senderTag + content[i].text;
-                            break;
-                        }
-                    }
-                }
-
                 // --- 上下文脱水：清洗残留的长表情包描述 ---
                 if (typeof content === 'string') {
                     content = content.replace(/\[用户发送了一个表情包[^\]]*含义是[：:]\s*「([^」]+)」[^\]]*\]/g, '[表情: $1]');
@@ -1157,17 +1142,17 @@ const API = {
                 };
             });
 
-            // --- 线上模式逻辑隔离：在最后一条用户消息末尾注入格式锁死指令 ---
-            for (let i = recentHistory.length - 1; i >= 0; i--) {
-                if (recentHistory[i].role === 'user' && typeof recentHistory[i].content === 'string') {
-                    recentHistory[i].content += '\n[当前为手机网聊模式。强制要求：1. 仅限三句以内口语回复；2. 严禁任何形式的动作描写、心理旁白或环境渲染；3. 严禁复述或提及任何带中括号的系统说明]';
-                    break;
-                }
-            }
-
+            // 构建 messages 数组：system prompt + 历史记录 + 末尾格式锁死提醒
             const messages = [
                 { role: 'system', content: systemPrompt }
             ].concat(recentHistory);
+
+            // --- 线上模式逻辑隔离：在 messages 末尾追加独立 system 消息 ---
+            // 不污染用户消息内容，避免破坏 AI 分条发送的格式
+            messages.push({
+                role: 'system',
+                content: '⚠️ 回复格式提醒：你正在线上聊天，每条1-2句话，用换行分隔多条。禁止动作描写(*旁白*)、心理描写、环境渲染。禁止复述任何中括号系统标注。'
+            });
 
             const response = await fetch(config.endpoint + '/chat/completions', {
                 method: 'POST',
@@ -1183,9 +1168,26 @@ const API = {
                 })
             });
 
-            if (!response.ok) throw new Error('API Request Failed');
+            if (!response.ok) {
+                let errDetail = 'HTTP ' + response.status;
+                try {
+                    const errData = await response.json();
+                    if (errData.error) {
+                        errDetail += ' | ' + (errData.error.message || errData.error.type || JSON.stringify(errData.error));
+                        if (errData.error.code) errDetail += ' (' + errData.error.code + ')';
+                    }
+                } catch (_) {
+                    try { errDetail += ' | ' + await response.text(); } catch (_2) {}
+                }
+                const err = new Error(errDetail);
+                err.httpStatus = response.status;
+                throw err;
+            }
             
             const data = await response.json();
+            if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+                throw new Error('AI返回内容为空');
+            }
             const reply = data.choices[0].message.content;
             
             // Return bubbles array

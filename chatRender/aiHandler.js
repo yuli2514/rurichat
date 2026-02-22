@@ -48,12 +48,12 @@ const AIHandler = {
                 text = text.replace(/\[用户发送了一个表情包[^\]]*\]/g, '').trim();
                 // 清除发件人标记复读（如 [发件人: User] [发件人: You]）
                 text = text.replace(/\[发件人:\s*(?:User|You)\]\s*/g, '').trim();
-                // 清除旁白符号段落（*动作描写* 或 *心理旁白*）
-                text = text.replace(/\*[^*]+\*/g, '').trim();
+                // 清除整行旁白（整条消息就是 *旁白内容*，前后无其他文字）
+                if (/^\*[^*]+\*$/.test(text.trim())) { text = ''; }
                 // 清除系统说明复读（如 [表情: xxx] 被AI原样输出时）
                 text = text.replace(/\[表情:\s*[^\]]+\]/g, '').trim();
                 // 清除线上模式锁死指令复读
-                text = text.replace(/\[当前为手机网聊模式[^\]]*\]/g, '').trim();
+                text = text.replace(/\[手机网聊模式[^\]]*\]/g, '').trim();
 
                 // 检查撤回命令 [RECALL]
                 const isRecall = text.includes('[RECALL]');
@@ -276,7 +276,50 @@ const AIHandler = {
             API.Chat.checkAutoSummary(ChatInterface.currentCharId);
 
         } catch (e) {
-            alert('AI 请求失败: ' + e.message);
+            console.error('[AIHandler] AI请求失败:', e);
+            
+            // 构建详细错误提示
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+            
+            let errorType = '未知错误';
+            let errorDetail = e.message || '无详细信息';
+            const status = e.httpStatus || 0;
+            
+            if (status === 401 || status === 403) {
+                errorType = 'API密钥无效或已过期';
+            } else if (status === 402 || errorDetail.includes('insufficient_quota') || errorDetail.includes('quota') || errorDetail.includes('balance')) {
+                errorType = 'API额度不足';
+            } else if (status === 429) {
+                errorType = '请求频率超限';
+            } else if (status === 404) {
+                errorType = 'API地址或模型不存在';
+            } else if (status === 500 || status === 502 || status === 503) {
+                errorType = 'API服务器错误';
+            } else if (errorDetail.includes('Failed to fetch') || errorDetail.includes('NetworkError') || errorDetail.includes('network')) {
+                errorType = '网络连接失败';
+            } else if (errorDetail.includes('AI返回内容为空')) {
+                errorType = 'AI返回空回复';
+            } else if (errorDetail.includes('请先在设置中配置')) {
+                errorType = 'API未配置';
+            }
+            
+            const errorContent = `⚠️ [${timeStr}] 请求失败\n类型：${errorType}\n详情：${errorDetail}`;
+            
+            // 在聊天界面中显示错误消息气泡
+            const errorMsg = {
+                sender: 'ai',
+                content: errorContent,
+                type: 'text',
+                timestamp: Date.now(),
+                isError: true
+            };
+            const updatedHistory = API.Chat.addMessage(ChatInterface.currentCharId, errorMsg);
+            ChatInterface.appendSingleMessage(errorMsg, updatedHistory.length - 1);
+            
+            if (typeof ChatManager !== 'undefined' && ChatManager.renderList) {
+                ChatManager.renderList();
+            }
         } finally {
             btn.classList.remove('animate-pulse');
             headerName.textContent = originalName;

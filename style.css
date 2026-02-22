@@ -336,6 +336,13 @@
             background-color: #ffffff;
             color: #000000;
         }
+        .bubble-error {
+            background-color: #FEF2F2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+            font-size: 12px;
+            line-height: 1.5;
+        }
 
         /* Sent Emoji / Image Style - 表情包保持小尺寸 */
         .sent-emoji {

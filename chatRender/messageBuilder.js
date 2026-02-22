@@ -159,7 +159,7 @@ const MessageBuilder = {
         const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, quoteHtml, showAvatarTimestamp, showBubbleTimestamp } = params;
         
         const contentHtml = msg.content.replace(/\n/g, '<br>');
-        const bubbleClass = isMe ? 'bubble bubble-user' : 'bubble bubble-ai';
+        const bubbleClass = msg.isError ? 'bubble bubble-error' : (isMe ? 'bubble bubble-user' : 'bubble bubble-ai');
         const avatarTimestampHtml = showAvatarTimestamp ? this.buildAvatarTimestamp(msg.timestamp) : '';
         const bubbleTimestampHtml = showBubbleTimestamp ? this.buildBubbleTimestamp(msg.timestamp) : '';
         
