@@ -354,13 +354,12 @@ const MemoryApp = {
         const char = API.Chat.getChar(this.currentCharId);
         if (!char) return;
 
-        // 获取按钮并显示"正在总结..."状态
+        // 获取按钮图标并添加闪烁动画
         const btn = document.getElementById('trigger-summary-btn');
+        const icon = btn ? btn.querySelector('i') : null;
         if (btn) {
             btn.disabled = true;
-            btn._originalText = btn.textContent;
-            btn.textContent = '正在总结...';
-            btn.classList.add('opacity-60');
+            if (icon) icon.classList.add('summary-icon-pulse');
         }
 
         const settings = char.settings || {};
@@ -394,19 +393,14 @@ const MemoryApp = {
             
             this.renderMemories();
             if (btn) {
-                btn.textContent = '总结完成 ✓';
-                setTimeout(function() {
-                    btn.textContent = btn._originalText || '立即总结';
-                    btn.disabled = false;
-                    btn.classList.remove('opacity-60');
-                }, 1500);
+                if (icon) icon.classList.remove('summary-icon-pulse');
+                btn.disabled = false;
             }
         } catch (e) {
             alert('总结失败: ' + e.message);
             if (btn) {
-                btn.textContent = btn._originalText || '立即总结';
+                if (icon) icon.classList.remove('summary-icon-pulse');
                 btn.disabled = false;
-                btn.classList.remove('opacity-60');
             }
         }
     },

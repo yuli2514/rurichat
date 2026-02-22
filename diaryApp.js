@@ -220,12 +220,44 @@ const DiaryApp = {
                 systemPrompt += '\n\n【用户信息（日记中的"你"或对方）】';
                 systemPrompt += '\n' + userPersona;
             }
+
+            // 获取上下文（最近聊天记录）
+            const ctxLength = charSettings.contextLength || 20;
+            const history = API.Chat.getHistory(this.currentCharId);
+            if (history && history.length > 0) {
+                const recentHistory = history.slice(-ctxLength);
+                const charName = character.name;
+                const contextLines = recentHistory.map(msg => {
+                    const sender = msg.sender === 'user' ? '用户' : charName;
+                    let content = msg.content || '';
+                    if (msg.type === 'image') content = '[发送了一张图片]';
+                    else if (msg.type === 'emoji') content = '[发送了表情包]';
+                    else if (msg.type === 'transfer') content = '[转账]';
+                    else if (msg.type === 'voice') content = (msg.voiceData && msg.voiceData.transcription) || '[语音消息]';
+                    return sender + ': ' + content;
+                }).join('\n');
+                systemPrompt += '\n\n【近期上下文对话】';
+                systemPrompt += '\n' + contextLines;
+            }
             
             if (memories.length > 0) {
                 systemPrompt += '\n\n【角色记忆】';
                 memories.forEach((m, i) => {
                     systemPrompt += '\n' + (i + 1) + '. ' + m.content;
                 });
+            }
+
+            // 获取绑定的世界书
+            const worldBookIds = charSettings.worldBookIds || (charSettings.worldBookId ? [charSettings.worldBookId] : []);
+            if (worldBookIds.length > 0) {
+                const books = API.WorldBook.getBooks();
+                const selectedBooks = books.filter(b => worldBookIds.includes(b.id));
+                if (selectedBooks.length > 0) {
+                    systemPrompt += '\n\n【世界背景设定】';
+                    selectedBooks.forEach(wb => {
+                        systemPrompt += '\n[' + wb.title + ']: ' + wb.content;
+                    });
+                }
             }
 
             // 构建用户提示词
@@ -740,18 +772,55 @@ const DiaryApp = {
         const diaryText = document.getElementById('diary-text');
         
         if (settings.fontUrl) {
-            // 加载自定义字体
-            const style = document.createElement('style');
-            style.textContent = `
-                @font-face {
-                    font-family: 'CustomDiaryFont';
-                    src: url('${settings.fontUrl}');
+            const fontUrl = settings.fontUrl.trim();
+            
+            // 移除之前的自定义字体样式
+            const oldStyle = document.getElementById('diary-custom-font-style');
+            if (oldStyle) oldStyle.remove();
+            
+            // 判断字体类型
+            const lowerUrl = fontUrl.toLowerCase();
+            const isCssFile = lowerUrl.endsWith('.css');
+            
+            if (isCssFile) {
+                // CSS文件：通过link标签加载
+                const link = document.createElement('link');
+                link.id = 'diary-custom-font-style';
+                link.rel = 'stylesheet';
+                link.href = fontUrl;
+                document.head.appendChild(link);
+                // CSS文件中通常定义了font-family，需要用户在URL中指定字体名
+                // 尝试从URL中提取字体名，或使用通用名
+                diaryText.style.setProperty('font-family', 'CustomDiaryFont, serif', 'important');
+            } else {
+                // ttf/woff2/其他字体文件：通过@font-face加载
+                let format = '';
+                if (lowerUrl.endsWith('.ttf') || lowerUrl.endsWith('.ttc')) {
+                    format = "format('truetype')";
+                } else if (lowerUrl.endsWith('.woff2')) {
+                    format = "format('woff2')";
+                } else if (lowerUrl.endsWith('.woff')) {
+                    format = "format('woff')";
+                } else if (lowerUrl.endsWith('.otf')) {
+                    format = "format('opentype')";
                 }
-            `;
-            document.head.appendChild(style);
-            diaryText.style.fontFamily = 'CustomDiaryFont';
+                
+                const style = document.createElement('style');
+                style.id = 'diary-custom-font-style';
+                style.textContent = `
+                    @font-face {
+                        font-family: 'CustomDiaryFont';
+                        src: url('${fontUrl}') ${format};
+                        font-display: swap;
+                    }
+                `;
+                document.head.appendChild(style);
+                diaryText.style.setProperty('font-family', "'CustomDiaryFont', serif", 'important');
+            }
         } else if (settings.fontPreset) {
-            diaryText.style.fontFamily = settings.fontPreset;
+            diaryText.style.setProperty('font-family', settings.fontPreset, 'important');
+        } else {
+            diaryText.style.removeProperty('font-family');
         }
         
         if (settings.fontSize) {

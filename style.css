@@ -446,6 +446,15 @@
             50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
         }
 
+        /* 总结按钮图标闪烁动画 */
+        .summary-icon-pulse {
+            animation: summary-pulse 0.8s ease-in-out infinite;
+        }
+        @keyframes summary-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
         /* Vinyl Record Style */
         .vinyl-record {
             border-radius: 50%;
