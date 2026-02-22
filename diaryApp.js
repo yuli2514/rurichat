@@ -210,8 +210,11 @@ const DiaryApp = {
             const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
             const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日 ${weekDays[today.getDay()]}`;
             
-            // 构建系统提示词（专门用于日记生成，不含聊天模式限制）
-            let systemPrompt = '你是一个日记写作助手。你需要以指定角色的第一人称视角写一篇日记。';
+            // 构建系统提示词（专门用于日记生成，完全独立于聊天系统）
+            let systemPrompt = '【重要】这是一个独立的日记写作任务，不是线上聊天，不是对话。你需要写一篇完整的、有深度的长篇日记。';
+            systemPrompt += '\n你的任务是以指定角色的第一人称视角，写一篇字数不少于' + wordCount + '字的日记。';
+            systemPrompt += '\n日记应该包含丰富的情感描写、生活细节、内心独白和场景描述，像一篇真正的文学日记。';
+            systemPrompt += '\n⚠️ 禁止写成聊天消息格式，禁止简短回复，必须写成完整的日记文章。';
             systemPrompt += '\n\n【角色信息】';
             systemPrompt += '\n角色名称：' + character.name;
             systemPrompt += '\n角色设定：' + (character.prompt || '无特殊设定');
@@ -261,12 +264,13 @@ const DiaryApp = {
             }
 
             // 构建用户提示词
-            let userPrompt = `请以第一人称写一篇日记。\n\n`;
-            userPrompt += `【要求】\n`;
+            let userPrompt = `请以"${character.name}"的第一人称视角写一篇完整的日记。\n\n`;
+            userPrompt += `【核心要求】\n`;
             userPrompt += `1. 第一行写上日期：${dateStr}\n`;
-            userPrompt += `2. 以"${character.name}"的口吻和风格来写，要符合角色性格\n`;
-            userPrompt += `3. 字数约${wordCount}字\n`;
-            userPrompt += `4. 内容要真实自然，像真正的日记，有情感和细节\n`;
+            userPrompt += `2. 以"${character.name}"的口吻和风格来写，要完全符合角色性格\n`;
+            userPrompt += `3. 字数必须达到${wordCount}字左右，不能少于${Math.floor(wordCount * 0.8)}字\n`;
+            userPrompt += `4. 这是一篇日记文章，不是聊天消息！要有丰富的情感描写、生活细节、内心独白\n`;
+            userPrompt += `5. 适当分段，增强可读性，像一篇真正的文学日记\n`;
             
             if (todayMemories) {
                 userPrompt += `\n【今天发生的事情（参考素材）】\n${todayMemories}\n`;
@@ -276,7 +280,7 @@ const DiaryApp = {
                 userPrompt += `\n【文风要求】\n${customStyle}\n`;
             }
             
-            userPrompt += `\n请直接开始写日记，不要加任何前缀说明。`;
+            userPrompt += `\n请直接开始写日记正文，不要加任何前缀说明、标题或额外解释。`;
 
             console.log('[DiaryApp] 系统提示词:', systemPrompt);
             console.log('[DiaryApp] 用户提示词:', userPrompt);
@@ -295,7 +299,7 @@ const DiaryApp = {
                         { role: 'user', content: userPrompt }
                     ],
                     temperature: 0.8,
-                    max_tokens: Math.max(wordCount * 3, 1500)
+                    max_tokens: Math.max(wordCount * 4, 2500)
                 })
             });
 
