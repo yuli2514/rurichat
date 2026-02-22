@@ -247,11 +247,12 @@ const MemoryApp = {
         document.getElementById('memory-current-avatar').src = char.avatar;
         document.getElementById('memory-current-name').textContent = char.remark;
         
-        // 默认激活普通记忆 Tab
-        this.switchTab('memories');
+        // 直接渲染记忆（不再需要Tab切换）
+        this.renderMemories();
         
-        // 更新token统计
+        // 更新token统计和轮数显示
         this.updateTokenCount();
+        this.updateRoundCount();
     },
 
     backToCharSelect: function() {
@@ -283,8 +284,9 @@ const MemoryApp = {
             '</div>'
         ).join('');
         
-        // 更新token统计
+        // 更新token统计和轮数显示
         this.updateTokenCount();
+        this.updateRoundCount();
     },
 
     // ==================== 编辑记忆功能 ====================
@@ -361,12 +363,35 @@ const MemoryApp = {
             btn.classList.add('opacity-60');
         }
 
-        const history = API.Chat.getHistory(this.currentCharId);
-        const summaryPrompt = char.settings && char.settings.summaryPrompt ? char.settings.summaryPrompt : null;
+        const settings = char.settings || {};
+        const summaryPrompt = settings.summaryPrompt || null;
+        const summaryFreq = settings.summaryFreq || 20;
 
         try {
-            const summary = await API.Memory.generateSummary(this.currentCharId, char.name, history, summaryPrompt);
+            // 合并线上线下历史进行总结
+            const onlineHistory = API.Chat.getHistory(this.currentCharId);
+            const offlineHistory = API.Offline.getHistory(this.currentCharId);
+            const mergedHistory = [];
+            
+            onlineHistory.forEach(msg => {
+                if (!msg.recalled) {
+                    mergedHistory.push({ ...msg, _source: 'online' });
+                }
+            });
+            offlineHistory.forEach(msg => {
+                mergedHistory.push({ ...msg, _source: 'offline' });
+            });
+            
+            // 按时间戳排序
+            mergedHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            
+            const summary = await API.Memory.generateSummary(this.currentCharId, char.name, mergedHistory, summaryPrompt, summaryFreq);
             API.Memory.addMemory(this.currentCharId, summary, 'manual');
+            
+            // 手动总结后强制重置计数器
+            API.Chat._resetRoundCounter(this.currentCharId);
+            console.log('[MemoryApp] 手动总结完成，计数器已重置');
+            
             this.renderMemories();
             if (btn) {
                 btn.textContent = '总结完成 ✓';
@@ -393,92 +418,6 @@ const MemoryApp = {
             API.Memory.addMemory(this.currentCharId, content.trim(), 'manual');
             this.renderMemories();
         }
-    },
-
-    /**
-     * 切换 Tab（普通记忆 / 线下总结）
-     */
-    switchTab: function(tab) {
-        const tabMemories = document.getElementById('tab-memories');
-        const tabOffline = document.getElementById('tab-offline-summaries');
-        const containerMemories = document.getElementById('memory-cards-container');
-        const containerOffline = document.getElementById('offline-summaries-container');
-
-        if (!tabMemories || !tabOffline || !containerMemories || !containerOffline) return;
-
-        if (tab === 'memories') {
-            tabMemories.classList.add('border-blue-500', 'text-blue-600');
-            tabMemories.classList.remove('border-transparent', 'text-gray-600');
-            tabOffline.classList.remove('border-blue-500', 'text-blue-600');
-            tabOffline.classList.add('border-transparent', 'text-gray-600');
-            containerMemories.classList.remove('hidden');
-            containerOffline.classList.add('hidden');
-            this.renderMemories();
-        } else if (tab === 'offline-summaries') {
-            tabOffline.classList.add('border-blue-500', 'text-blue-600');
-            tabOffline.classList.remove('border-transparent', 'text-gray-600');
-            tabMemories.classList.remove('border-blue-500', 'text-blue-600');
-            tabMemories.classList.add('border-transparent', 'text-gray-600');
-            containerOffline.classList.remove('hidden');
-            containerMemories.classList.add('hidden');
-            this.renderOfflineSummaries();
-        }
-    },
-
-    /**
-     * 渲染线下总结列表
-     */
-    renderOfflineSummaries: function() {
-        const container = document.getElementById('offline-summaries-container');
-        if (!container || !this.currentCharId) return;
-
-        const summaries = API.Offline.getOfflineSummaries(this.currentCharId);
-
-        if (summaries.length === 0) {
-            container.innerHTML = '<div class="text-center text-gray-400 py-12">' +
-                '<i class="fa-solid fa-book-open text-4xl mb-2 opacity-50"></i>' +
-                '<p class="text-sm">暂无线下总结</p>' +
-                '<p class="text-xs mt-1">在线下模式中聊天后会自动生成总结</p>' +
-                '</div>';
-            return;
-        }
-
-        container.innerHTML = summaries.map((s, idx) =>
-            '<div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">' +
-                '<div class="flex justify-between items-start mb-2">' +
-                    '<span class="text-xs text-gray-400">' + new Date(s.timestamp).toLocaleString() + '</span>' +
-                    '<div class="flex gap-2">' +
-                        '<span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-600">' + (s.type === 'auto' ? '自动' : '手动') + '</span>' +
-                        '<button onclick="MemoryApp.editOfflineSummary(' + idx + ')" class="text-blue-500 text-xs"><i class="fa-solid fa-pen"></i></button>' +
-                        '<button onclick="MemoryApp.deleteOfflineSummary(' + idx + ')" class="text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>' +
-                    '</div>' +
-                '</div>' +
-                '<p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">' + s.content + '</p>' +
-            '</div>'
-        ).join('');
-    },
-
-    /**
-     * 删除线下总结
-     */
-    /**
-     * 编辑线下总结
-     */
-    editOfflineSummary: function(index) {
-        const summaries = API.Offline.getOfflineSummaries(this.currentCharId);
-        const summary = summaries[index];
-        if (!summary) return;
-        const newContent = prompt('编辑线下总结内容:', summary.content);
-        if (newContent !== null && newContent.trim()) {
-            API.Offline.updateOfflineSummary(this.currentCharId, index, newContent.trim());
-            this.renderOfflineSummaries();
-        }
-    },
-
-    deleteOfflineSummary: function(index) {
-        if (!confirm('确定要删除这条线下总结吗？')) return;
-        API.Offline.deleteOfflineSummary(this.currentCharId, index);
-        this.renderOfflineSummaries();
     },
 
     // ==================== Token统计功能 ====================
@@ -860,6 +799,37 @@ const MemoryApp = {
         }
 
         return simplified;
+    },
+    
+    /**
+     * 更新轮数显示
+     */
+    updateRoundCount: function() {
+        if (!this.currentCharId) return;
+        
+        const char = API.Chat.getChar(this.currentCharId);
+        if (!char) return;
+        
+        const settings = char.settings || {};
+        const freq = settings.summaryFreq || 10;
+        
+        // 获取统一的轮数计数
+        const currentCount = API.Chat._getUnifiedRoundCount(this.currentCharId);
+        const lastSummaryRound = API.Chat._getLastSummaryRound(this.currentCharId);
+        const newRounds = currentCount.totalRounds - lastSummaryRound;
+        
+        const roundCountEl = document.getElementById('round-count');
+        if (roundCountEl) {
+            roundCountEl.textContent = newRounds + '/' + freq;
+            roundCountEl.title = '当前新增轮数: ' + newRounds + ' (线上:' + currentCount.onlineRounds + ' 线下:' + currentCount.offlineRounds + ') / 自动总结频率: ' + freq;
+            
+            // 如果接近触发自动总结，改变颜色提示
+            if (newRounds >= freq * 0.8) {
+                roundCountEl.classList.add('text-orange-500', 'font-bold');
+            } else {
+                roundCountEl.classList.remove('text-orange-500', 'font-bold');
+            }
+        }
     }
 };
 

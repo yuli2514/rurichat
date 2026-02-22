@@ -898,6 +898,11 @@ const API = {
             
             systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账/换头像必须单独一行！';
 
+            // --- 身份隔离铁律 ---
+            systemPrompt += '\n\n[CRITICAL: 你必须严格区分 User 和 You 的身份。User 发出的表情和情绪仅属于 User，严禁你（You）在回复中认领这些情绪或复读 User 的表情描述。]';
+            systemPrompt += '\n[记忆准则：历史记录中的 [发件人: User] 标记仅供你理解上下文，严禁在你的回复中输出这些标记。]';
+            systemPrompt += '\n[严禁复读任何带中括号的系统说明文本，如"[用户发送了一个表情包...]"等，这些是系统内部标注，不是对话内容。]';
+
             // --- Memory Integration (强化版) ---
             const memories = API.Memory.getMemories(charId);
             if (memories.length > 0) {
@@ -1051,17 +1056,17 @@ const API = {
                         content = '[' + sender + '发送了一条语音消息，语音转文字失败，请根据上下文推测用户可能在说什么，并自然地回应]';
                     }
                 }
-                // 处理表情包消息（新的emoji类型）
+                // 处理表情包消息（新的emoji类型）- 脱水：缩减为短标记
                 else if (msg.type === 'emoji') {
                     const meaning = msg.emojiMeaning || emojiMap[msg.content] || '未知表情';
-                    content = '[用户发送了一个表情包，表情包的含义是：「' + meaning + '」，请注意这不是图片，是表情包，请根据表情包的含义来理解用户的情绪和意图]';
+                    content = '[表情: ' + meaning + ']';
                 }
                 // 处理图片消息
                 else if (msg.type === 'image') {
                     const imgUrl = msg.content;
                     if (emojiMap[imgUrl]) {
-                        // 匹配到表情包，显示含义
-                        content = '[用户发送了一个表情包，表情包的含义是：「' + emojiMap[imgUrl] + '」，请注意这不是图片，是表情包，请根据表情包的含义来理解用户的情绪和意图]';
+                        // 匹配到表情包 - 脱水：缩减为短标记
+                        content = '[表情: ' + emojiMap[imgUrl] + ']';
                     } else if (msg.isVisionImage && msg.content && msg.content.startsWith('data:image/')) {
                         // 用户发送的真实图片，使用Vision API格式让AI识别
                         content = [
@@ -1127,11 +1132,38 @@ const API = {
                     }
                 }
                 
+                // --- 身份显式化：在文本内容前添加身份标识 ---
+                const senderTag = msg.sender === 'user' ? '[发件人: User] ' : '[发件人: You] ';
+                if (typeof content === 'string') {
+                    content = senderTag + content;
+                } else if (Array.isArray(content)) {
+                    // 多模态内容（图片/音频），在第一个text元素前添加身份标识
+                    for (let i = 0; i < content.length; i++) {
+                        if (content[i].type === 'text') {
+                            content[i].text = senderTag + content[i].text;
+                            break;
+                        }
+                    }
+                }
+
+                // --- 上下文脱水：清洗残留的长表情包描述 ---
+                if (typeof content === 'string') {
+                    content = content.replace(/\[用户发送了一个表情包[^\]]*含义是[：:]\s*「([^」]+)」[^\]]*\]/g, '[表情: $1]');
+                }
+
                 return {
                     role: msg.sender === 'user' ? 'user' : 'assistant',
                     content: content
                 };
             });
+
+            // --- 线上模式逻辑隔离：在最后一条用户消息末尾注入格式锁死指令 ---
+            for (let i = recentHistory.length - 1; i >= 0; i--) {
+                if (recentHistory[i].role === 'user' && typeof recentHistory[i].content === 'string') {
+                    recentHistory[i].content += '\n[当前为手机网聊模式。强制要求：1. 仅限三句以内口语回复；2. 严禁任何形式的动作描写、心理旁白或环境渲染；3. 严禁复述或提及任何带中括号的系统说明]';
+                    break;
+                }
+            }
 
             const messages = [
                 { role: 'system', content: systemPrompt }
@@ -1160,30 +1192,89 @@ const API = {
             return reply.split('\n').filter(t => t.trim());
         },
 
+        /**
+         * 获取统一的轮数计数器（线上+线下合并计算）
+         * 返回：{ totalRounds: 总轮数, onlineRounds: 线上轮数, offlineRounds: 线下轮数 }
+         */
+        _getUnifiedRoundCount: function(charId) {
+            const onlineHistory = this.getHistory(charId);
+            const offlineHistory = API.Offline.getHistory(charId);
+            
+            // 只计算AI回复的轮数（1次AI回复 = 1轮）
+            const onlineRounds = onlineHistory.filter(m => m.sender === 'ai' || m.sender === 'assistant').length;
+            const offlineRounds = offlineHistory.filter(m => m.sender === 'ai').length;
+            const totalRounds = onlineRounds + offlineRounds;
+            
+            return { totalRounds, onlineRounds, offlineRounds };
+        },
+        
+        /**
+         * 获取上次总结时的轮数
+         */
+        _getLastSummaryRound: function(charId) {
+            const key = 'ruri_unified_last_summary_round_' + charId;
+            return parseInt(DataStore.get(key) || '0') || 0;
+        },
+        
+        /**
+         * 设置上次总结时的轮数
+         */
+        _setLastSummaryRound: function(charId, round) {
+            const key = 'ruri_unified_last_summary_round_' + charId;
+            DataStore.set(key, round);
+        },
+        
+        /**
+         * 重置轮数计数器（手动总结或自动总结后调用）
+         */
+        _resetRoundCounter: function(charId) {
+            const currentCount = this._getUnifiedRoundCount(charId);
+            this._setLastSummaryRound(charId, currentCount.totalRounds);
+            console.log('[RoundCounter] 计数器已重置 - 角色:', charId, '当前总轮数:', currentCount.totalRounds);
+        },
+
         checkAutoSummary: async function(charId) {
             const char = this.getChar(charId);
             if (!char) return;
             const settings = char.settings || {};
             
             if (settings.autoSummary) {
-                const history = this.getHistory(charId);
                 const freq = settings.summaryFreq || 10;
                 
-                // 使用记录的上次总结位置来判断，避免因消息数跳过倍数而永远不触发
-                const lastSummaryKey = 'ruri_last_summary_pos_' + charId;
-                const lastSummaryPos = parseInt(DataStore.get(lastSummaryKey) || '0') || 0;
-                const newMessageCount = history.length - lastSummaryPos;
+                // 使用统一的轮数计数器（线上+线下）
+                const currentCount = this._getUnifiedRoundCount(charId);
+                const lastSummaryRound = this._getLastSummaryRound(charId);
+                const newRounds = currentCount.totalRounds - lastSummaryRound;
                 
-                console.log('[AutoSummary] 检查自动总结 - 历史总数:', history.length, '上次总结位置:', lastSummaryPos, '新消息数:', newMessageCount, '频率:', freq);
+                console.log('[AutoSummary] 检查自动总结 - 当前总轮数:', currentCount.totalRounds, '(线上:', currentCount.onlineRounds, '线下:', currentCount.offlineRounds, ') 上次总结轮数:', lastSummaryRound, '新增轮数:', newRounds, '设定频率:', freq);
                 
-                if (history.length > 0 && newMessageCount >= freq) {
+                if (currentCount.totalRounds > 0 && newRounds >= freq) {
                     try {
-                        // 传入freq作为总结的轮数范围，确保根据用户设置的轮数来总结
-                        const summary = await API.Memory.generateSummary(charId, char.name, history, settings.summaryPrompt, freq);
+                        // 合并线上线下历史进行总结
+                        const onlineHistory = this.getHistory(charId);
+                        const offlineHistory = API.Offline.getHistory(charId);
+                        const mergedHistory = [];
+                        
+                        onlineHistory.forEach(msg => {
+                            if (!msg.recalled) {
+                                mergedHistory.push({ ...msg, _source: 'online' });
+                            }
+                        });
+                        offlineHistory.forEach(msg => {
+                            mergedHistory.push({ ...msg, _source: 'offline' });
+                        });
+                        
+                        // 按时间戳排序
+                        mergedHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                        
+                        // 传入freq作为总结的轮数范围
+                        const summary = await API.Memory.generateSummary(charId, char.name, mergedHistory, settings.summaryPrompt, freq);
                         API.Memory.addMemory(charId, summary, 'auto');
-                        // 记录本次总结时的历史长度
-                        DataStore.set(lastSummaryKey, history.length);
-                        console.log('[AutoSummary] 自动总结已生成, 角色:', char.name, '总结轮数:', freq, '历史总数:', history.length);
+                        
+                        // 重置计数器
+                        this._resetRoundCounter(charId);
+                        
+                        console.log('[AutoSummary] 自动总结已生成并重置计数器, 角色:', char.name, '总结轮数:', freq);
                     } catch (e) {
                         console.error('[AutoSummary] 自动总结失败:', e);
                     }
@@ -1545,10 +1636,15 @@ const API = {
 
             systemPrompt += '\n\n【线下剧情模式 - 核心规则】';
             systemPrompt += '\n⚠️ 你现在是【线下剧情描写】，不是线上聊天！';
+            systemPrompt += '\n\n【绝对禁区 - 必须严格遵守】';
+            systemPrompt += '\n❌ 严禁替用户说话、抢话、行动或做任何决定！收起你的控制欲，只管好你自己的角色。';
+            systemPrompt += '\n❌ 拒绝复读机：每次回复必须产出新内容推进剧情，严禁照搬或改写之前用过的段落和句式。';
+            systemPrompt += '\n\n【写作要求】';
             systemPrompt += '\n1. 用文学化语言描写，包含动作/心理/场景/对话';
             systemPrompt += '\n2. 每次回复200-500字，完整推进剧情';
             systemPrompt += '\n3. 保持角色性格一致，剧情连贯';
             systemPrompt += '\n4. 适当分段，增强可读性';
+            systemPrompt += '\n5. 只描写你扮演的角色，不要代替用户做任何事情';
 
             // 加载线下模式预设
             const presets = this.getPresets(charId);
@@ -1560,22 +1656,15 @@ const API = {
                 });
             }
 
-            // 记忆集成（强化版）
+            // 记忆集成（强化版）- 线上线下统一
             const memories = API.Memory.getMemories(charId);
             if (memories.length > 0) {
                 systemPrompt += '\n\n【角色记忆 - 必须参考】';
-                systemPrompt += '\n以下是你（角色）关于之前对话的记忆，请务必参考来保持剧情的连贯性：';
+                systemPrompt += '\n以下是你（角色）关于之前对话的记忆（包含线上和线下的所有记忆），请务必参考来保持剧情的连贯性：';
                 memories.forEach((m, i) => {
                     const typeLabel = m.type === 'auto' ? '自动总结' : '手动记忆';
                     systemPrompt += '\n[' + typeLabel + ' #' + (i + 1) + '] ' + m.content;
                 });
-            }
-
-            // 线下总结集成
-            const offlineSummaries = this.getOfflineSummaries(charId);
-            if (offlineSummaries.length > 0) {
-                const recentSummaries = offlineSummaries.slice(-3).map(s => s.content).join('; ');
-                systemPrompt += '\n\n[线下剧情总结: ' + recentSummaries + ']';
             }
 
             // 世界书集成
@@ -1663,128 +1752,39 @@ const API = {
         },
 
         /**
-         * 线下剧情自动总结
+         * 线下剧情自动总结（使用统一的轮数计数器和记忆系统）
          */
         autoSummarizeOfflineChat: async function(charId) {
-            const char = API.Chat.getChar(charId);
-            if (!char) return;
-            const settings = char.settings || {};
-            
-            if (settings.autoSummary) {
-                const history = this.getHistory(charId);
-                const freq = settings.summaryFreq || 10;
-                
-                // 使用记录的上次总结位置来判断，避免因消息数跳过倍数而永远不触发
-                const lastSummaryKey = 'ruri_offline_last_summary_pos_' + charId;
-                const lastSummaryPos = parseInt(DataStore.get(lastSummaryKey) || '0') || 0;
-                const newMessageCount = history.length - lastSummaryPos;
-                
-                console.log('[Offline AutoSummary] 检查线下自动总结 - 历史总数:', history.length, '上次总结位置:', lastSummaryPos, '新消息数:', newMessageCount, '频率:', freq);
-                
-                if (history.length > 0 && newMessageCount >= freq) {
-                    try {
-                        const summary = await this.generateOfflineSummary(charId, char.name, history, settings.summaryPrompt);
-                        this.addOfflineSummary(charId, summary);
-                        // 记录本次总结时的历史长度
-                        DataStore.set(lastSummaryKey, history.length);
-                        console.log('[Offline] Auto summary generated for', char.name);
-                    } catch (e) {
-                        console.error('[Offline] Auto summary failed:', e);
-                    }
-                }
-            }
+            // 线下模式也使用统一的轮数计数器和记忆系统
+            // 直接调用线上的 checkAutoSummary，记忆会自动合并到统一的记忆App中
+            await API.Chat.checkAutoSummary(charId);
         },
 
-        /**
-         * 生成线下剧情总结
-         */
-        generateOfflineSummary: async function(charId, charName, history, summaryPrompt) {
-            const config = API.Settings.getApiConfig();
-            if (!config.endpoint || !config.key) throw new Error('请先在设置中配置 API');
-            if (history.length === 0) throw new Error('暂无线下聊天记录可总结');
-
-            const char = API.Chat.getChar(charId);
-            const settings = char && char.settings ? char.settings : {};
-            const charDisplayName = settings.charNameForSummary || (char ? char.name : null) || charName;
-            let userName = settings.userName || '用户';
-
-            // 使用用户设置的轮数来决定总结范围
-            const rounds = settings.summaryFreq || 20;
-            const recentMessages = history.slice(-rounds).map(m =>
-                (m.sender === 'user' ? userName : charDisplayName) + ': ' + m.content
-            ).join('\n');
-
-            let systemContent = '';
-            if (summaryPrompt) {
-                systemContent = summaryPrompt;
-            } else {
-                systemContent = '你是一个剧情总结助手。请以第三人称视角总结以下线下剧情对话的关键信息。';
-                systemContent += '\n\n【角色信息】';
-                systemContent += '\n- 角色名称: ' + charDisplayName;
-                systemContent += '\n\n【总结要求】';
-                systemContent += '\n1. 使用第三人称描述剧情发展';
-                systemContent += '\n2. 提取重要的事件、情感和细节';
-                systemContent += '\n3. 用简洁的语言概括，不超过200字';
-            }
-
-            const response = await fetch(config.endpoint + '/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + config.key
-                },
-                body: JSON.stringify({
-                    model: config.model || 'gpt-3.5-turbo',
-                    messages: [
-                        { role: 'system', content: systemContent },
-                        { role: 'user', content: '以下是线下剧情聊天记录：\n\n' + recentMessages }
-                    ],
-                    temperature: 0.5
-                })
-            });
-
-            if (!response.ok) throw new Error('API Request Failed');
-            const data = await response.json();
-            return data.choices[0].message.content;
-        },
-
-        // 线下总结存储
+        // 线下总结存储 - 已废弃，统一使用 API.Memory
+        // 保留这些方法是为了向后兼容，但实际上会重定向到统一的记忆系统
         getOfflineSummaries: function(charId) {
-            if (!charId) return [];
-            return DataStore.get('ruri_offline_summaries_' + charId) || [];
+            // 返回空数组，因为线下总结已经合并到统一的记忆系统中
+            return [];
         },
 
         saveOfflineSummaries: function(charId, summaries) {
-            if (!charId) return;
-            DataStore.set('ruri_offline_summaries_' + charId, summaries);
+            // 不再单独保存线下总结
+            console.warn('[Offline] saveOfflineSummaries is deprecated, use API.Memory instead');
         },
 
         addOfflineSummary: function(charId, content) {
-            const summaries = this.getOfflineSummaries(charId);
-            summaries.push({
-                id: 'offline_sum_' + Date.now(),
-                content: content,
-                timestamp: Date.now(),
-                type: 'auto'
-            });
-            this.saveOfflineSummaries(charId, summaries);
-            return summaries;
+            // 重定向到统一的记忆系统
+            return API.Memory.addMemory(charId, content, 'auto');
         },
 
         updateOfflineSummary: function(charId, index, content) {
-            const summaries = this.getOfflineSummaries(charId);
-            if (summaries[index]) {
-                summaries[index].content = content;
-                this.saveOfflineSummaries(charId, summaries);
-            }
-            return summaries;
+            // 重定向到统一的记忆系统
+            return API.Memory.updateMemory(charId, index, content);
         },
 
         deleteOfflineSummary: function(charId, index) {
-            const summaries = this.getOfflineSummaries(charId);
-            summaries.splice(index, 1);
-            this.saveOfflineSummaries(charId, summaries);
-            return summaries;
+            // 重定向到统一的记忆系统
+            return API.Memory.deleteMemory(charId, index);
         },
 
         /**

@@ -1,0 +1,154 @@
+<!-- ==================== DIARY APP ==================== -->
+<div id="diary-app" class="absolute inset-0 z-[70] flex flex-col hidden">
+    <!-- Diary Header with Frosted Glass Effect -->
+    <div class="h-24 px-4 pt-10 flex items-center justify-between shrink-0 sticky top-0 z-20 backdrop-blur-md bg-white/30">
+        <div class="flex items-center gap-3">
+            <button onclick="DiaryApp.close()" class="text-[#333333] text-lg w-10 flex justify-start">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button onclick="DiaryApp.openHistory()" class="text-[#333333] text-lg w-8 flex justify-start ml-1">
+                <i class="fa-regular fa-snowflake"></i>
+            </button>
+        </div>
+        <h1 class="font-bold text-base text-gray-900">日记</h1>
+        <div class="flex items-center gap-2">
+            <button onclick="DiaryApp.generateDiary()" class="text-[#333333] text-lg w-8 flex items-center justify-end mr-1 active:scale-95 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                    <path d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" />
+                </svg>
+            </button>
+            <button onclick="DiaryApp.openSettings()" class="text-[#333333] w-10 flex justify-end">
+                <i class="fa-solid fa-gear text-xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Diary Content Area -->
+    <div id="diary-content" class="flex-1 overflow-y-auto p-6 relative bg-gray-50" style="background-size: cover; background-position: center;">
+        <div id="diary-text" class="whitespace-pre-wrap leading-relaxed" style="font-family: 'SimSun', serif; font-size: 16px; color: #000000;">
+            <!-- 日记内容将显示在这里 -->
+        </div>
+    </div>
+</div>
+
+<!-- ==================== DIARY HISTORY ==================== -->
+<div id="diary-history" class="absolute inset-0 z-[75] flex flex-col hidden bg-white">
+    <!-- History Header -->
+    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
+        <button onclick="DiaryApp.closeHistory()" class="text-[#333333] text-lg w-10 flex justify-start">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <h1 class="font-bold text-base text-gray-900">历史日记</h1>
+        <div class="w-10"></div>
+    </div>
+
+    <!-- History List -->
+    <div id="diary-history-list" class="flex-1 overflow-y-auto p-4">
+        <!-- 历史日记列表将显示在这里 -->
+    </div>
+</div>
+
+<!-- ==================== DIARY SETTINGS ==================== -->
+<div id="diary-settings" class="absolute inset-0 z-[75] flex flex-col hidden bg-white">
+    <!-- Settings Header -->
+    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
+        <button onclick="DiaryApp.closeSettings()" class="text-[#333333] text-lg w-10 flex justify-start">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <h1 class="font-bold text-base text-gray-900">日记设置</h1>
+        <div class="w-10"></div>
+    </div>
+
+    <!-- Settings Content -->
+    <div class="flex-1 overflow-y-auto p-4">
+        <!-- 字体设置 -->
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">字体设置</h3>
+            
+            <!-- 字体URL -->
+            <div class="mb-4">
+                <label class="text-xs text-gray-600 mb-1 block">自定义字体URL</label>
+                <input type="text" id="diary-font-url" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="https://example.com/font.woff2">
+            </div>
+
+            <!-- 字体预设 -->
+            <div class="mb-4">
+                <label class="text-xs text-gray-600 mb-1 block">字体预设</label>
+                <div class="flex gap-2 mb-2">
+                    <select id="diary-font-preset" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">选择预设</option>
+                    </select>
+                    <button onclick="DiaryApp.saveFontPreset()" class="px-3 py-2 bg-blue-500 text-white rounded-lg text-xs active:scale-95 transition">保存</button>
+                    <button onclick="DiaryApp.deleteFontPreset()" class="px-3 py-2 bg-red-500 text-white rounded-lg text-xs active:scale-95 transition">删除</button>
+                </div>
+                <input type="text" id="diary-font-preset-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="预设名称（用于保存新预设）">
+            </div>
+
+            <!-- 字体大小 -->
+            <div class="mb-4">
+                <label class="text-xs text-gray-600 mb-1 block">字体大小: <span id="font-size-value">16</span>px</label>
+                <input type="range" id="diary-font-size" min="12" max="24" value="16" class="w-full">
+            </div>
+
+            <!-- 字体颜色 -->
+            <div class="mb-4">
+                <label class="text-xs text-gray-600 mb-1 block">字体颜色</label>
+                <input type="color" id="diary-font-color" value="#000000" class="w-full h-10 border border-gray-300 rounded-lg">
+            </div>
+        </div>
+
+        <!-- 日记字数 -->
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">日记字数</h3>
+            <input type="number" id="diary-word-count" min="100" max="2000" value="500" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="500">
+        </div>
+
+        <!-- 定时写日记 -->
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">定时写日记</h3>
+            <div class="flex items-center gap-3 mb-2">
+                <input type="checkbox" id="diary-schedule-enabled" class="w-5 h-5">
+                <label for="diary-schedule-enabled" class="text-sm text-gray-700">启用定时写日记</label>
+            </div>
+            <input type="time" id="diary-schedule-time" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" value="21:00">
+        </div>
+
+        <!-- 文风设置 -->
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">文风设置</h3>
+            
+            <!-- 文风预设 -->
+            <div class="mb-4">
+                <label class="text-xs text-gray-600 mb-1 block">文风预设</label>
+                <div class="flex gap-2 mb-2">
+                    <select id="diary-style-preset" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">选择预设</option>
+                    </select>
+                    <button onclick="DiaryApp.saveStylePreset()" class="px-3 py-2 bg-blue-500 text-white rounded-lg text-xs active:scale-95 transition">保存</button>
+                    <button onclick="DiaryApp.deleteStylePreset()" class="px-3 py-2 bg-red-500 text-white rounded-lg text-xs active:scale-95 transition">删除</button>
+                </div>
+                <input type="text" id="diary-style-preset-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="预设名称（用于保存新预设）">
+            </div>
+
+            <!-- 自定义文风 -->
+            <div class="mb-4">
+                <label class="text-xs text-gray-600 mb-1 block">自定义文风</label>
+                <textarea id="diary-custom-style" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" placeholder="描述你想要的日记风格..."></textarea>
+            </div>
+        </div>
+
+        <!-- 背景图设置 -->
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">背景图设置</h3>
+            <input type="file" id="diary-bg-upload" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <button onclick="DiaryApp.clearBackground()" class="mt-2 w-full px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm active:scale-95 transition">
+                清除背景图
+            </button>
+        </div>
+
+        <!-- 保存按钮 -->
+        <button onclick="DiaryApp.saveSettings()" class="w-full py-3 bg-blue-500 text-white rounded-lg font-medium active:scale-95 transition">
+            保存设置
+        </button>
+    </div>
+</div>

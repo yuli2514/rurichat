@@ -43,13 +43,25 @@ const AIHandler = {
             }
             
             for (let text of bubbles) {
+                // --- 前端物理过滤：抹除AI回复中残留的系统描述和旁白 ---
+                // 清除表情包系统描述复读（如 [用户发送了一个表情包...] ）
+                text = text.replace(/\[用户发送了一个表情包[^\]]*\]/g, '').trim();
+                // 清除发件人标记复读（如 [发件人: User] [发件人: You]）
+                text = text.replace(/\[发件人:\s*(?:User|You)\]\s*/g, '').trim();
+                // 清除旁白符号段落（*动作描写* 或 *心理旁白*）
+                text = text.replace(/\*[^*]+\*/g, '').trim();
+                // 清除系统说明复读（如 [表情: xxx] 被AI原样输出时）
+                text = text.replace(/\[表情:\s*[^\]]+\]/g, '').trim();
+                // 清除线上模式锁死指令复读
+                text = text.replace(/\[当前为手机网聊模式[^\]]*\]/g, '').trim();
+
                 // 检查撤回命令 [RECALL]
                 const isRecall = text.includes('[RECALL]');
                 if (isRecall) {
                     text = text.replace('[RECALL]', '').trim();
                 }
                 
-                // 跳过空消息
+                // 跳过空消息（包括被过滤后变空的消息）
                 if (!text || text.trim() === '') continue;
                 
                 // 清理AI可能添加的markdown图片格式：![xxx](url) -> url

@@ -582,12 +582,17 @@ const SettingsManager = {
                 const data = {};
                 
                 if (storeNames.length === 0) {
+                    db.close();
                     resolve(data);
                     return;
                 }
                 
                 const transaction = db.transaction(storeNames, 'readonly');
                 let completed = 0;
+                
+                transaction.oncomplete = function() {
+                    db.close(); // 关闭连接，防止后续import被阻塞
+                };
                 
                 storeNames.forEach(storeName => {
                     const store = transaction.objectStore(storeName);
@@ -602,6 +607,7 @@ const SettingsManager = {
                     };
                     
                     getAllRequest.onerror = function() {
+                        db.close();
                         reject(new Error('Failed to read from ' + storeName));
                     };
                 });
@@ -804,154 +810,131 @@ const SettingsManager = {
         }
     },
 
-    // 导入IndexedDB数据（使用版本升级方式，避免删除数据库被阻塞）
-    importIndexedDB: async function(dbName, data) {
-        return new Promise((resolve, reject) => {
-            console.log('[导入] 开始导入数据库:', dbName);
-            console.log('[导入] 数据表:', Object.keys(data));
-            
-            const storeNames = Object.keys(data);
-            if (storeNames.length === 0) {
-                console.log('[导入] 数据为空，跳过');
-                resolve();
-                return;
+    // 关闭应用持有的IndexedDB连接，防止版本升级被阻塞
+    _closeAllDBConnections: function() {
+        console.log('[导入] 关闭现有数据库连接...');
+        try {
+            if (typeof AvatarStore !== 'undefined' && AvatarStore._db) {
+                AvatarStore._db.close();
+                AvatarStore._db = null;
+                AvatarStore._ready = false;
+                AvatarStore._readyPromise = null;
+                console.log('[导入] 已关闭 AvatarStore 连接');
             }
-            
-            // 添加超时处理
+        } catch (e) { console.warn('[导入] 关闭AvatarStore失败:', e); }
+        try {
+            if (typeof DataStore !== 'undefined' && DataStore._db) {
+                DataStore._db.close();
+                DataStore._db = null;
+                DataStore._ready = false;
+                DataStore._readyPromise = null;
+                console.log('[导入] 已关闭 DataStore 连接');
+            }
+        } catch (e) { console.warn('[导入] 关闭DataStore失败:', e); }
+    },
+
+    // 导入IndexedDB数据（先删除旧数据库，再以版本1创建新数据库）
+    // 重要：不能使用版本升级方式！因为 AvatarStore._openDB() / DataStore._openDB() / ruri_offline_db
+    // 都硬编码 indexedDB.open(dbName, 1)，如果版本升级到2+，恢复后页面刷新时会触发 VersionError
+    importIndexedDB: async function(dbName, data) {
+        const storeNames = Object.keys(data);
+        if (storeNames.length === 0) {
+            console.log('[导入] 数据为空，跳过', dbName);
+            return;
+        }
+        console.log('[导入] 开始导入', dbName, '数据表:', storeNames);
+
+        const getKeyPath = function(dbName, storeName) {
+            // RuriAvatarDB.avatars -> keyPath: 'id'  (AvatarStore uses { keyPath: 'id' })
+            // RuriDataDB.data      -> keyPath: 'id'  (DataStore uses { keyPath: 'id' })
+            // ruri_offline_db.*    -> keyPath: 'charId'
+            if (dbName === 'ruri_offline_db') return 'charId';
+            return 'id';
+        };
+
+        // 第一步：删除旧数据库
+        await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
-                reject(new Error('导入超时（30秒）'));
-            }, 30000);
-            
-            // 先打开数据库获取当前版本
-            const checkRequest = indexedDB.open(dbName);
-            
-            checkRequest.onsuccess = function(e) {
-                const db = e.target.result;
-                const currentVersion = db.version;
-                db.close();
-                console.log('[导入] 当前数据库版本:', currentVersion);
-                
-                // 使用更高的版本号重新打开，触发升级
-                const newVersion = currentVersion + 1;
-                console.log('[导入] 升级到版本:', newVersion);
-                const openRequest = indexedDB.open(dbName, newVersion);
-                
-                openRequest.onupgradeneeded = function(e) {
-                    console.log('[导入] 正在升级数据库结构...');
-                    const db = e.target.result;
-                    
-                    // 删除所有旧的数据表
-                    const existingStores = Array.from(db.objectStoreNames);
-                    existingStores.forEach(storeName => {
-                        console.log('[导入] 删除旧数据表:', storeName);
-                        db.deleteObjectStore(storeName);
-                    });
-                    
-                    // 创建新的数据表
-                    storeNames.forEach(storeName => {
-                        let keyPath = 'charId';
-                        if (dbName === 'RuriDataDB' && storeName === 'data') {
-                            keyPath = 'id';
-                        }
-                        console.log('[导入] 创建数据表:', storeName, 'keyPath:', keyPath);
-                        db.createObjectStore(storeName, { keyPath: keyPath });
-                    });
-                };
-                
-                openRequest.onsuccess = function(e) {
-                    console.log('[导入] 数据库升级完成，开始写入数据');
-                    const db = e.target.result;
-                    const transaction = db.transaction(storeNames, 'readwrite');
-                    
-                    storeNames.forEach(storeName => {
-                        const store = transaction.objectStore(storeName);
-                        const items = data[storeName] || [];
-                        console.log('[导入] 写入', storeName, ':', items.length, '条记录');
-                        items.forEach(item => {
-                            store.put(item);
-                        });
-                    });
-                    
-                    transaction.oncomplete = function() {
-                        console.log('[导入] 数据写入完成');
-                        db.close();
-                        clearTimeout(timeoutId);
-                        resolve();
-                    };
-                    
-                    transaction.onerror = function(e) {
-                        console.error('[导入] 事务错误:', e.target.error);
-                        db.close();
-                        clearTimeout(timeoutId);
-                        reject(new Error('导入失败: ' + e.target.error));
-                    };
-                };
-                
-                openRequest.onerror = function(e) {
-                    console.error('[导入] 打开数据库失败:', e.target.error);
-                    clearTimeout(timeoutId);
-                    reject(new Error('打开数据库失败: ' + e.target.error));
-                };
-                
-                openRequest.onblocked = function() {
-                    console.error('[导入] 数据库升级被阻塞');
-                    clearTimeout(timeoutId);
-                    reject(new Error('数据库被占用，请关闭所有使用该应用的标签页后重试'));
-                };
+                console.warn('[导入]', dbName, '删除超时，继续尝试创建');
+                resolve(); // 超时也继续，不阻塞
+            }, 5000);
+
+            console.log('[导入] 删除旧数据库', dbName);
+            const deleteReq = indexedDB.deleteDatabase(dbName);
+            deleteReq.onsuccess = function() {
+                console.log('[导入]', dbName, '已删除');
+                clearTimeout(timeoutId);
+                resolve();
             };
-            
-            checkRequest.onerror = function(e) {
-                // 数据库不存在，创建新的
-                console.log('[导入] 数据库不存在，创建新数据库');
-                const openRequest = indexedDB.open(dbName, 1);
-                
-                openRequest.onupgradeneeded = function(e) {
-                    console.log('[导入] 正在创建数据表...');
-                    const db = e.target.result;
-                    storeNames.forEach(storeName => {
-                        let keyPath = 'charId';
-                        if (dbName === 'RuriDataDB' && storeName === 'data') {
-                            keyPath = 'id';
-                        }
-                        console.log('[导入] 创建数据表:', storeName, 'keyPath:', keyPath);
-                        db.createObjectStore(storeName, { keyPath: keyPath });
+            deleteReq.onerror = function() {
+                console.warn('[导入]', dbName, '删除失败，继续尝试创建');
+                clearTimeout(timeoutId);
+                resolve(); // 删除失败也继续
+            };
+            deleteReq.onblocked = function() {
+                console.warn('[导入]', dbName, '删除被阻塞，继续尝试创建');
+                clearTimeout(timeoutId);
+                resolve(); // 被阻塞也继续
+            };
+        });
+
+        // 第二步：以版本1创建新数据库并写入数据
+        return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                reject(new Error(dbName + ' 导入超时（30秒）'));
+            }, 30000);
+
+            console.log('[导入] 以版本1创建', dbName);
+            const openReq = indexedDB.open(dbName, 1);
+
+            openReq.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                // 确保清除所有旧表（以防删除数据库失败）
+                Array.from(db.objectStoreNames).forEach(s => db.deleteObjectStore(s));
+                // 创建新表
+                storeNames.forEach(s => {
+                    const kp = getKeyPath(dbName, s);
+                    console.log('[导入] 创建表', s, 'keyPath:', kp);
+                    db.createObjectStore(s, { keyPath: kp });
+                });
+            };
+
+            openReq.onsuccess = function(e) {
+                const db = e.target.result;
+                try {
+                    const tx = db.transaction(storeNames, 'readwrite');
+                    storeNames.forEach(s => {
+                        const store = tx.objectStore(s);
+                        const items = data[s] || [];
+                        console.log('[导入] 写入', s, ':', items.length, '条');
+                        items.forEach(item => store.put(item));
                     });
-                };
-                
-                openRequest.onsuccess = function(e) {
-                    console.log('[导入] 数据库已创建，开始写入数据');
-                    const db = e.target.result;
-                    const transaction = db.transaction(storeNames, 'readwrite');
-                    
-                    storeNames.forEach(storeName => {
-                        const store = transaction.objectStore(storeName);
-                        const items = data[storeName] || [];
-                        console.log('[导入] 写入', storeName, ':', items.length, '条记录');
-                        items.forEach(item => {
-                            store.put(item);
-                        });
-                    });
-                    
-                    transaction.oncomplete = function() {
-                        console.log('[导入] 数据写入完成');
+                    tx.oncomplete = function() {
+                        console.log('[导入]', dbName, '写入完成（版本1）');
                         db.close();
                         clearTimeout(timeoutId);
                         resolve();
                     };
-                    
-                    transaction.onerror = function(e) {
-                        console.error('[导入] 事务错误:', e.target.error);
+                    tx.onerror = function(e) {
                         db.close();
                         clearTimeout(timeoutId);
-                        reject(new Error('导入失败: ' + e.target.error));
+                        reject(new Error(dbName + ' 写入失败: ' + e.target.error));
                     };
-                };
-                
-                openRequest.onerror = function(e) {
-                    console.error('[导入] 创建数据库失败:', e.target.error);
+                } catch (err) {
+                    db.close();
                     clearTimeout(timeoutId);
-                    reject(new Error('创建数据库失败: ' + e.target.error));
-                };
+                    reject(new Error(dbName + ' 事务创建失败: ' + err.message));
+                }
+            };
+
+            openReq.onerror = function(e) {
+                clearTimeout(timeoutId);
+                reject(new Error(dbName + ' 打开失败: ' + e.target.error));
+            };
+
+            openReq.onblocked = function() {
+                clearTimeout(timeoutId);
+                reject(new Error(dbName + ' 被占用，无法创建'));
             };
         });
     },
@@ -1061,6 +1044,9 @@ const SettingsManager = {
                     }
                     localStorage.setItem(key, value);
                 });
+                
+                // 关闭现有数据库连接，防止版本升级被阻塞
+                this._closeAllDBConnections();
                 
                 // 恢复 IndexedDB
                 const dbNames = Object.keys(backupData.indexedDB);

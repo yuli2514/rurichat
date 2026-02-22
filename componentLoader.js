@@ -129,6 +129,7 @@ const ComponentLoader = {
             { name: 'chat-settings', containerId: 'phone-shell', position: 'append' },
             { name: 'settings-app', containerId: 'phone-shell', position: 'append' },
             { name: 'offline-mode', containerId: 'phone-shell', position: 'append' },
+            { name: 'diary-app', containerId: 'phone-shell', position: 'append' },
             { name: 'css-preset-modal', containerId: 'phone-shell', position: 'append' }
         ];
         

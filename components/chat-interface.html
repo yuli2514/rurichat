@@ -89,43 +89,63 @@
                 </div>
             </div>
 
-            <!-- Expand Panel -->
-            <div id="panel-expand" class="hidden h-64 p-6 overflow-y-auto">
-                <div class="grid grid-cols-4 gap-6">
-                    <!-- 第一排：重回、拍照、照片、语音 -->
-                    <button type="button" onclick="ChatInterface.regenerateLastAI()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-rotate text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">重回</span>
-                    </button>
-                    <button type="button" onclick="ChatInterface.openCamera()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-camera text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">拍照</span>
-                    </button>
-                    <button type="button" onclick="ChatInterface.openGalleryMenu()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-regular fa-image text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">照片</span>
-                    </button>
-                    <button type="button" onclick="VoiceHandler.openVoicePanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-microphone text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">语音</span>
-                    </button>
-                    <!-- 第二排：转账、语音通话、视频通话、线下模式 -->
-                    <button type="button" onclick="TransferHandler.openTransferPanel(event)" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-money-bill-transfer text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">转账</span>
-                    </button>
-                    <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-phone text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">语音通话</span>
-                    </button>
-                    <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-video text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">视频通话</span>
-                    </button>
-                    <button type="button" onclick="OfflineMode.open()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
-                        <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-plane-slash text-2xl text-gray-600"></i></div>
-                        <span class="text-xs">线下模式</span>
-                    </button>
+            <!-- Expand Panel with Swipe Pages -->
+            <div id="panel-expand" class="hidden h-64 overflow-hidden relative">
+                <div id="expand-pages-container" class="flex transition-transform duration-300 h-full" style="width: 200%;">
+                    <!-- Page 1 -->
+                    <div class="w-1/2 p-6 overflow-y-auto shrink-0">
+                        <div class="grid grid-cols-4 gap-6">
+                            <!-- 第一排：重回、拍照、照片、语音 -->
+                            <button type="button" onclick="ChatInterface.regenerateLastAI()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-rotate text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">重回</span>
+                            </button>
+                            <button type="button" onclick="ChatInterface.openCamera()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-camera text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">拍照</span>
+                            </button>
+                            <button type="button" onclick="ChatInterface.openGalleryMenu()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-regular fa-image text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">照片</span>
+                            </button>
+                            <button type="button" onclick="VoiceHandler.openVoicePanel()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-microphone text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">语音</span>
+                            </button>
+                            <!-- 第二排：转账、语音通话、视频通话、线下模式 -->
+                            <button type="button" onclick="TransferHandler.openTransferPanel(event)" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-money-bill-transfer text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">转账</span>
+                            </button>
+                            <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-phone text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">语音通话</span>
+                            </button>
+                            <button type="button" class="flex flex-col items-center gap-2 text-gray-500 bg-transparent border-none p-0 opacity-50" disabled>
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-video text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">视频通话</span>
+                            </button>
+                            <button type="button" onclick="OfflineMode.open()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-plane-slash text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">线下模式</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Page 2 -->
+                    <div class="w-1/2 p-6 overflow-y-auto shrink-0">
+                        <div class="grid grid-cols-4 gap-6">
+                            <!-- 日记按钮 -->
+                            <button type="button" onclick="DiaryApp.open()" class="flex flex-col items-center gap-2 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-book text-2xl text-gray-600"></i></div>
+                                <span class="text-xs">日记</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Page Indicators -->
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-2">
+                    <div id="expand-indicator-0" class="w-2 h-2 rounded-full bg-gray-400 transition-all"></div>
+                    <div id="expand-indicator-1" class="w-2 h-2 rounded-full bg-gray-300 transition-all"></div>
                 </div>
             </div>
 
