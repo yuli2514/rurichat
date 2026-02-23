@@ -50,7 +50,12 @@ const SaveApp = {
     renderSaveList: function() {
         const container = document.getElementById('save-list-container');
         const emptyState = document.getElementById('save-empty-state');
-        const saves = SaveManager.getAllSaves();
+        const allSaves = SaveManager.getAllSaves();
+        
+        // 按当前角色过滤存档
+        const saves = this.currentCharId
+            ? allSaves.filter(s => s.charId === this.currentCharId)
+            : allSaves;
 
         if (saves.length === 0) {
             container.innerHTML = '';
@@ -295,6 +300,27 @@ const SaveApp = {
         } catch (e) {
             console.error('[SaveApp] Export failed:', e);
             alert('❌ 导出失败：' + e.message);
+        }
+    },
+
+    /**
+     * 覆盖当前查看的存档
+     */
+    overwriteCurrentSave: function() {
+        if (!this.currentSaveId || !this.currentCharId) return;
+
+        if (!confirm('确定要用当前状态覆盖这个存档吗？原存档数据将被替换！')) {
+            return;
+        }
+
+        try {
+            const save = SaveManager.overwriteSave(this.currentSaveId, this.currentCharId);
+            this.closeDetailModal();
+            this.renderSaveList();
+            alert('✅ 存档已覆盖');
+        } catch (e) {
+            console.error('[SaveApp] Overwrite failed:', e);
+            alert('❌ 覆盖失败：' + e.message);
         }
     },
 

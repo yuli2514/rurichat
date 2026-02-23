@@ -157,6 +157,42 @@ const SaveManager = {
     },
 
     /**
+     * 覆盖存档 - 用当前状态覆盖已有存档
+     * @param {string} saveId - 要覆盖的存档ID
+     * @param {string} charId - 当前角色ID
+     * @returns {Object} 更新后的存档对象
+     */
+    overwriteSave: function(saveId, charId) {
+        let saves = this.getAllSaves();
+        const index = saves.findIndex(s => s.id === saveId);
+        
+        if (index === -1) {
+            throw new Error('存档不存在');
+        }
+
+        const char = API.Chat.getChar(charId);
+        if (!char) {
+            throw new Error('角色不存在');
+        }
+
+        // 用当前数据覆盖
+        saves[index].data = {
+            onlineHistory: API.Chat.getHistory(charId) || [],
+            offlineHistory: API.Offline.getHistory(charId) || [],
+            memories: API.Memory.getMemories(charId) || [],
+            character: JSON.parse(JSON.stringify(char)),
+            userPersonas: API.Profile.getPersonas() || []
+        };
+        saves[index].timestamp = Date.now();
+        saves[index].charId = charId;
+        saves[index].charName = char.name;
+
+        this._saveSavesList(saves);
+        console.log('[SaveManager] Save overwritten:', saveId);
+        return saves[index];
+    },
+
+    /**
      * 删除存档
      * @param {string} saveId - 存档ID
      */
