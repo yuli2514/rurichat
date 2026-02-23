@@ -544,7 +544,7 @@ const OfflineMode = {
     },
 
     /**
-     * 应用字体输入框中的字体（支持字体名、ttf/woff2 URL）
+     * 应用字体输入框中的字体（支持字体名、css、ttf/woff2 URL）
      */
     applyFontInput: function() {
         const fontInput = document.getElementById('offline-font-family');
@@ -553,9 +553,15 @@ const OfflineMode = {
         if (!val) return;
 
         let fontName = val;
+        const lowerVal = val.toLowerCase();
 
-        // 检测是否为字体文件URL（ttf / woff2 / woff / otf）
-        if (/\.(ttf|woff2?|otf)(\?.*)?$/i.test(val)) {
+        if (lowerVal.endsWith('.css')) {
+            // CSS文件：通过link标签加载（如Google Fonts等在线字体CSS）
+            fontName = 'offline-custom-font';
+            this._injectFontCssLink(val);
+            API.Offline.saveSettings(this.currentCharId, { fontUrl: val });
+        } else if (/\.(ttf|woff2?|otf)(\?.*)?$/i.test(val)) {
+            // 字体文件URL：通过@font-face加载
             fontName = 'offline-custom-font';
             this._injectFontFace(fontName, val);
             API.Offline.saveSettings(this.currentCharId, { fontUrl: val });
@@ -598,7 +604,24 @@ const OfflineMode = {
     },
 
     /**
-     * 注入 @font-face 到 <head>
+     * 注入 CSS 字体链接到 <head>（用于 .css 格式的字体URL）
+     */
+    _injectFontCssLink: function(cssUrl) {
+        let link = document.getElementById('offline-font-css-link');
+        if (!link) {
+            link = document.createElement('link');
+            link.id = 'offline-font-css-link';
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+        }
+        link.href = cssUrl;
+        // 移除可能存在的font-face样式，避免冲突
+        const faceStyle = document.getElementById('offline-font-face-style');
+        if (faceStyle) faceStyle.textContent = '';
+    },
+
+    /**
+     * 注入 @font-face 到 <head>（支持ttf/woff2/woff/otf格式自动检测）
      */
     _injectFontFace: function(fontName, url) {
         let faceStyle = document.getElementById('offline-font-face-style');
@@ -607,7 +630,22 @@ const OfflineMode = {
             faceStyle.id = 'offline-font-face-style';
             document.head.appendChild(faceStyle);
         }
-        faceStyle.textContent = `@font-face { font-family: "${fontName}"; src: url("${url}"); }`;
+        // 移除可能存在的CSS link，避免冲突
+        const cssLink = document.getElementById('offline-font-css-link');
+        if (cssLink) cssLink.remove();
+
+        const lowerUrl = url.toLowerCase();
+        let format = '';
+        if (lowerUrl.endsWith('.ttf') || lowerUrl.endsWith('.ttc')) {
+            format = "format('truetype')";
+        } else if (lowerUrl.endsWith('.woff2')) {
+            format = "format('woff2')";
+        } else if (lowerUrl.endsWith('.woff')) {
+            format = "format('woff')";
+        } else if (lowerUrl.endsWith('.otf')) {
+            format = "format('opentype')";
+        }
+        faceStyle.textContent = `@font-face { font-family: "${fontName}"; src: url("${url}") ${format}; font-display: swap; }`;
     },
 
     closeSettings: function() {
@@ -631,9 +669,14 @@ const OfflineMode = {
          offlineEl.style.right = '0';
          offlineEl.style.bottom = '0';
 
-         // 如果保存了字体URL，重新注入 @font-face
+         // 如果保存了字体URL，根据格式选择加载方式
          if (settings.fontUrl) {
-             this._injectFontFace('offline-custom-font', settings.fontUrl);
+             const lowerUrl = settings.fontUrl.toLowerCase();
+             if (lowerUrl.endsWith('.css')) {
+                 this._injectFontCssLink(settings.fontUrl);
+             } else {
+                 this._injectFontFace('offline-custom-font', settings.fontUrl);
+             }
          }
 
          // 通过 CSS 强制应用字体到整个界面

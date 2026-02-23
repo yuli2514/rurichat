@@ -198,12 +198,42 @@ const SettingsManager = {
         
         const oldStyle = document.getElementById('custom-font-style');
         if (oldStyle) oldStyle.remove();
+        const oldLink = document.getElementById('custom-font-link');
+        if (oldLink) oldLink.remove();
         
-        const fontName = 'CustomFont' + Date.now();
-        const style = document.createElement('style');
-        style.id = 'custom-font-style';
-        style.textContent = '@font-face { font-family: "' + fontName + '"; src: url("' + fontUrl + '") format("woff2"), url("' + fontUrl + '") format("woff"), url("' + fontUrl + '") format("truetype"); font-display: swap; } body, p, span, div, input, textarea, button, h1, h2, h3, h4, h5, h6, label, a { font-family: "' + fontName + '", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; } i[class*="fa-"] { font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important; }';
-        document.head.appendChild(style);
+        const lowerUrl = fontUrl.toLowerCase();
+        const isCssFile = lowerUrl.endsWith('.css');
+        
+        if (isCssFile) {
+            // CSS文件：通过link标签加载（如Google Fonts等在线字体CSS）
+            const link = document.createElement('link');
+            link.id = 'custom-font-link';
+            link.rel = 'stylesheet';
+            link.href = fontUrl;
+            document.head.appendChild(link);
+            // CSS文件中定义了font-family，使用通用名覆盖
+            const style = document.createElement('style');
+            style.id = 'custom-font-style';
+            style.textContent = 'body, p, span, div, input, textarea, button, h1, h2, h3, h4, h5, h6, label, a { font-family: inherit; } i[class*="fa-"] { font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important; }';
+            document.head.appendChild(style);
+        } else {
+            // ttf/woff2/woff/otf字体文件：通过@font-face加载
+            const fontName = 'CustomFont' + Date.now();
+            let format = '';
+            if (lowerUrl.endsWith('.ttf') || lowerUrl.endsWith('.ttc')) {
+                format = "format('truetype')";
+            } else if (lowerUrl.endsWith('.woff2')) {
+                format = "format('woff2')";
+            } else if (lowerUrl.endsWith('.woff')) {
+                format = "format('woff')";
+            } else if (lowerUrl.endsWith('.otf')) {
+                format = "format('opentype')";
+            }
+            const style = document.createElement('style');
+            style.id = 'custom-font-style';
+            style.textContent = '@font-face { font-family: "' + fontName + '"; src: url("' + fontUrl + '") ' + format + '; font-display: swap; } body, p, span, div, input, textarea, button, h1, h2, h3, h4, h5, h6, label, a { font-family: "' + fontName + '", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; } i[class*="fa-"] { font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important; }';
+            document.head.appendChild(style);
+        }
         localStorage.setItem('customFont', fontUrl);
     },
 
@@ -296,6 +326,7 @@ const SettingsManager = {
             };
             
             // 备份 localStorage（完整备份，编码敏感数据）
+            // 注意：存档数据 (ruri_save_archives) 也会被自动包含在 localStorage 备份中
             Object.keys(localStorage).forEach(key => {
                 let value = localStorage[key];
                 // 对包含"key"或"token"的配置进行Base64编码
@@ -654,6 +685,7 @@ const SettingsManager = {
             };
             
             // 备份 localStorage（完整备份）
+            // 注意：存档数据 (ruri_save_archives) 会被自动包含在 localStorage 备份中
             // 对敏感数据进行简单编码以绕过GitHub的Secret检测
             Object.keys(localStorage).forEach(key => {
                 let value = localStorage[key];

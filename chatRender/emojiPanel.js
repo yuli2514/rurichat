@@ -59,7 +59,7 @@ const EmojiPanel = {
         let emojis = [];
 
         if (groupId === 'recent') {
-            // 显示最近使用的表情包（最多15个）
+            // 显示最近使用的表情包（最多12个）
             emojis = this.getRecentEmojis();
         } else {
             const group = allGroups.find(g => g.id === groupId);
@@ -126,13 +126,13 @@ const EmojiPanel = {
     },
 
     /**
-     * 获取最近使用的表情包（最多15个）
+     * 获取最近使用的表情包（最多12个）
      * @returns {Array} - 最近使用的表情包数组
      */
     getRecentEmojis: function() {
         try {
             const recent = JSON.parse(localStorage.getItem('recent_emojis') || '[]');
-            return recent.slice(0, 15);
+            return recent.slice(0, 12);
         } catch (e) {
             return [];
         }
@@ -159,8 +159,8 @@ const EmojiPanel = {
             }
             // 添加到最前面
             recent.unshift({ url: emojiUrl, meaning: meaning });
-            // 只保留最近15个
-            recent = recent.slice(0, 15);
+            // 只保留最近12个
+            recent = recent.slice(0, 12);
             localStorage.setItem('recent_emojis', JSON.stringify(recent));
         } catch (e) {
             console.error('保存最近使用表情包失败:', e);

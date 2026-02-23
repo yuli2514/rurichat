@@ -104,15 +104,15 @@
 
 
 
-        /* 聊天界面 header 背景图 */
-        #super-chat-interface .h-12 {
+        /* 聊天界面 header 背景图 - 只针对顶部header，不影响扩展面板按钮 */
+        #super-chat-interface > .h-24 {
             background-size: cover !important;
             background-position: center !important;
             background-color: #f5f5f5; /* Fallback color */
         }
 
-        /* 确保内容在背景图上清晰显示 */
-        #super-chat-interface .h-12 * {
+        /* 确保header内容在背景图上清晰显示 - 只针对顶部header */
+        #super-chat-interface > .h-24 * {
             background: transparent; /* Remove background from children to avoid white boxes */
             backdrop-filter: none;
         }

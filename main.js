@@ -53,7 +53,8 @@ function initializeApp() {
             { name: 'WorldBookManager', obj: typeof WorldBookManager !== 'undefined' ? WorldBookManager : null },
             { name: 'ChatManager', obj: typeof ChatManager !== 'undefined' ? ChatManager : null },
             { name: 'ChatInterface', obj: typeof ChatInterface !== 'undefined' ? ChatInterface : null },
-            { name: 'HomeManager', obj: typeof HomeManager !== 'undefined' ? HomeManager : null }
+            { name: 'HomeManager', obj: typeof HomeManager !== 'undefined' ? HomeManager : null },
+            { name: 'SaveManager', obj: typeof SaveManager !== 'undefined' ? SaveManager : null }
         ];
 
         managers.forEach(m => {
