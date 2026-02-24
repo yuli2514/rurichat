@@ -606,7 +606,8 @@ const VoiceHandler = {
                             ]
                         }
                     ],
-                    temperature: 0.1
+                    temperature: 0.1,
+                    safety_settings: API.Settings.getSafetySettings()
                 })
             });
             

@@ -504,6 +504,16 @@ const ChatInterface = {
             this.renderEmojiGrid();
         }
         
+        // 打开扩展面板时，重置到第一页
+        if (panelName === 'expand') {
+            const expandContainer = document.getElementById('expand-pages-container');
+            if (expandContainer) {
+                expandContainer.style.transition = 'none';
+                expandContainer.style.transform = 'translateX(0%)';
+                DiaryApp.updatePageIndicators(0);
+            }
+        }
+        
         this.scrollToBottom();
     },
 

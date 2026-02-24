@@ -771,7 +771,8 @@ const MemoryApp = {
                     { role: 'system', content: systemContent },
                     { role: 'user', content: memoryText }
                 ],
-                temperature: 0.3
+                temperature: 0.3,
+                safety_settings: API.Settings.getSafetySettings()
             })
         });
 

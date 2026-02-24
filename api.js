@@ -525,7 +525,8 @@ const API = {
                         { role: 'system', content: systemContent },
                         { role: 'user', content: '以下是聊天记录：\n\n' + recentMessages }
                     ],
-                    temperature: 0.5
+                    temperature: 0.5,
+                    safety_settings: API.Settings.getSafetySettings()
                 })
             });
 
@@ -549,6 +550,20 @@ const API = {
 
         saveApiConfig: function(config) {
             localStorage.setItem('apiConfig', JSON.stringify(config));
+        },
+
+        /**
+         * 获取 Gemini 安全设置（所有类别设为 BLOCK_NONE）
+         * 用于避免 API 400 错误
+         */
+        getSafetySettings: function() {
+            return [
+                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+            ];
         },
 
         getPresets: function() {
@@ -1164,7 +1179,8 @@ const API = {
                     model: config.model || 'gpt-3.5-turbo',
                     messages: messages,
                     temperature: config.temperature !== undefined ? config.temperature : 0.8,
-                    max_tokens: 4096  // 限制AI单次输出不超过约1万字符
+                    max_tokens: 4096,
+                    safety_settings: API.Settings.getSafetySettings()
                 })
             });
 
@@ -1640,22 +1656,27 @@ const API = {
             systemPrompt += '\n⚠️ 你现在是【线下剧情描写】，不是线上聊天！';
             systemPrompt += '\n\n【绝对禁区 - 必须严格遵守】';
             systemPrompt += '\n❌ 严禁替用户说话、抢话、行动或做任何决定！收起你的控制欲，只管好你自己的角色。';
-            systemPrompt += '\n❌ 拒绝复读机：每次回复必须产出新内容推进剧情，严禁照搬或改写之前用过的段落和句式。';
+            systemPrompt += '\n❌ 拒绝复读机：每次回复必须产出全新内容推进剧情，严禁照搬或改写之前用过的段落和句式。';
+            systemPrompt += '\n❌ 严禁模仿/复制前文的句式结构、开头方式、描写模式。每段回复的句式、节奏、用词都必须与前文不同。';
+            systemPrompt += '\n❌ 严禁重复前面对话中已经出现过的描写段落、动作描写、心理描写。如果前文已经描写过某个场景或动作，你必须跳过它，写新的内容。';
             systemPrompt += '\n\n【写作要求】';
             systemPrompt += '\n1. 用文学化语言描写，包含动作/心理/场景/对话';
             systemPrompt += '\n2. 每次回复200-500字，完整推进剧情';
             systemPrompt += '\n3. 保持角色性格一致，剧情连贯';
             systemPrompt += '\n4. 适当分段，增强可读性';
             systemPrompt += '\n5. 只描写你扮演的角色，不要代替用户做任何事情';
+            systemPrompt += '\n6. 每次回复必须让剧情向前推进，不要原地踏步或重复已有情节';
 
-            // 加载线下模式预设
+            // 加载线下模式预设（文风预设 - 最高优先级）
             const presets = this.getPresets(charId);
             const enabledPresets = presets.filter(p => p.enabled);
             if (enabledPresets.length > 0) {
-                systemPrompt += '\n\n【用户自定义写作要求】';
+                systemPrompt += '\n\n⚠️⚠️⚠️【最高优先级 - 用户指定文风/写作要求，必须严格遵守！】';
+                systemPrompt += '\n以下是用户明确指定的文风和写作要求，你的每一段回复都必须完全按照这些要求来写，这比其他所有规则的优先级都高：';
                 enabledPresets.forEach(p => {
-                    systemPrompt += '\n- ' + p.name + ': ' + p.content;
+                    systemPrompt += '\n★ ' + p.name + '：' + p.content;
                 });
+                systemPrompt += '\n\n请在每次回复时都严格按照以上文风要求进行创作，不要忽略！';
             }
 
             // 记忆集成（强化版）- 线上线下统一
@@ -1733,6 +1754,13 @@ const API = {
                 { role: 'system', content: systemPrompt }
             ].concat(recentHistory);
 
+            // 末尾追加防重复+文风强制提醒
+            let endReminder = '⚠️【回复前必读】\n1. 严禁重复前文已有的段落、句式、描写模式，每次回复必须是全新的内容和表达方式。\n2. 不要模仿前面对话的开头方式、句式结构，换一种完全不同的写法。\n3. 推进剧情向前发展，不要原地踏步。';
+            if (enabledPresets.length > 0) {
+                endReminder += '\n4. 严格按照用户指定的文风要求写作，不要忽略！';
+            }
+            messages.push({ role: 'system', content: endReminder });
+
             const response = await fetch(config.endpoint + '/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -1743,7 +1771,8 @@ const API = {
                     model: config.model || 'gpt-3.5-turbo',
                     messages: messages,
                     temperature: config.temperature !== undefined ? config.temperature : 0.8,
-                    max_tokens: 4096
+                    max_tokens: 4096,
+                    safety_settings: API.Settings.getSafetySettings()
                 })
             });
 

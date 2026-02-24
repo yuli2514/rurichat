@@ -46,6 +46,7 @@ const DiaryApp = {
         // 触摸事件处理
         const handleStart = (clientX) => {
             startX = clientX;
+            currentX = clientX; // 初始化currentX，防止没有move事件时diff计算错误
             isDragging = true;
             container.style.transition = 'none';
         };
@@ -299,7 +300,8 @@ const DiaryApp = {
                         { role: 'user', content: userPrompt }
                     ],
                     temperature: 0.8,
-                    max_tokens: Math.max(wordCount * 4, 2500)
+                    max_tokens: Math.max(wordCount * 4, 2500),
+                    safety_settings: API.Settings.getSafetySettings()
                 })
             });
 
