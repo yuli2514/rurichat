@@ -1180,6 +1180,7 @@ const API = {
                     messages: messages,
                     temperature: config.temperature !== undefined ? config.temperature : 0.8,
                     max_tokens: 4096,
+                    stream: true,  // 启用流式传输
                     safety_settings: API.Settings.getSafetySettings()
                 })
             });
@@ -1200,14 +1201,98 @@ const API = {
                 throw err;
             }
             
-            const data = await response.json();
-            if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-                throw new Error('AI返回内容为空');
-            }
-            const reply = data.choices[0].message.content;
+            // 流式读取响应
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let fullReply = '';
+            let firstChunkReceived = false;
             
-            // Return bubbles array
-            return reply.split('\n').filter(t => t.trim());
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed === 'data: [DONE]') continue;
+                        if (!trimmed.startsWith('data: ')) continue;
+                        
+                        try {
+                            const jsonStr = trimmed.substring(6);
+                            const chunk = JSON.parse(jsonStr);
+                            const content = chunk.choices?.[0]?.delta?.content;
+                            
+                            if (content) {
+                                fullReply += content;
+                                
+                                // 第一个数据片段到达后立刻返回,触发展示流程
+                                if (!firstChunkReceived && fullReply.trim().length > 0) {
+                                    firstChunkReceived = true;
+                                    // 继续在后台接收剩余数据
+                                    this._continueStreamInBackground(reader, decoder, buffer, fullReply).then(finalReply => {
+                                        // 后台接收完成后,更新缓存的完整回复
+                                        this._cachedStreamReply = finalReply;
+                                    });
+                                    // 立刻返回第一个片段,让前端开始展示
+                                    return [fullReply.trim()];
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Stream] 解析chunk失败:', e);
+                        }
+                    }
+                }
+                
+                // 如果没有触发firstChunkReceived(极少见),返回完整内容
+                if (!fullReply.trim()) {
+                    throw new Error('AI返回内容为空');
+                }
+                return fullReply.split('\n').filter(t => t.trim());
+                
+            } catch (e) {
+                console.error('[Stream] 读取失败:', e);
+                throw e;
+            }
+        },
+        
+        // 后台继续接收流式数据
+        _continueStreamInBackground: async function(reader, decoder, buffer, initialReply) {
+            let fullReply = initialReply;
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed === 'data: [DONE]') continue;
+                        if (!trimmed.startsWith('data: ')) continue;
+                        
+                        try {
+                            const jsonStr = trimmed.substring(6);
+                            const chunk = JSON.parse(jsonStr);
+                            const content = chunk.choices?.[0]?.delta?.content;
+                            if (content) {
+                                fullReply += content;
+                            }
+                        } catch (e) {
+                            console.warn('[Stream] 后台解析chunk失败:', e);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[Stream] 后台接收失败:', e);
+            }
+            return fullReply;
         },
 
         /**
@@ -1772,14 +1857,105 @@ const API = {
                     messages: messages,
                     temperature: config.temperature !== undefined ? config.temperature : 0.8,
                     max_tokens: 4096,
+                    stream: true,  // 启用流式传输
                     safety_settings: API.Settings.getSafetySettings()
                 })
             });
 
             if (!response.ok) throw new Error('API Request Failed');
             
-            const data = await response.json();
-            return data.choices[0].message.content;
+            // 流式读取响应
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let fullReply = '';
+            let firstChunkReceived = false;
+            
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed === 'data: [DONE]') continue;
+                        if (!trimmed.startsWith('data: ')) continue;
+                        
+                        try {
+                            const jsonStr = trimmed.substring(6);
+                            const chunk = JSON.parse(jsonStr);
+                            const content = chunk.choices?.[0]?.delta?.content;
+                            
+                            if (content) {
+                                fullReply += content;
+                                
+                                // 第一个数据片段到达后立刻返回,触发展示流程
+                                if (!firstChunkReceived && fullReply.trim().length > 0) {
+                                    firstChunkReceived = true;
+                                    // 继续在后台接收剩余数据
+                                    this._continueOfflineStreamInBackground(reader, decoder, buffer, fullReply).then(finalReply => {
+                                        // 后台接收完成后,更新缓存的完整回复
+                                        this._cachedOfflineStreamReply = finalReply;
+                                    });
+                                    // 立刻返回第一个片段,让前端开始展示
+                                    return fullReply.trim();
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[OfflineStream] 解析chunk失败:', e);
+                        }
+                    }
+                }
+                
+                // 如果没有触发firstChunkReceived(极少见),返回完整内容
+                if (!fullReply.trim()) {
+                    throw new Error('AI返回内容为空');
+                }
+                return fullReply.trim();
+                
+            } catch (e) {
+                console.error('[OfflineStream] 读取失败:', e);
+                throw e;
+            }
+        },
+        
+        // 后台继续接收线下模式流式数据
+        _continueOfflineStreamInBackground: async function(reader, decoder, buffer, initialReply) {
+            let fullReply = initialReply;
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed === 'data: [DONE]') continue;
+                        if (!trimmed.startsWith('data: ')) continue;
+                        
+                        try {
+                            const jsonStr = trimmed.substring(6);
+                            const chunk = JSON.parse(jsonStr);
+                            const content = chunk.choices?.[0]?.delta?.content;
+                            if (content) {
+                                fullReply += content;
+                            }
+                        } catch (e) {
+                            console.warn('[OfflineStream] 后台解析chunk失败:', e);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[OfflineStream] 后台接收失败:', e);
+            }
+            return fullReply;
         },
 
         /**
