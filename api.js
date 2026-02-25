@@ -1274,9 +1274,9 @@ const API = {
         },
 
         /**
-         * 智能分段函数 - 强制拆分成多条消息
-         * 无论AI返回什么格式，都必须拆分成多条
-         * 但要保护URL不被拆分
+         * 智能分段函数 - 更自然的分段逻辑
+         * 只按换行符分段，不强制按标点拆分，让对话更像真人
+         * 保护URL和特殊指令不被拆分
          */
         _smartSplitReply: function(fullReply) {
             console.log('[SmartSplit] 原始回复:', fullReply);
@@ -1306,52 +1306,21 @@ const API = {
                 return placeholder + idx + '___';
             });
             
-            // 第一步：按换行符分割
+            // 也保护URL（http/https开头的链接）
+            cleanReply = cleanReply.replace(/https?:\/\/[^\s\n]+/gi, (match) => {
+                const idx = specialCommands.length;
+                specialCommands.push(match);
+                console.log('[SmartSplit] 保护URL:', match);
+                return placeholder + idx + '___';
+            });
+            
+            // 只按换行符分割，保持段落完整性
             let segments = cleanReply.split(/\n+/).filter(t => t.trim());
             console.log('[SmartSplit] 换行分割后条数:', segments.length);
             
-            // 第二步：对每个段落进行标点拆分（但保护URL和占位符）
-            let allBubbles = [];
-            for (const seg of segments) {
-                const trimmedSeg = seg.trim();
-                // 检查是否是URL或包含占位符
-                if (this._isUrl(trimmedSeg) || trimmedSeg.includes(placeholder)) {
-                    // 不拆分，直接保留
-                    allBubbles.push(trimmedSeg);
-                } else {
-                    const bubbles = this._splitByPunctuation(trimmedSeg);
-                    allBubbles.push(...bubbles);
-                }
-            }
-            console.log('[SmartSplit] 标点拆分后条数:', allBubbles.length);
-            
-            // 第三步：如果只有1-2条且内容较长，强制拆分（但保护占位符）
-            if (allBubbles.length <= 2) {
-                const moreBubbles = [];
-                for (const bubble of allBubbles) {
-                    if (this._isUrl(bubble) || bubble.includes(placeholder)) {
-                        moreBubbles.push(bubble);
-                    } else if (bubble.length > 20) {
-                        // 先按逗号拆
-                        const parts = this._splitByComma(bubble);
-                        if (parts.length > 1) {
-                            moreBubbles.push(...parts);
-                        } else {
-                            // 逗号拆不开，强制按字数拆
-                            const charParts = this._forceCharSplit(bubble);
-                            moreBubbles.push(...charParts);
-                        }
-                    } else {
-                        moreBubbles.push(bubble);
-                    }
-                }
-                allBubbles = moreBubbles;
-                console.log('[SmartSplit] 强制拆分后条数:', allBubbles.length);
-            }
-            
-            // 第四步：还原特殊指令
-            const result = allBubbles.map(bubble => {
-                let restored = bubble;
+            // 还原特殊指令和URL
+            const result = segments.map(seg => {
+                let restored = seg.trim();
                 for (let i = 0; i < specialCommands.length; i++) {
                     restored = restored.replace(placeholder + i + '___', specialCommands[i]);
                 }
