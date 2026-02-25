@@ -891,15 +891,33 @@ const API = {
             }
             
             systemPrompt += '\n\n【线上聊天模式 - 核心规则】';
-            systemPrompt += '\n⚠️ 你现在是【线上聊天】，不是线下剧情！';
-            systemPrompt += '\n1. 像真人发微信/QQ一样说话，每条消息1-2句话（20-30字内）';
-            systemPrompt += '\n2. 【必须】分多条发送（用换行分隔），每次回复至少3条消息，模拟真实聊天节奏';
-            systemPrompt += '\n3. 禁止任何描写（动作/心理/场景/括号注释），只说话！';
-            systemPrompt += '\n4. 禁止主动发emoji（😊😂等），可发表情包URL';
-            systemPrompt += '\n5. 口语化，用"嗯""啊""哈哈""emmm"等语气词';
-            
-            systemPrompt += '\n\n❌ 错误：*微微一笑* 好的呀~';
-            systemPrompt += '\n✅ 正确：好的呀~';
+            systemPrompt += '\n⚠️ 你现在是【线上聊天】，模拟真人发微信/QQ！';
+            systemPrompt += '\n';
+            systemPrompt += '\n★★★ 最重要的规则 ★★★';
+            systemPrompt += '\n你必须像真人发消息一样，把回复拆成多条短消息发送！';
+            systemPrompt += '\n每次回复【必须至少5条消息】，用换行符分隔每条消息。';
+            systemPrompt += '\n';
+            systemPrompt += '\n【真人发消息的特点】';
+            systemPrompt += '\n- 一条消息可以只有几个字，比如"嗯"、"好的"、"哈哈哈"';
+            systemPrompt += '\n- 想到什么说什么，不会把所有话攒成一大段';
+            systemPrompt += '\n- 口语化，用语气词：嗯、啊、哈哈、emmm、额、呃、诶、哦';
+            systemPrompt += '\n- 说话随意自然，不会像写作文一样';
+            systemPrompt += '\n';
+            systemPrompt += '\n【格式示例】';
+            systemPrompt += '\n哈哈哈';
+            systemPrompt += '\n你说的这个我知道';
+            systemPrompt += '\n之前还看过相关的';
+            systemPrompt += '\n挺有意思的';
+            systemPrompt += '\n你是怎么知道的呀';
+            systemPrompt += '\n';
+            systemPrompt += '\n【禁止事项】';
+            systemPrompt += '\n- 禁止动作描写（*微笑*、*点头*等）';
+            systemPrompt += '\n- 禁止心理描写';
+            systemPrompt += '\n- 禁止场景描写';
+            systemPrompt += '\n- 禁止括号注释';
+            systemPrompt += '\n- 禁止把所有内容写成一条长消息';
+            systemPrompt += '\n';
+            systemPrompt += '\n记住：你必须严格按照角色人设来回复，但表达方式要像真人发微信！';
             
             // 特殊功能指令（精简版）
             systemPrompt += '\n\n【特殊指令】';
@@ -1166,7 +1184,7 @@ const API = {
             // 不污染用户消息内容，避免破坏 AI 分条发送的格式
             messages.push({
                 role: 'system',
-                content: '⚠️⚠️⚠️ 【最高优先级】回复格式强制要求：你现在是线上聊天模式！你必须用换行符分隔，发送【不少于3条】独立的短消息（每条1-2句话）。绝对禁止只发1条长消息！绝对禁止动作描写(*旁白*)、心理描写、环境渲染。禁止复述任何中括号系统标注。请像真人发微信一样，把想说的话拆成多条短消息发出来。'
+                content: '⚠️⚠️⚠️ 【最高优先级】你必须像真人发微信一样回复！\n\n1. 必须发送【至少5条消息】，用换行符分隔\n2. 每条消息可以很短，几个字也行\n3. 口语化、自然、随意\n4. 严格按照角色人设回复\n5. 禁止动作描写、心理描写、括号注释\n\n示例格式：\n哈哈\n你说的对\n我也这么觉得\n不过话说回来\n你最近怎么样啊'
             });
 
             const response = await fetch(config.endpoint + '/chat/completions', {
@@ -1250,220 +1268,53 @@ const API = {
         },
 
         /**
-         * 智能分段函数 - 模拟真人聊天的消息流
-         * 核心理念：像真人发微信一样，日常闲聊每条很短，讲故事才稍长
+         * 智能分段函数 - 简单直接，信任AI的换行
+         * AI已经被提示要分多条发送，这里只做简单处理
          */
         _smartSplitReply: function(fullReply) {
-            // 第一步：先按换行符分割（AI自己的分段意图）
+            // 直接按换行符分割，信任AI的分段
             let segments = fullReply.split('\n').filter(t => t.trim());
             
-            // 第二步：对每个段落进行"真人化"拆分
-            const finalBubbles = [];
-            for (const segment of segments) {
-                const humanized = this._humanizeSplit(segment.trim());
-                finalBubbles.push(...humanized);
+            // 如果AI没有分段或分段太少，简单拆分
+            if (segments.length < 5) {
+                segments = this._simpleSplit(fullReply);
             }
             
-            // 第三步：确保至少3条消息
-            if (finalBubbles.length < 3) {
-                return this._humanizeSplit(fullReply, true);
-            }
-            
-            return finalBubbles;
+            return segments;
         },
 
         /**
-         * 真人化拆分 - 模拟真人发消息的节奏
-         * 真人特点：
-         * - 一句话说完就发，不会攒着
-         * - 语气词、感叹词单独发
-         * - 问句单独发
-         * - 日常闲聊每条5-25字
+         * 简单拆分 - 按标点符号拆分成多条
          */
-        _humanizeSplit: function(text, forceMore = false) {
+        _simpleSplit: function(text) {
             const bubbles = [];
             
-            // 检测是否是"小作文"模式（长篇叙述）
-            const isLongForm = text.length > 150 || text.includes('首先') || text.includes('其次') ||
-                              text.includes('第一') || text.includes('然后') || text.includes('最后');
+            // 按句号、问号、感叹号、省略号拆分
+            const sentences = text.match(/[^。！？…\n]+[。！？…]?/g) || [text];
             
-            // 日常聊天模式：每条很短
-            // 小作文模式：每条可以稍长
-            const maxLen = isLongForm ? 50 : 25;
-            
-            // 按句子切分（句号、问号、感叹号、省略号）
-            const sentences = text.match(/[^。！？…~]+[。！？…~]?/g) || [text];
-            
-            let currentBubble = '';
-            
-            for (let i = 0; i < sentences.length; i++) {
-                const sentence = sentences[i].trim();
-                if (!sentence) continue;
-                
-                // 特殊处理：语气词/感叹词/短回应 单独成条
-                if (this._isShortResponse(sentence)) {
-                    if (currentBubble) {
-                        bubbles.push(currentBubble);
-                        currentBubble = '';
-                    }
-                    bubbles.push(sentence);
-                    continue;
+            for (const sentence of sentences) {
+                const trimmed = sentence.trim();
+                if (trimmed) {
+                    bubbles.push(trimmed);
                 }
-                
-                // 特殊处理：问句单独成条
-                if (sentence.includes('？') || sentence.includes('?') ||
-                    sentence.includes('吗') || sentence.includes('呢') || sentence.includes('吧')) {
-                    if (currentBubble) {
-                        bubbles.push(currentBubble);
-                        currentBubble = '';
-                    }
-                    // 问句如果太长，拆分
-                    if (sentence.length > maxLen) {
-                        const parts = this._splitAtComma(sentence, maxLen);
-                        bubbles.push(...parts);
+            }
+            
+            // 如果还是不够5条，继续按逗号拆
+            if (bubbles.length < 5) {
+                const moreBubbles = [];
+                for (const bubble of bubbles) {
+                    if (bubble.length > 30) {
+                        // 长句按逗号拆
+                        const parts = bubble.match(/[^，、,]+[，、,]?/g) || [bubble];
+                        moreBubbles.push(...parts.map(p => p.trim()).filter(p => p));
                     } else {
-                        bubbles.push(sentence);
+                        moreBubbles.push(bubble);
                     }
-                    continue;
                 }
-                
-                // 普通句子：累积到合适长度
-                if (!currentBubble) {
-                    currentBubble = sentence;
-                } else if ((currentBubble + sentence).length <= maxLen) {
-                    currentBubble += sentence;
-                } else {
-                    // 当前气泡够了，保存
-                    bubbles.push(currentBubble);
-                    currentBubble = sentence;
-                }
-                
-                // 如果当前句子本身就超长，需要拆分
-                if (currentBubble.length > maxLen) {
-                    const parts = this._splitAtComma(currentBubble, maxLen);
-                    // 最后一部分继续累积
-                    currentBubble = parts.pop() || '';
-                    bubbles.push(...parts);
-                }
-            }
-            
-            // 保存最后的气泡
-            if (currentBubble) {
-                // 最后一条如果太长，也要拆
-                if (currentBubble.length > maxLen) {
-                    const parts = this._splitAtComma(currentBubble, maxLen);
-                    bubbles.push(...parts);
-                } else {
-                    bubbles.push(currentBubble);
-                }
-            }
-            
-            // 如果强制要求更多条，且当前不够
-            if (forceMore && bubbles.length < 3) {
-                return this._forceSplitHuman(text);
+                return moreBubbles.filter(b => b.trim());
             }
             
             return bubbles.filter(b => b.trim());
-        },
-
-        /**
-         * 检测是否是短回应（语气词、感叹词等）
-         */
-        _isShortResponse: function(text) {
-            const shortPatterns = [
-                /^[哈嘿嗯啊哦呃唔噢欸嘛呀咦哇呜嘻]+[~。！？…]*$/,  // 语气词
-                /^(好的?|行|可以|没问题|当然|是的?|对|嗯|ok|OK|好嘞|收到|明白|懂了|知道了?)[~。！？…]*$/,  // 短回应
-                /^(哈哈+|嘿嘿+|呵呵+|嘻嘻+|hiahia+)[~。！？…]*$/i,  // 笑声
-                /^(emmm*|emm*|额+|呃+|这+|那个+)[~。！？…]*$/i,  // 思考词
-                /^(谢谢|感谢|多谢|3q|thx|thanks)[~。！？…]*$/i,  // 感谢
-                /^(拜拜|再见|晚安|早安|午安|你好|嗨|hi|hello)[~。！？…]*$/i,  // 问候
-            ];
-            
-            return text.length <= 10 && shortPatterns.some(p => p.test(text));
-        },
-
-        /**
-         * 在逗号处拆分长句
-         */
-        _splitAtComma: function(text, maxLen) {
-            const result = [];
-            // 按逗号、顿号拆分
-            const parts = text.match(/[^，、,]+[，、,]?/g) || [text];
-            let current = '';
-            
-            for (const part of parts) {
-                if (!current) {
-                    current = part;
-                } else if ((current + part).length <= maxLen) {
-                    current += part;
-                } else {
-                    result.push(current);
-                    current = part;
-                }
-            }
-            
-            if (current) {
-                result.push(current);
-            }
-            
-            return result.filter(r => r.trim());
-        },
-
-        /**
-         * 强制拆分成真人风格（最后手段）
-         */
-        _forceSplitHuman: function(text) {
-            const result = [];
-            // 目标：每条10-20字
-            const targetLen = 15;
-            
-            // 先按所有标点拆分
-            const parts = text.match(/[^。！？…，、,~]+[。！？…，、,~]?/g) || [text];
-            let current = '';
-            
-            for (const part of parts) {
-                const trimmed = part.trim();
-                if (!trimmed) continue;
-                
-                if (!current) {
-                    current = trimmed;
-                } else if ((current + trimmed).length <= targetLen) {
-                    current += trimmed;
-                } else {
-                    result.push(current);
-                    current = trimmed;
-                }
-            }
-            
-            if (current) {
-                result.push(current);
-            }
-            
-            // 确保至少3条
-            if (result.length < 3 && text.length >= 15) {
-                // 强制按字数均分
-                const avgLen = Math.ceil(text.length / 3);
-                const forced = [];
-                let remaining = text;
-                
-                while (remaining.length > 0 && forced.length < 2) {
-                    // 在目标位置附近找标点
-                    let pos = avgLen;
-                    const puncts = '。！？…，、,~';
-                    for (let i = Math.max(0, avgLen - 8); i < Math.min(remaining.length, avgLen + 8); i++) {
-                        if (puncts.includes(remaining[i])) {
-                            pos = i + 1;
-                            break;
-                        }
-                    }
-                    forced.push(remaining.substring(0, pos).trim());
-                    remaining = remaining.substring(pos).trim();
-                }
-                if (remaining) forced.push(remaining);
-                return forced.filter(f => f.trim());
-            }
-            
-            return result.filter(r => r.trim());
         },
 
         /**
