@@ -898,38 +898,42 @@ const API = {
             systemPrompt += '\n每次回复【必须至少5条消息】，用换行符分隔每条消息。';
             systemPrompt += '\n';
             systemPrompt += '\n【真人发消息的特点】';
-            systemPrompt += '\n- 一条消息可以只有几个字，比如"嗯"、"好的"、"哈哈哈"';
-            systemPrompt += '\n- 想到什么说什么，不会把所有话攒成一大段';
             systemPrompt += '\n- 口语化，用语气词：嗯、啊、哈哈、emmm、额、呃、诶、哦';
             systemPrompt += '\n- 说话随意自然，不会像写作文一样';
+            systemPrompt += '\n- 一条消息可以包含多句话，就像真人发微信一样';
+            systemPrompt += '\n- 不要每句话都换行！只有在想分开发送时才换行';
             systemPrompt += '\n';
-            systemPrompt += '\n【格式示例】';
+            systemPrompt += '\n【格式示例 - 正确】';
+            systemPrompt += '\n哈哈哈你说的这个我知道，之前还看过相关的，挺有意思的';
+            systemPrompt += '\n你是怎么知道的呀';
+            systemPrompt += '\n';
+            systemPrompt += '\n【格式示例 - 错误，不要这样】';
             systemPrompt += '\n哈哈哈';
             systemPrompt += '\n你说的这个我知道';
             systemPrompt += '\n之前还看过相关的';
-            systemPrompt += '\n挺有意思的';
-            systemPrompt += '\n你是怎么知道的呀';
+            systemPrompt += '\n（每句话都换行是错误的！）';
             systemPrompt += '\n';
             systemPrompt += '\n【禁止事项】';
             systemPrompt += '\n- 禁止动作描写（*微笑*、*点头*等）';
             systemPrompt += '\n- 禁止心理描写';
             systemPrompt += '\n- 禁止场景描写';
             systemPrompt += '\n- 禁止括号注释';
-            systemPrompt += '\n- 禁止把所有内容写成一条长消息';
+            systemPrompt += '\n- 禁止每句话都换行（这样会变成很多条短消息）';
             systemPrompt += '\n';
-            systemPrompt += '\n记住：你必须严格按照角色人设来回复，但表达方式要像真人发微信！';
+            systemPrompt += '\n记住：你必须严格按照角色人设来回复，但表达方式要像真人发微信！一条消息可以有多句话！';
             
             // 特殊功能指令（精简版）
-            systemPrompt += '\n\n【特殊指令】';
+            systemPrompt += '\n\n【特殊指令】（谨慎使用，不要滥用）';
             systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复';
             systemPrompt += '\n消息[RECALL] - 撤回（说错话时用）';
-            systemPrompt += '\n[图片:描述] - 文字传图（单独一行）';
-            systemPrompt += '\n[语音:内容] - 语音消息（单独一行）';
+            systemPrompt += '\n[图片:描述] - 文字传图（单独一行，仅在需要描述场景时偶尔使用）';
+            systemPrompt += '\n[语音:内容] - 语音消息（单独一行，极少使用，只在特别亲密或撒娇时才用）';
             systemPrompt += '\n[转账:金额:备注] - 转账（单独一行，不重复发）';
             systemPrompt += '\n[领取转账] - 领取用户转账（已领取不重复）';
             systemPrompt += '\n[换头像] - 当用户提到换头像并发送图片时，使用此指令将用户发送的图片设为你的新头像（单独一行）';
             
             systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账/换头像必须单独一行！';
+            systemPrompt += '\n⚠️ 重要：日常对话请直接用文字回复，不要频繁使用语音消息！语音消息应该非常罕见！';
 
             // --- 身份隔离铁律 ---
             systemPrompt += '\n\n[CRITICAL: 你必须严格区分用户和你自己的身份。用户发出的表情和情绪仅属于用户，严禁你在回复中认领这些情绪或复读用户的表情描述。]';
@@ -992,9 +996,11 @@ const API = {
                     systemPrompt += '\n你可以使用以下表情包来表达情绪，根据你的人设性格决定发送频率：';
                     systemPrompt += '\n- 如果人设活泼开朗，可以多发表情包';
                     systemPrompt += '\n- 如果人设冷淡高冷，可以少发或不发';
+                    systemPrompt += '\n- ⚠️ 表情包和[图片:描述]是完全不同的功能！表情包是预设的URL，[图片:描述]是文字传图';
                     systemPrompt += '\n- 发送表情包时，只需要单独一行输出完整的URL即可，不要添加任何markdown格式、括号、感叹号或其他修饰符号';
-                    systemPrompt += '\n- 错误示例：![表情](URL) 或 [表情](URL) 或 ![](URL)';
+                    systemPrompt += '\n- 错误示例：![表情](URL) 或 [表情](URL) 或 ![](URL) 或 [图片:表情包URL]';
                     systemPrompt += '\n- 正确示例：直接输出URL，如 https://example.com/emoji.png';
+                    systemPrompt += '\n- ⚠️ 只能使用下面列表中的表情包URL，不要自己编造URL！';
                     systemPrompt += '\n\n可用表情包列表（含义: URL）：\n' + emojiList;
                 }
             }
