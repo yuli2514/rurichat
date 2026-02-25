@@ -1268,53 +1268,86 @@ const API = {
         },
 
         /**
-         * 智能分段函数 - 简单直接，信任AI的换行
-         * AI已经被提示要分多条发送，这里只做简单处理
+         * 智能分段函数 - 强制拆分成多条消息
          */
         _smartSplitReply: function(fullReply) {
-            // 直接按换行符分割，信任AI的分段
+            // 第一步：按换行符分割
             let segments = fullReply.split('\n').filter(t => t.trim());
             
-            // 如果AI没有分段或分段太少，简单拆分
+            // 第二步：如果分段不够5条，强制拆分
             if (segments.length < 5) {
-                segments = this._simpleSplit(fullReply);
+                // 对每个段落进行拆分
+                const allBubbles = [];
+                for (const seg of segments) {
+                    const bubbles = this._splitByPunctuation(seg);
+                    allBubbles.push(...bubbles);
+                }
+                segments = allBubbles;
             }
             
-            return segments;
+            // 第三步：如果还是不够，继续拆
+            if (segments.length < 5) {
+                segments = this._forceSplitMore(segments);
+            }
+            
+            // 确保至少有3条
+            if (segments.length < 3 && fullReply.length > 10) {
+                segments = this._forceSplitMore([fullReply]);
+            }
+            
+            return segments.filter(s => s.trim());
         },
 
         /**
-         * 简单拆分 - 按标点符号拆分成多条
+         * 按标点符号拆分，保留标点
          */
-        _simpleSplit: function(text) {
+        _splitByPunctuation: function(text) {
+            if (!text || text.length < 10) return [text];
+            
             const bubbles = [];
             
-            // 按句号、问号、感叹号、省略号拆分
-            const sentences = text.match(/[^。！？…\n]+[。！？…]?/g) || [text];
+            // 按句号、问号、感叹号、省略号、波浪号拆分
+            // 正则：匹配非标点内容+标点，或者末尾无标点的内容
+            const pattern = /[^。！？…~\n]+[。！？…~]+|[^。！？…~\n]+$/g;
+            const matches = text.match(pattern);
             
-            for (const sentence of sentences) {
-                const trimmed = sentence.trim();
-                if (trimmed) {
-                    bubbles.push(trimmed);
-                }
-            }
-            
-            // 如果还是不够5条，继续按逗号拆
-            if (bubbles.length < 5) {
-                const moreBubbles = [];
-                for (const bubble of bubbles) {
-                    if (bubble.length > 30) {
-                        // 长句按逗号拆
-                        const parts = bubble.match(/[^，、,]+[，、,]?/g) || [bubble];
-                        moreBubbles.push(...parts.map(p => p.trim()).filter(p => p));
-                    } else {
-                        moreBubbles.push(bubble);
+            if (matches && matches.length > 0) {
+                for (const match of matches) {
+                    const trimmed = match.trim();
+                    if (trimmed) {
+                        bubbles.push(trimmed);
                     }
                 }
-                return moreBubbles.filter(b => b.trim());
+            } else {
+                bubbles.push(text);
             }
             
-            return bubbles.filter(b => b.trim());
+            return bubbles;
+        },
+
+        /**
+         * 强制拆分更多条
+         */
+        _forceSplitMore: function(segments) {
+            const result = [];
+            
+            for (const seg of segments) {
+                if (seg.length > 25) {
+                    // 按逗号、顿号拆分
+                    const pattern = /[^，、,；：]+[，、,；：]+|[^，、,；：]+$/g;
+                    const parts = seg.match(pattern);
+                    
+                    if (parts && parts.length > 1) {
+                        result.push(...parts.map(p => p.trim()).filter(p => p));
+                    } else {
+                        result.push(seg);
+                    }
+                } else {
+                    result.push(seg);
+                }
+            }
+            
+            return result;
         },
 
         /**
