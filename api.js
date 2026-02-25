@@ -1269,46 +1269,85 @@ const API = {
 
         /**
          * 智能分段函数 - 强制拆分成多条消息
+         * 无论AI返回什么格式，都必须拆分成多条
+         * 但要保护URL不被拆分
          */
         _smartSplitReply: function(fullReply) {
-            // 第一步：按换行符分割
-            let segments = fullReply.split('\n').filter(t => t.trim());
+            console.log('[SmartSplit] 原始回复长度:', fullReply.length, '内容预览:', fullReply.substring(0, 100));
             
-            // 第二步：如果分段不够5条，强制拆分
-            if (segments.length < 5) {
-                // 对每个段落进行拆分
-                const allBubbles = [];
-                for (const seg of segments) {
-                    const bubbles = this._splitByPunctuation(seg);
+            // 清理可能的特殊字符
+            let cleanReply = fullReply.trim();
+            
+            // 第一步：按换行符分割
+            let segments = cleanReply.split(/\n+/).filter(t => t.trim());
+            console.log('[SmartSplit] 换行分割后条数:', segments.length);
+            
+            // 第二步：对每个段落进行标点拆分（但保护URL）
+            let allBubbles = [];
+            for (const seg of segments) {
+                // 检查是否是URL（表情包、图片等）
+                if (this._isUrl(seg.trim())) {
+                    // URL不拆分，直接保留
+                    allBubbles.push(seg.trim());
+                } else {
+                    const bubbles = this._splitByPunctuation(seg.trim());
                     allBubbles.push(...bubbles);
                 }
-                segments = allBubbles;
+            }
+            console.log('[SmartSplit] 标点拆分后条数:', allBubbles.length);
+            
+            // 第三步：如果还是太少，继续按逗号拆（但保护URL）
+            if (allBubbles.length < 3) {
+                const moreBubbles = [];
+                for (const bubble of allBubbles) {
+                    if (this._isUrl(bubble)) {
+                        moreBubbles.push(bubble);
+                    } else {
+                        const parts = this._splitByComma(bubble);
+                        moreBubbles.push(...parts);
+                    }
+                }
+                allBubbles = moreBubbles;
+                console.log('[SmartSplit] 逗号拆分后条数:', allBubbles.length);
             }
             
-            // 第三步：如果还是不够，继续拆
-            if (segments.length < 5) {
-                segments = this._forceSplitMore(segments);
+            // 第四步：最后保底 - 如果还是只有1条且很长且不是URL，强制按字数拆
+            if (allBubbles.length === 1 && allBubbles[0].length > 30 && !this._isUrl(allBubbles[0])) {
+                allBubbles = this._forceCharSplit(allBubbles[0]);
+                console.log('[SmartSplit] 强制字数拆分后条数:', allBubbles.length);
             }
             
-            // 确保至少有3条
-            if (segments.length < 3 && fullReply.length > 10) {
-                segments = this._forceSplitMore([fullReply]);
-            }
+            // 过滤空消息
+            const result = allBubbles.filter(s => s && s.trim());
+            console.log('[SmartSplit] 最终条数:', result.length);
             
-            return segments.filter(s => s.trim());
+            return result;
         },
 
         /**
-         * 按标点符号拆分，保留标点
+         * 检查是否是URL
+         */
+        _isUrl: function(text) {
+            if (!text) return false;
+            text = text.trim();
+            // 检查是否以 http:// 或 https:// 开头
+            return /^https?:\/\//i.test(text);
+        },
+
+        /**
+         * 按句号、问号、感叹号等拆分，保留标点
          */
         _splitByPunctuation: function(text) {
-            if (!text || text.length < 10) return [text];
+            if (!text) return [];
+            text = text.trim();
+            if (text.length < 5) return [text];
             
             const bubbles = [];
             
-            // 按句号、问号、感叹号、省略号、波浪号拆分
-            // 正则：匹配非标点内容+标点，或者末尾无标点的内容
-            const pattern = /[^。！？…~\n]+[。！？…~]+|[^。！？…~\n]+$/g;
+            // 中文标点：句号、问号、感叹号、省略号、波浪号
+            // 英文标点：. ? !
+            // 正则：匹配内容+标点
+            const pattern = /[^。！？…~.!?\n]+[。！？…~.!?]+|[^。！？…~.!?\n]+$/g;
             const matches = text.match(pattern);
             
             if (matches && matches.length > 0) {
@@ -1318,7 +1357,10 @@ const API = {
                         bubbles.push(trimmed);
                     }
                 }
-            } else {
+            }
+            
+            // 如果正则没匹配到，返回原文
+            if (bubbles.length === 0) {
                 bubbles.push(text);
             }
             
@@ -1326,28 +1368,69 @@ const API = {
         },
 
         /**
-         * 强制拆分更多条
+         * 按逗号、顿号拆分，保留标点
          */
-        _forceSplitMore: function(segments) {
-            const result = [];
+        _splitByComma: function(text) {
+            if (!text) return [];
+            text = text.trim();
+            if (text.length < 20) return [text];
             
-            for (const seg of segments) {
-                if (seg.length > 25) {
-                    // 按逗号、顿号拆分
-                    const pattern = /[^，、,；：]+[，、,；：]+|[^，、,；：]+$/g;
-                    const parts = seg.match(pattern);
-                    
-                    if (parts && parts.length > 1) {
-                        result.push(...parts.map(p => p.trim()).filter(p => p));
-                    } else {
-                        result.push(seg);
-                    }
-                } else {
-                    result.push(seg);
-                }
+            // 中文逗号、顿号、分号、冒号
+            const pattern = /[^，、,；：;:]+[，、,；：;:]+|[^，、,；：;:]+$/g;
+            const matches = text.match(pattern);
+            
+            if (matches && matches.length > 1) {
+                return matches.map(m => m.trim()).filter(m => m);
             }
             
-            return result;
+            return [text];
+        },
+
+        /**
+         * 强制按字数拆分（最后保底）
+         */
+        _forceCharSplit: function(text) {
+            if (!text) return [];
+            text = text.trim();
+            
+            const result = [];
+            const targetLen = 25; // 目标每条25字左右
+            let remaining = text;
+            
+            while (remaining.length > 0) {
+                if (remaining.length <= targetLen * 1.5) {
+                    // 剩余不多，直接作为最后一条
+                    result.push(remaining);
+                    break;
+                }
+                
+                // 在目标位置附近找标点
+                let splitPos = targetLen;
+                const allPuncts = '。！？…~，、,；：;:.!?';
+                
+                // 向后找标点（优先）
+                for (let i = targetLen; i < Math.min(remaining.length, targetLen + 15); i++) {
+                    if (allPuncts.includes(remaining[i])) {
+                        splitPos = i + 1;
+                        break;
+                    }
+                }
+                
+                // 如果向后没找到，向前找
+                if (splitPos === targetLen) {
+                    for (let i = targetLen - 1; i >= Math.max(0, targetLen - 15); i--) {
+                        if (allPuncts.includes(remaining[i])) {
+                            splitPos = i + 1;
+                            break;
+                        }
+                    }
+                }
+                
+                result.push(remaining.substring(0, splitPos).trim());
+                remaining = remaining.substring(splitPos).trim();
+            }
+            
+            return result.filter(r => r);
         },
 
         /**
