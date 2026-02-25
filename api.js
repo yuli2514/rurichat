@@ -894,33 +894,25 @@ const API = {
             systemPrompt += '\n⚠️ 你现在是【线上聊天】，模拟真人发微信/QQ！';
             systemPrompt += '\n';
             systemPrompt += '\n★★★ 最重要的规则 ★★★';
-            systemPrompt += '\n你必须像真人发消息一样，把回复拆成多条短消息发送！';
-            systemPrompt += '\n每次回复【必须至少5条消息】，用换行符分隔每条消息。';
+            systemPrompt += '\n你必须像真人发微信一样自然地回复！';
             systemPrompt += '\n';
             systemPrompt += '\n【真人发消息的特点】';
             systemPrompt += '\n- 口语化，用语气词：嗯、啊、哈哈、emmm、额、呃、诶、哦';
             systemPrompt += '\n- 说话随意自然，不会像写作文一样';
-            systemPrompt += '\n- 一条消息可以包含多句话，就像真人发微信一样';
-            systemPrompt += '\n- 不要每句话都换行！只有在想分开发送时才换行';
+            systemPrompt += '\n- 一条消息可以包含多句话，用逗号、句号等标点连接';
+            systemPrompt += '\n- 换行表示分开发送多条消息，不换行就是一条消息';
+            systemPrompt += '\n- 根据情况自由决定发几条消息，每条消息多长';
             systemPrompt += '\n';
-            systemPrompt += '\n【格式示例 - 正确】';
-            systemPrompt += '\n哈哈哈你说的这个我知道，之前还看过相关的，挺有意思的';
-            systemPrompt += '\n你是怎么知道的呀';
-            systemPrompt += '\n';
-            systemPrompt += '\n【格式示例 - 错误，不要这样】';
-            systemPrompt += '\n哈哈哈';
-            systemPrompt += '\n你说的这个我知道';
-            systemPrompt += '\n之前还看过相关的';
-            systemPrompt += '\n（每句话都换行是错误的！）';
+            systemPrompt += '\n【格式示例】';
+            systemPrompt += '\n哈哈哈你说的这个我知道，之前还看过相关的，挺有意思的。你是怎么知道的呀？';
             systemPrompt += '\n';
             systemPrompt += '\n【禁止事项】';
             systemPrompt += '\n- 禁止动作描写（*微笑*、*点头*等）';
             systemPrompt += '\n- 禁止心理描写';
             systemPrompt += '\n- 禁止场景描写';
             systemPrompt += '\n- 禁止括号注释';
-            systemPrompt += '\n- 禁止每句话都换行（这样会变成很多条短消息）';
             systemPrompt += '\n';
-            systemPrompt += '\n记住：你必须严格按照角色人设来回复，但表达方式要像真人发微信！一条消息可以有多句话！';
+            systemPrompt += '\n记住：你必须严格按照角色人设来回复，表达方式要像真人发微信！';
             
             // 特殊功能指令（精简版）
             systemPrompt += '\n\n【特殊指令】（谨慎使用，不要滥用）';
@@ -1280,9 +1272,9 @@ const API = {
         },
 
         /**
-         * 智能分段函数 - 更自然的分段逻辑
-         * 只按换行符分段，不强制按标点拆分，让对话更像真人
-         * 保护URL和特殊指令不被拆分
+         * 智能分段函数 - 合并短消息，保护特殊指令
+         * 把AI回复中连续的短文本合并成较长的消息，让对话更自然
+         * 特殊指令（语音、图片、转账、表情包URL）单独成一条
          */
         _smartSplitReply: function(fullReply) {
             console.log('[SmartSplit] 原始回复:', fullReply);
@@ -1301,7 +1293,7 @@ const API = {
                 const idx = specialCommands.length;
                 specialCommands.push(match);
                 console.log('[SmartSplit] 保护特殊指令:', match);
-                return placeholder + idx + '___';
+                return '\n' + placeholder + idx + '___\n';
             });
             
             // 也保护单独的指令如 [换头像]、[领取转账]、[RECALL]
@@ -1309,23 +1301,61 @@ const API = {
                 const idx = specialCommands.length;
                 specialCommands.push(match);
                 console.log('[SmartSplit] 保护特殊指令:', match);
-                return placeholder + idx + '___';
+                return '\n' + placeholder + idx + '___\n';
             });
             
-            // 也保护URL（http/https开头的链接）
+            // 也保护URL（http/https开头的链接）- 表情包URL
             cleanReply = cleanReply.replace(/https?:\/\/[^\s\n]+/gi, (match) => {
                 const idx = specialCommands.length;
                 specialCommands.push(match);
                 console.log('[SmartSplit] 保护URL:', match);
-                return placeholder + idx + '___';
+                return '\n' + placeholder + idx + '___\n';
             });
             
-            // 只按换行符分割，保持段落完整性
+            // 按换行符分割
             let segments = cleanReply.split(/\n+/).filter(t => t.trim());
             console.log('[SmartSplit] 换行分割后条数:', segments.length);
             
+            // 合并连续的普通文本消息，特殊指令单独成一条
+            const merged = [];
+            let currentText = '';
+            
+            for (const seg of segments) {
+                const trimmed = seg.trim();
+                
+                // 如果是特殊指令占位符，单独成一条
+                if (trimmed.includes(placeholder)) {
+                    // 先把之前累积的文本作为一条消息
+                    if (currentText) {
+                        merged.push(currentText);
+                        currentText = '';
+                    }
+                    merged.push(trimmed);
+                } else {
+                    // 普通文本，合并到当前消息
+                    if (currentText) {
+                        // 用逗号或句号连接
+                        const lastChar = currentText[currentText.length - 1];
+                        if ('。！？…~.!?'.includes(lastChar)) {
+                            currentText += trimmed;
+                        } else {
+                            currentText += '，' + trimmed;
+                        }
+                    } else {
+                        currentText = trimmed;
+                    }
+                }
+            }
+            
+            // 别忘了最后一条
+            if (currentText) {
+                merged.push(currentText);
+            }
+            
+            console.log('[SmartSplit] 合并后条数:', merged.length);
+            
             // 还原特殊指令和URL
-            const result = segments.map(seg => {
+            const result = merged.map(seg => {
                 let restored = seg.trim();
                 for (let i = 0; i < specialCommands.length; i++) {
                     restored = restored.replace(placeholder + i + '___', specialCommands[i]);
