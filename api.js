@@ -1199,6 +1199,8 @@ const API = {
                     temperature: config.temperature !== undefined ? config.temperature : 0.8,
                     max_tokens: 4096,
                     stream: true,  // 启用流式传输
+                    // 添加随机种子，确保每次生成不同的回复
+                    seed: Math.floor(Math.random() * 1000000),
                     safety_settings: API.Settings.getSafetySettings()
                 })
             });
@@ -1254,12 +1256,16 @@ const API = {
                 }
                 
                 // 接收完整内容后进行智能分段
+                console.log('[generateReply] AI原始回复:', fullReply);
+                
                 if (!fullReply.trim()) {
                     throw new Error('AI返回内容为空');
                 }
                 
                 // 智能分段逻辑:确保AI回复被拆分成多条消息
-                return this._smartSplitReply(fullReply);
+                const result = this._smartSplitReply(fullReply);
+                console.log('[generateReply] 分段结果:', result);
+                return result;
                 
             } catch (e) {
                 console.error('[Stream] 读取失败:', e);
@@ -1273,55 +1279,102 @@ const API = {
          * 但要保护URL不被拆分
          */
         _smartSplitReply: function(fullReply) {
-            console.log('[SmartSplit] 原始回复长度:', fullReply.length, '内容预览:', fullReply.substring(0, 100));
+            console.log('[SmartSplit] 原始回复:', fullReply);
             
             // 清理可能的特殊字符
             let cleanReply = fullReply.trim();
+            
+            // 第零步：提取并保护特殊指令（语音、图片、转账等）
+            // 用占位符替换，分段后再还原
+            const specialCommands = [];
+            const placeholder = '___SPECIAL_CMD_';
+            
+            // 匹配 [语音:xxx]、[图片:xxx]、[转账:xxx:xxx]、[表情·xxx]、[表情包:xxx] 等格式
+            // 使用 [\s\S] 来匹配包括换行符在内的所有字符
+            cleanReply = cleanReply.replace(/\[(?:语音|VOICE|voice|图片|IMAGE|image|转账|TRANSFER|换头像|领取转账|RECALL|表情|表情包)[：:·][\s\S]*?\]/gi, (match) => {
+                const idx = specialCommands.length;
+                specialCommands.push(match);
+                console.log('[SmartSplit] 保护特殊指令:', match);
+                return placeholder + idx + '___';
+            });
+            
+            // 也保护单独的指令如 [换头像]、[领取转账]、[RECALL]
+            cleanReply = cleanReply.replace(/\[(?:换头像|领取转账|RECALL)\]/gi, (match) => {
+                const idx = specialCommands.length;
+                specialCommands.push(match);
+                console.log('[SmartSplit] 保护特殊指令:', match);
+                return placeholder + idx + '___';
+            });
             
             // 第一步：按换行符分割
             let segments = cleanReply.split(/\n+/).filter(t => t.trim());
             console.log('[SmartSplit] 换行分割后条数:', segments.length);
             
-            // 第二步：对每个段落进行标点拆分（但保护URL）
+            // 第二步：对每个段落进行标点拆分（但保护URL和占位符）
             let allBubbles = [];
             for (const seg of segments) {
-                // 检查是否是URL（表情包、图片等）
-                if (this._isUrl(seg.trim())) {
-                    // URL不拆分，直接保留
-                    allBubbles.push(seg.trim());
+                const trimmedSeg = seg.trim();
+                // 检查是否是URL或包含占位符
+                if (this._isUrl(trimmedSeg) || trimmedSeg.includes(placeholder)) {
+                    // 不拆分，直接保留
+                    allBubbles.push(trimmedSeg);
                 } else {
-                    const bubbles = this._splitByPunctuation(seg.trim());
+                    const bubbles = this._splitByPunctuation(trimmedSeg);
                     allBubbles.push(...bubbles);
                 }
             }
             console.log('[SmartSplit] 标点拆分后条数:', allBubbles.length);
             
-            // 第三步：如果还是太少，继续按逗号拆（但保护URL）
-            if (allBubbles.length < 3) {
+            // 第三步：如果只有1-2条且内容较长，强制拆分（但保护占位符）
+            if (allBubbles.length <= 2) {
                 const moreBubbles = [];
                 for (const bubble of allBubbles) {
-                    if (this._isUrl(bubble)) {
+                    if (this._isUrl(bubble) || bubble.includes(placeholder)) {
                         moreBubbles.push(bubble);
-                    } else {
+                    } else if (bubble.length > 20) {
+                        // 先按逗号拆
                         const parts = this._splitByComma(bubble);
-                        moreBubbles.push(...parts);
+                        if (parts.length > 1) {
+                            moreBubbles.push(...parts);
+                        } else {
+                            // 逗号拆不开，强制按字数拆
+                            const charParts = this._forceCharSplit(bubble);
+                            moreBubbles.push(...charParts);
+                        }
+                    } else {
+                        moreBubbles.push(bubble);
                     }
                 }
                 allBubbles = moreBubbles;
-                console.log('[SmartSplit] 逗号拆分后条数:', allBubbles.length);
+                console.log('[SmartSplit] 强制拆分后条数:', allBubbles.length);
             }
             
-            // 第四步：最后保底 - 如果还是只有1条且很长且不是URL，强制按字数拆
-            if (allBubbles.length === 1 && allBubbles[0].length > 30 && !this._isUrl(allBubbles[0])) {
-                allBubbles = this._forceCharSplit(allBubbles[0]);
-                console.log('[SmartSplit] 强制字数拆分后条数:', allBubbles.length);
-            }
+            // 第四步：还原特殊指令
+            const result = allBubbles.map(bubble => {
+                let restored = bubble;
+                for (let i = 0; i < specialCommands.length; i++) {
+                    restored = restored.replace(placeholder + i + '___', specialCommands[i]);
+                }
+                return restored;
+            }).filter(s => s && s.trim());
             
-            // 过滤空消息
-            const result = allBubbles.filter(s => s && s.trim());
-            console.log('[SmartSplit] 最终条数:', result.length);
+            console.log('[SmartSplit] 最终结果:', result.length, result);
             
             return result;
+        },
+
+        /**
+         * 检查是否是特殊指令
+         */
+        _isSpecialCommand: function(text) {
+            if (!text) return false;
+            text = text.trim();
+            // 检查是否是特殊指令格式 [xxx] 或 [xxx:xxx]
+            // 包括：[语音:xxx]、[图片:xxx]、[转账:xxx]、[QUOTE:xxx]、[RECALL] 等
+            if (/^\[.+\]$/.test(text)) return true;
+            // 检查是否包含特殊指令（可能和其他文字混在一起）
+            if (/\[(?:语音|VOICE|voice|图片|IMAGE|转账|TRANSFER|QUOTE|RECALL|换头像|领取转账)[：:]/i.test(text)) return true;
+            return false;
         },
 
         /**
