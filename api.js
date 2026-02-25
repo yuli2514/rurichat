@@ -1235,16 +1235,160 @@ const API = {
                     }
                 }
                 
-                // 接收完整内容后按换行符分割返回
+                // 接收完整内容后进行智能分段
                 if (!fullReply.trim()) {
                     throw new Error('AI返回内容为空');
                 }
-                return fullReply.split('\n').filter(t => t.trim());
+                
+                // 智能分段逻辑:确保AI回复被拆分成多条消息
+                return this._smartSplitReply(fullReply);
                 
             } catch (e) {
                 console.error('[Stream] 读取失败:', e);
                 throw e;
             }
+        },
+
+        /**
+         * 智能分段函数 - 将AI回复拆分成多条消息
+         * 核心逻辑:
+         * 1. 优先按换行符分割
+         * 2. 如果分割后少于3条,根据语意逻辑(句号、问号、感叹号等)进一步切分
+         * 3. 确保每条消息长度适中(20-80字),避免"石碑式"输出
+         * 4. 保持语意完整性
+         */
+        _smartSplitReply: function(fullReply) {
+            // 第一步:按换行符分割
+            let segments = fullReply.split('\n').filter(t => t.trim());
+            
+            // 第二步:如果分割后少于3条,进行语意切分
+            if (segments.length < 3) {
+                segments = this._semanticSplit(fullReply);
+            }
+            
+            // 第三步:检查每条消息长度,如果太长则进一步切分
+            const finalSegments = [];
+            for (const seg of segments) {
+                if (seg.length > 80) {
+                    // 长消息需要进一步切分
+                    const subSegments = this._splitLongMessage(seg);
+                    finalSegments.push(...subSegments);
+                } else {
+                    finalSegments.push(seg);
+                }
+            }
+            
+            // 第四步:确保至少有3条消息
+            if (finalSegments.length < 3) {
+                return this._forceSplit(fullReply, 3);
+            }
+            
+            return finalSegments;
+        },
+
+        /**
+         * 语意切分 - 根据标点符号和语意逻辑切分
+         */
+        _semanticSplit: function(text) {
+            const segments = [];
+            // 按句号、问号、感叹号、省略号等自然断点切分
+            const sentences = text.match(/[^。！？…\n]+[。！？…]*/g) || [text];
+            
+            let currentSegment = '';
+            for (const sentence of sentences) {
+                const trimmed = sentence.trim();
+                if (!trimmed) continue;
+                
+                // 如果当前段落+新句子长度适中(20-80字),合并
+                if (currentSegment && (currentSegment + trimmed).length <= 80) {
+                    currentSegment += trimmed;
+                } else {
+                    // 否则,保存当前段落,开始新段落
+                    if (currentSegment) {
+                        segments.push(currentSegment);
+                    }
+                    currentSegment = trimmed;
+                }
+            }
+            
+            // 保存最后一个段落
+            if (currentSegment) {
+                segments.push(currentSegment);
+            }
+            
+            return segments.length > 0 ? segments : [text];
+        },
+
+        /**
+         * 切分长消息 - 将超过80字的消息切分成多条
+         */
+        _splitLongMessage: function(message) {
+            const segments = [];
+            // 先尝试按句子切分
+            const sentences = message.match(/[^。！？…]+[。！？…]*/g) || [message];
+            
+            for (const sentence of sentences) {
+                const trimmed = sentence.trim();
+                if (!trimmed) continue;
+                
+                if (trimmed.length <= 80) {
+                    segments.push(trimmed);
+                } else {
+                    // 如果单个句子太长,按逗号、顿号等次级标点切分
+                    const subSentences = trimmed.match(/[^，、；：]+[，、；：]*/g) || [trimmed];
+                    let currentSub = '';
+                    for (const sub of subSentences) {
+                        if (currentSub && (currentSub + sub).length <= 80) {
+                            currentSub += sub;
+                        } else {
+                            if (currentSub) segments.push(currentSub);
+                            currentSub = sub;
+                        }
+                    }
+                    if (currentSub) segments.push(currentSub);
+                }
+            }
+            
+            return segments.length > 0 ? segments : [message];
+        },
+
+        /**
+         * 强制切分 - 确保至少有指定数量的消息
+         */
+        _forceSplit: function(text, minCount) {
+            // 先尝试语意切分
+            let segments = this._semanticSplit(text);
+            
+            // 如果还是不够,强制按字数平均切分
+            if (segments.length < minCount) {
+                const avgLength = Math.ceil(text.length / minCount);
+                segments = [];
+                let remaining = text;
+                
+                while (remaining.length > 0 && segments.length < minCount - 1) {
+                    // 在平均长度附近寻找最近的标点符号
+                    let splitPos = avgLength;
+                    const punctuations = ['。', '！', '？', '…', '，', '、', '；', '：'];
+                    
+                    // 在 avgLength 前后20字范围内寻找标点
+                    for (let i = Math.max(0, avgLength - 20); i < Math.min(remaining.length, avgLength + 20); i++) {
+                        if (punctuations.includes(remaining[i])) {
+                            splitPos = i + 1;
+                            break;
+                        }
+                    }
+                    
+                    segments.push(remaining.substring(0, splitPos).trim());
+                    remaining = remaining.substring(splitPos).trim();
+                }
+                
+                // 剩余部分作为最后一条
+                if (remaining) {
+                    segments.push(remaining);
+                }
+            }
+            
+            return segments.filter(s => s.trim());
         },
 
         /**
