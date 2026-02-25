@@ -1250,161 +1250,151 @@ const API = {
         },
 
         /**
-         * 智能分段函数 - 语意驱动的消息流分发
-         * 核心逻辑:
-         * 1. 全局扫描：将AI返回的全部内容按段落、换行、强语气标点进行全局扫描
-         * 2. 动态气泡分发：根据内容自然的段落转折拆分为多个气泡
-         * 3. 均衡检查：确保每个气泡的体感长度相对均衡，消除"最后一条是石碑"的问题
-         * 4. 不限制总字数，不限制气泡数量，内容多就发更多条
+         * 智能分段函数 - 模拟真人聊天的消息流
+         * 核心理念：像真人发微信一样，日常闲聊每条很短，讲故事才稍长
          */
         _smartSplitReply: function(fullReply) {
-            // 第一步：全局语意扫描，提取所有句子单元
-            const allSentences = this._extractAllSentences(fullReply);
+            // 第一步：先按换行符分割（AI自己的分段意图）
+            let segments = fullReply.split('\n').filter(t => t.trim());
             
-            // 第二步：动态组合成气泡，目标每条30-60字
-            const targetMin = 30;
-            const targetMax = 60;
+            // 第二步：对每个段落进行"真人化"拆分
+            const finalBubbles = [];
+            for (const segment of segments) {
+                const humanized = this._humanizeSplit(segment.trim());
+                finalBubbles.push(...humanized);
+            }
+            
+            // 第三步：确保至少3条消息
+            if (finalBubbles.length < 3) {
+                return this._humanizeSplit(fullReply, true);
+            }
+            
+            return finalBubbles;
+        },
+
+        /**
+         * 真人化拆分 - 模拟真人发消息的节奏
+         * 真人特点：
+         * - 一句话说完就发，不会攒着
+         * - 语气词、感叹词单独发
+         * - 问句单独发
+         * - 日常闲聊每条5-25字
+         */
+        _humanizeSplit: function(text, forceMore = false) {
             const bubbles = [];
+            
+            // 检测是否是"小作文"模式（长篇叙述）
+            const isLongForm = text.length > 150 || text.includes('首先') || text.includes('其次') ||
+                              text.includes('第一') || text.includes('然后') || text.includes('最后');
+            
+            // 日常聊天模式：每条很短
+            // 小作文模式：每条可以稍长
+            const maxLen = isLongForm ? 50 : 25;
+            
+            // 按句子切分（句号、问号、感叹号、省略号）
+            const sentences = text.match(/[^。！？…~]+[。！？…~]?/g) || [text];
+            
             let currentBubble = '';
             
-            for (const sentence of allSentences) {
-                const trimmed = sentence.trim();
-                if (!trimmed) continue;
+            for (let i = 0; i < sentences.length; i++) {
+                const sentence = sentences[i].trim();
+                if (!sentence) continue;
                 
-                // 如果当前气泡为空，直接添加
-                if (!currentBubble) {
-                    currentBubble = trimmed;
+                // 特殊处理：语气词/感叹词/短回应 单独成条
+                if (this._isShortResponse(sentence)) {
+                    if (currentBubble) {
+                        bubbles.push(currentBubble);
+                        currentBubble = '';
+                    }
+                    bubbles.push(sentence);
                     continue;
                 }
                 
-                // 计算合并后的长度
-                const combinedLength = currentBubble.length + trimmed.length;
+                // 特殊处理：问句单独成条
+                if (sentence.includes('？') || sentence.includes('?') ||
+                    sentence.includes('吗') || sentence.includes('呢') || sentence.includes('吧')) {
+                    if (currentBubble) {
+                        bubbles.push(currentBubble);
+                        currentBubble = '';
+                    }
+                    // 问句如果太长，拆分
+                    if (sentence.length > maxLen) {
+                        const parts = this._splitAtComma(sentence, maxLen);
+                        bubbles.push(...parts);
+                    } else {
+                        bubbles.push(sentence);
+                    }
+                    continue;
+                }
                 
-                // 如果合并后在目标范围内，合并
-                if (combinedLength <= targetMax) {
-                    currentBubble += trimmed;
+                // 普通句子：累积到合适长度
+                if (!currentBubble) {
+                    currentBubble = sentence;
+                } else if ((currentBubble + sentence).length <= maxLen) {
+                    currentBubble += sentence;
                 } else {
-                    // 当前气泡已经足够，保存并开始新气泡
+                    // 当前气泡够了，保存
                     bubbles.push(currentBubble);
-                    currentBubble = trimmed;
+                    currentBubble = sentence;
+                }
+                
+                // 如果当前句子本身就超长，需要拆分
+                if (currentBubble.length > maxLen) {
+                    const parts = this._splitAtComma(currentBubble, maxLen);
+                    // 最后一部分继续累积
+                    currentBubble = parts.pop() || '';
+                    bubbles.push(...parts);
                 }
             }
             
-            // 保存最后一个气泡
+            // 保存最后的气泡
             if (currentBubble) {
-                bubbles.push(currentBubble);
-            }
-            
-            // 第三步：均衡检查 - 如果最后一条太长，继续拆分
-            const balancedBubbles = this._balanceBubbles(bubbles, targetMax);
-            
-            // 第四步：确保至少有3条消息
-            if (balancedBubbles.length < 3) {
-                return this._forceSplitBalanced(fullReply, 3, targetMax);
-            }
-            
-            return balancedBubbles;
-        },
-
-        /**
-         * 提取所有句子单元 - 全局语意扫描
-         */
-        _extractAllSentences: function(text) {
-            // 先按换行符分割成段落
-            const paragraphs = text.split(/\n+/).filter(p => p.trim());
-            const allSentences = [];
-            
-            for (const para of paragraphs) {
-                // 每个段落按强语气标点切分（句号、问号、感叹号、省略号）
-                const sentences = para.match(/[^。！？…]+[。！？…]*/g) || [para];
-                allSentences.push(...sentences);
-            }
-            
-            return allSentences;
-        },
-
-        /**
-         * 均衡气泡 - 确保没有"石碑式"的超长气泡
-         */
-        _balanceBubbles: function(bubbles, maxLength) {
-            if (bubbles.length === 0) return bubbles;
-            
-            const result = [];
-            
-            for (const bubble of bubbles) {
-                if (bubble.length <= maxLength) {
-                    result.push(bubble);
+                // 最后一条如果太长，也要拆
+                if (currentBubble.length > maxLen) {
+                    const parts = this._splitAtComma(currentBubble, maxLen);
+                    bubbles.push(...parts);
                 } else {
-                    // 超长气泡需要继续拆分
-                    const subBubbles = this._splitLongBubble(bubble, maxLength);
-                    result.push(...subBubbles);
+                    bubbles.push(currentBubble);
                 }
             }
             
-            // 最终均衡检查：如果最后一条比平均长度的1.5倍还长，继续拆
-            if (result.length > 1) {
-                const avgLength = result.slice(0, -1).reduce((sum, b) => sum + b.length, 0) / (result.length - 1);
-                const lastBubble = result[result.length - 1];
-                
-                if (lastBubble.length > avgLength * 1.5 && lastBubble.length > maxLength) {
-                    result.pop();
-                    const subBubbles = this._splitLongBubble(lastBubble, Math.min(maxLength, avgLength * 1.2));
-                    result.push(...subBubbles);
-                }
+            // 如果强制要求更多条，且当前不够
+            if (forceMore && bubbles.length < 3) {
+                return this._forceSplitHuman(text);
             }
             
-            return result;
+            return bubbles.filter(b => b.trim());
         },
 
         /**
-         * 拆分超长气泡
+         * 检测是否是短回应（语气词、感叹词等）
          */
-        _splitLongBubble: function(bubble, maxLength) {
-            const result = [];
+        _isShortResponse: function(text) {
+            const shortPatterns = [
+                /^[哈嘿嗯啊哦呃唔噢欸嘛呀咦哇呜嘻]+[~。！？…]*$/,  // 语气词
+                /^(好的?|行|可以|没问题|当然|是的?|对|嗯|ok|OK|好嘞|收到|明白|懂了|知道了?)[~。！？…]*$/,  // 短回应
+                /^(哈哈+|嘿嘿+|呵呵+|嘻嘻+|hiahia+)[~。！？…]*$/i,  // 笑声
+                /^(emmm*|emm*|额+|呃+|这+|那个+)[~。！？…]*$/i,  // 思考词
+                /^(谢谢|感谢|多谢|3q|thx|thanks)[~。！？…]*$/i,  // 感谢
+                /^(拜拜|再见|晚安|早安|午安|你好|嗨|hi|hello)[~。！？…]*$/i,  // 问候
+            ];
             
-            // 先尝试按句子切分
-            const sentences = bubble.match(/[^。！？…]+[。！？…]*/g) || [bubble];
-            let current = '';
-            
-            for (const sentence of sentences) {
-                const trimmed = sentence.trim();
-                if (!trimmed) continue;
-                
-                if (!current) {
-                    current = trimmed;
-                } else if ((current + trimmed).length <= maxLength) {
-                    current += trimmed;
-                } else {
-                    result.push(current);
-                    current = trimmed;
-                }
-            }
-            
-            if (current) {
-                // 如果最后一段还是太长，按次级标点继续拆
-                if (current.length > maxLength) {
-                    const subParts = this._splitBySecondaryPunctuation(current, maxLength);
-                    result.push(...subParts);
-                } else {
-                    result.push(current);
-                }
-            }
-            
-            return result.length > 0 ? result : [bubble];
+            return text.length <= 10 && shortPatterns.some(p => p.test(text));
         },
 
         /**
-         * 按次级标点拆分（逗号、顿号、分号等）
+         * 在逗号处拆分长句
          */
-        _splitBySecondaryPunctuation: function(text, maxLength) {
+        _splitAtComma: function(text, maxLen) {
             const result = [];
-            const parts = text.match(/[^，、；：]+[，、；：]*/g) || [text];
+            // 按逗号、顿号拆分
+            const parts = text.match(/[^，、,]+[，、,]?/g) || [text];
             let current = '';
             
             for (const part of parts) {
                 if (!current) {
                     current = part;
-                } else if ((current + part).length <= maxLength) {
+                } else if ((current + part).length <= maxLen) {
                     current += part;
                 } else {
                     result.push(current);
@@ -1416,30 +1406,28 @@ const API = {
                 result.push(current);
             }
             
-            return result.length > 0 ? result : [text];
+            return result.filter(r => r.trim());
         },
 
         /**
-         * 强制均衡切分 - 确保至少有指定数量的消息，且长度均衡
+         * 强制拆分成真人风格（最后手段）
          */
-        _forceSplitBalanced: function(text, minCount, maxLength) {
-            // 先提取所有句子
-            const sentences = this._extractAllSentences(text);
-            
-            // 计算目标每条的平均长度
-            const totalLength = text.length;
-            const targetLength = Math.min(maxLength, Math.ceil(totalLength / minCount));
-            
+        _forceSplitHuman: function(text) {
             const result = [];
+            // 目标：每条10-20字
+            const targetLen = 15;
+            
+            // 先按所有标点拆分
+            const parts = text.match(/[^。！？…，、,~]+[。！？…，、,~]?/g) || [text];
             let current = '';
             
-            for (const sentence of sentences) {
-                const trimmed = sentence.trim();
+            for (const part of parts) {
+                const trimmed = part.trim();
                 if (!trimmed) continue;
                 
                 if (!current) {
                     current = trimmed;
-                } else if ((current + trimmed).length <= targetLength) {
+                } else if ((current + trimmed).length <= targetLen) {
                     current += trimmed;
                 } else {
                     result.push(current);
@@ -1451,59 +1439,31 @@ const API = {
                 result.push(current);
             }
             
-            // 如果还是不够，强制按字数切分
-            if (result.length < minCount) {
-                return this._forceCharSplit(text, minCount);
-            }
-            
-            // 最后均衡检查
-            return this._balanceBubbles(result, maxLength);
-        },
-
-        /**
-         * 强制按字数切分（最后手段）
-         */
-        _forceCharSplit: function(text, minCount) {
-            const avgLength = Math.ceil(text.length / minCount);
-            const result = [];
-            let remaining = text;
-            const punctuations = ['。', '！', '？', '…', '，', '、', '；', '：', ' '];
-            
-            while (remaining.length > 0) {
-                if (remaining.length <= avgLength * 1.3) {
-                    // 剩余部分不多了，直接作为最后一条
-                    result.push(remaining.trim());
-                    break;
-                }
+            // 确保至少3条
+            if (result.length < 3 && text.length >= 15) {
+                // 强制按字数均分
+                const avgLen = Math.ceil(text.length / 3);
+                const forced = [];
+                let remaining = text;
                 
-                // 在目标长度附近寻找最近的标点符号
-                let splitPos = avgLength;
-                let foundPunct = false;
-                
-                // 优先向后找标点（在avgLength到avgLength+30范围内）
-                for (let i = avgLength; i < Math.min(remaining.length, avgLength + 30); i++) {
-                    if (punctuations.includes(remaining[i])) {
-                        splitPos = i + 1;
-                        foundPunct = true;
-                        break;
-                    }
-                }
-                
-                // 如果向后没找到，向前找
-                if (!foundPunct) {
-                    for (let i = avgLength - 1; i >= Math.max(0, avgLength - 30); i--) {
-                        if (punctuations.includes(remaining[i])) {
-                            splitPos = i + 1;
+                while (remaining.length > 0 && forced.length < 2) {
+                    // 在目标位置附近找标点
+                    let pos = avgLen;
+                    const puncts = '。！？…，、,~';
+                    for (let i = Math.max(0, avgLen - 8); i < Math.min(remaining.length, avgLen + 8); i++) {
+                        if (puncts.includes(remaining[i])) {
+                            pos = i + 1;
                             break;
                         }
                     }
+                    forced.push(remaining.substring(0, pos).trim());
+                    remaining = remaining.substring(pos).trim();
                 }
-                
-                result.push(remaining.substring(0, splitPos).trim());
-                remaining = remaining.substring(splitPos).trim();
+                if (remaining) forced.push(remaining);
+                return forced.filter(f => f.trim());
             }
             
-            return result.filter(s => s.trim());
+            return result.filter(r => r.trim());
         },
 
         /**
