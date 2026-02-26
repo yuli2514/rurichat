@@ -36,7 +36,8 @@ const DiaryApp = {
      */
     initExpandPanelSwipe: function() {
         const container = document.getElementById('expand-pages-container');
-        if (!container) {
+        const panel = document.getElementById('panel-expand');
+        if (!container || !panel) {
             console.warn('扩展面板容器未找到，延迟重试...');
             setTimeout(() => this.initExpandPanelSwipe(), 500);
             return;
@@ -51,7 +52,7 @@ const DiaryApp = {
         // 触摸事件处理
         const handleStart = (clientX) => {
             startX = clientX;
-            currentX = clientX; // 初始化currentX，防止没有move事件时diff计算错误
+            currentX = clientX;
             isDragging = true;
             container.style.transition = 'none';
             console.log('扩展面板滑动开始:', { startX, currentPage });
@@ -61,9 +62,8 @@ const DiaryApp = {
             if (!isDragging) return;
             currentX = clientX;
             const diff = currentX - startX;
-            const containerWidth = container.offsetWidth || container.clientWidth;
-            const offset = -currentPage * 50 + (diff / containerWidth) * 50;
-            // 限制滑动范围，防止滑动超出边界
+            const panelWidth = panel.offsetWidth || panel.clientWidth;
+            const offset = -currentPage * 50 + (diff / panelWidth) * 50;
             const clampedOffset = Math.max(-50, Math.min(0, offset));
             container.style.transform = `translateX(${clampedOffset}%)`;
         };
@@ -74,10 +74,10 @@ const DiaryApp = {
             container.style.transition = 'transform 0.3s';
 
             const diff = currentX - startX;
-            const containerWidth = container.offsetWidth || container.clientWidth;
-            const threshold = containerWidth * 0.15; // 降低阈值，让滑动更敏感
+            const panelWidth = panel.offsetWidth || panel.clientWidth;
+            const threshold = panelWidth * 0.2;
 
-            console.log('扩展面板滑动结束:', { diff, threshold, currentPage, containerWidth });
+            console.log('扩展面板滑动结束:', { diff, threshold, currentPage, panelWidth });
 
             if (diff < -threshold && currentPage < 1) {
                 currentPage++;
@@ -88,30 +88,33 @@ const DiaryApp = {
             }
 
             container.style.transform = `translateX(-${currentPage * 50}%)`;
-            this.updatePageIndicators(currentPage);
+            DiaryApp.updatePageIndicators(currentPage);
         };
 
         // 触摸事件
         container.addEventListener('touchstart', (e) => {
-            // 如果点击的是按钮或其子元素，不触发滑动
-            if (e.target.closest('button')) {
+            if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
                 return;
             }
+            e.stopPropagation();
             handleStart(e.touches[0].clientX);
-        }, { passive: false }); // 允许preventDefault
+        }, { passive: false });
 
         container.addEventListener('touchmove', (e) => {
             if (isDragging) {
-                e.preventDefault(); // 阻止默认滚动行为
+                e.preventDefault();
+                e.stopPropagation();
                 handleMove(e.touches[0].clientX);
             }
-        }, { passive: false }); // 允许preventDefault
+        }, { passive: false });
 
         container.addEventListener('touchend', (e) => {
-            handleEnd();
-        }, { passive: false }); // 允许preventDefault
+            if (isDragging) {
+                e.stopPropagation();
+                handleEnd();
+            }
+        }, { passive: false });
 
-        // 处理触摸取消事件（比如被其他手势中断）
         container.addEventListener('touchcancel', (e) => {
             if (isDragging) {
                 isDragging = false;
@@ -123,8 +126,7 @@ const DiaryApp = {
 
         // 鼠标事件（电脑端）
         container.addEventListener('mousedown', (e) => {
-            // 如果点击的是按钮或其子元素，不触发滑动
-            if (e.target.closest('button')) {
+            if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
                 return;
             }
             e.preventDefault();

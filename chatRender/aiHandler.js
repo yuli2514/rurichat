@@ -31,7 +31,7 @@ const AIHandler = {
             const bubbles = await API.Chat.generateReply(ChatInterface.currentCharId);
             const history = API.Chat.getHistory(ChatInterface.currentCharId);
             
-            // 生成本次AI回复的唯一标识（用于轮数计算去重）
+            // 生成本次AI回复的唯一标识（用于轮数计算）
             const replyId = 'reply_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
             // 获取表情包映射（含义 -> URL）支持多选表情包分组
@@ -336,6 +336,7 @@ const AIHandler = {
                         content: '',
                         type: 'transfer',
                         timestamp: Date.now(),
+                        replyId: replyId,
                         transferData: {
                             amount: transferAmount,
                             remark: transferRemark,
@@ -354,6 +355,7 @@ const AIHandler = {
                         content: voiceContent,
                         type: 'voice',
                         timestamp: Date.now(),
+                        replyId: replyId,
                         quote: quote,
                         voiceData: {
                             duration: voiceDuration,
@@ -370,6 +372,7 @@ const AIHandler = {
                         content: fileContent,
                         type: 'ai_file',
                         timestamp: Date.now(),
+                        replyId: replyId,
                         quote: quote,
                         fileName: fileName,
                         description: fileDescription
@@ -388,6 +391,7 @@ const AIHandler = {
                         content: text,
                         type: msgType,
                         timestamp: Date.now(),
+                        replyId: replyId,
                         quote: quote
                     };
                     

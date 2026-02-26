@@ -1319,8 +1319,16 @@ const API = {
                 return segments;
             }
             
-            // 如果只有一段，不强制分割，直接返回
-            console.log('[SmartSplit] 只有一段，不强制分割，直接返回');
+            // 如果只有一段，尝试按标点符号分割（确保多条消息）
+            console.log('[SmartSplit] 只有一段，尝试按标点分割');
+            const punctSplit = this._splitByPunctuation(cleanReply);
+            if (punctSplit.length > 1) {
+                console.log('[SmartSplit] 按标点分割得到', punctSplit.length, '段');
+                return punctSplit;
+            }
+            
+            // 如果还是只有一段，直接返回
+            console.log('[SmartSplit] 无法分割，返回原文');
             return [cleanReply];
         },
 
@@ -1458,25 +1466,33 @@ const API = {
             const onlineHistory = this.getHistory(charId);
             const offlineHistory = API.Offline.getHistory(charId);
             
-            // 计算AI回复轮数：连续的AI消息只算1轮
-            // 当遇到用户消息后，下一个AI消息才算新的一轮
+            // 计算AI回复轮数：使用replyId去重，同一个replyId只算1轮
             const countRounds = (history) => {
                 let rounds = 0;
                 let lastSenderWasAI = false;
+                let lastReplyId = null;
                 
                 for (const msg of history) {
                     const isAI = msg.sender === 'ai' || msg.sender === 'assistant' || msg.sender === 'char';
                     const isUser = msg.sender === 'user';
                     
-                    if (isAI && !lastSenderWasAI) {
-                        // 从非AI消息切换到AI消息，算一轮
-                        rounds++;
-                        lastSenderWasAI = true;
+                    if (isAI) {
+                        // 如果是AI消息，检查replyId
+                        if (!lastSenderWasAI) {
+                            // 从非AI消息切换到AI消息，算一轮
+                            rounds++;
+                            lastSenderWasAI = true;
+                            lastReplyId = msg.replyId || null;
+                        } else if (msg.replyId && msg.replyId !== lastReplyId) {
+                            // 连续的AI消息，但replyId不同，说明是新的一轮回复
+                            rounds++;
+                            lastReplyId = msg.replyId;
+                        }
                     } else if (isUser) {
                         // 用户消息，重置标记
                         lastSenderWasAI = false;
+                        lastReplyId = null;
                     }
-                    // 连续的AI消息不增加轮数
                 }
                 
                 return rounds;
