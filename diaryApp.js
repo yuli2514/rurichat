@@ -13,14 +13,28 @@ const DiaryApp = {
      * 初始化日记应用
      */
     init: function() {
+        console.log('[DiaryApp] Initializing...');
+        
         // 等待组件加载完成后再初始化
         if (typeof AppEvents !== 'undefined') {
+            console.log('[DiaryApp] AppEvents found, waiting for components:allLoaded...');
             AppEvents.on('components:allLoaded', () => {
+                console.log('[DiaryApp] components:allLoaded event received, initializing swipe...');
                 this.initExpandPanelSwipe();
                 this.initSettingsListeners();
             });
+            
+            // 备用初始化 - 如果事件没有触发，延迟初始化
+            setTimeout(() => {
+                if (!document.getElementById('expand-pages-container')?._swipeInitialized) {
+                    console.log('[DiaryApp] Fallback initialization triggered');
+                    this.initExpandPanelSwipe();
+                    this.initSettingsListeners();
+                }
+            }, 2000);
         } else {
             // 如果AppEvents不存在，延迟初始化
+            console.log('[DiaryApp] AppEvents not found, using timeout initialization...');
             setTimeout(() => {
                 this.initExpandPanelSwipe();
                 this.initSettingsListeners();
@@ -35,12 +49,20 @@ const DiaryApp = {
      * 初始化expand panel滑动功能
      */
     initExpandPanelSwipe: function() {
+        console.log('[DiaryApp] initExpandPanelSwipe called');
         const container = document.getElementById('expand-pages-container');
-        if (!container) return;
+        if (!container) {
+            console.log('[DiaryApp] expand-pages-container not found');
+            return;
+        }
 
         // 防止重复初始化
-        if (container._swipeInitialized) return;
+        if (container._swipeInitialized) {
+            console.log('[DiaryApp] Swipe already initialized');
+            return;
+        }
         container._swipeInitialized = true;
+        console.log('[DiaryApp] Initializing swipe functionality...');
 
         let startX = 0;
         let currentX = 0;
@@ -89,8 +111,7 @@ const DiaryApp = {
                 target.closest('button') ||
                 target.tagName === 'I' ||  // 图标
                 target.tagName === 'SPAN' || // 文字
-                target.classList.contains('w-12') || // 按钮图标容器
-                target.closest('.grid')) { // 按钮网格区域
+                target.classList.contains('w-12')) { // 按钮图标容器
                 return;
             }
             
@@ -112,11 +133,13 @@ const DiaryApp = {
 
         // 鼠标事件（电脑端）
         container.addEventListener('mousedown', (e) => {
-            // 更严格的按钮检测
-            if (e.target.tagName === 'BUTTON' ||
-                e.target.closest('button') ||
-                e.target.classList.contains('btn') ||
-                e.target.closest('.btn')) {
+            // 检查是否点击在按钮或其子元素上
+            const target = e.target;
+            if (target.tagName === 'BUTTON' ||
+                target.closest('button') ||
+                target.tagName === 'I' ||  // 图标
+                target.tagName === 'SPAN' || // 文字
+                target.classList.contains('w-12')) { // 按钮图标容器
                 return;
             }
             e.preventDefault();
