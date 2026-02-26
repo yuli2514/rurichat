@@ -874,8 +874,7 @@ const API = {
             const ctxLength = settings.contextLength || 20;
             
             // 构建线上聊天系统提示词
-            let systemPrompt = '【角色扮演设定】';
-            systemPrompt += '\n你正在扮演一个角色进行线上聊天。';
+            let systemPrompt = '这是线上聊天，扮演角色进行聊天，必须遵守人设。要口语化。模仿真人短句聊天。';
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
 
@@ -885,81 +884,21 @@ const API = {
                 const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
                 const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + weekDays[now.getDay()];
                 const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-                systemPrompt += '\n\n【现实世界时间感知】';
-                systemPrompt += '\n当前现实世界的日期和时间：' + dateStr + ' ' + timeStr;
-                systemPrompt += '\n你可以感知到现在的真实时间，可以据此做出合理的反应（如问候早安/晚安、节日祝福、评论时间等）。';
+                systemPrompt += '\n当前时间：' + dateStr + ' ' + timeStr;
             }
-            
-            systemPrompt += '\n\n【线上聊天模式 - 核心规则】';
-            systemPrompt += '\n⚠️ 你现在是【线上聊天】，模拟真人发微信/QQ！';
-            systemPrompt += '\n';
-            systemPrompt += '\n★★★ 最重要的规则 ★★★';
-            systemPrompt += '\n🚨 强制要求：你的回复必须严格按照以下格式！';
-            systemPrompt += '\n<msg>第一条消息内容</msg>';
-            systemPrompt += '\n<msg>第二条消息内容</msg>';
-            systemPrompt += '\n<msg>第三条消息内容</msg>';
-            systemPrompt += '\n<msg>第四条消息内容</msg>';
-            systemPrompt += '\n<msg>第五条消息内容</msg>';
-            systemPrompt += '\n';
-            systemPrompt += '\n⚠️ 绝对不允许直接输出文本！必须用<msg>标签包裹！';
-            systemPrompt += '\n⚠️ 每次回复至少5条<msg>标签！每个标签是一条消息气泡！';
-            systemPrompt += '\n';
-            systemPrompt += '\n【真人发消息的特点 - 长短结合，灵活自然】';
-            systemPrompt += '\n- 有时候发很多短句（每条几个字）';
-            systemPrompt += '\n- 有时候一两句话放在一条消息里';
-            systemPrompt += '\n- 特殊情况下（比如讲故事、写小作文）可以有一条较长的消息，但前后还是要有其他短消息';
-            systemPrompt += '\n- 口语化，用语气词：嗯、啊、哈哈、emmm、额、呃、诶、哦';
-            systemPrompt += '\n- 说话随意自然，不会像写作文一样';
-            systemPrompt += '\n- 不要频繁发语音消息！语音消息应该非常罕见！';
-            systemPrompt += '\n';
-            systemPrompt += '\n【格式示例 - 日常聊天】';
-            systemPrompt += '\n<msg>哈哈哈</msg>';
-            systemPrompt += '\n<msg>你说的这个我知道</msg>';
-            systemPrompt += '\n<msg>之前还看过相关的</msg>';
-            systemPrompt += '\n<msg>挺有意思的</msg>';
-            systemPrompt += '\n<msg>你是怎么知道的呀</msg>';
-            systemPrompt += '\n';
-            systemPrompt += '\n【格式示例 - 写小作文时】';
-            systemPrompt += '\n<msg>好嘞</msg>';
-            systemPrompt += '\n<msg>那我给你写一个</msg>';
-            systemPrompt += '\n<msg>（这里是一段较长的小作文内容，可以有很多句话...）</msg>';
-            systemPrompt += '\n<msg>写完啦</msg>';
-            systemPrompt += '\n<msg>你看看怎么样</msg>';
-            systemPrompt += '\n';
-            systemPrompt += '\n【禁止事项】';
-            systemPrompt += '\n- 禁止动作描写（*微笑*、*点头*等）';
-            systemPrompt += '\n- 禁止心理描写';
-            systemPrompt += '\n- 禁止场景描写';
-            systemPrompt += '\n- 禁止括号注释';
-            systemPrompt += '\n- 禁止只发1-2条消息（至少5条！）';
-            systemPrompt += '\n- 禁止频繁发语音消息！';
-            systemPrompt += '\n';
-            systemPrompt += '\n🔥 最终提醒：你的每一句话都必须用<msg>标签包裹！';
-            systemPrompt += '\n🔥 格式示例：<msg>哈哈</msg><msg>你说得对</msg><msg>还有什么问题吗</msg>';
-            systemPrompt += '\n🔥 绝对不要直接输出文本，必须用标签！每次至少5个<msg>标签！';
             
             // 特殊功能指令（精简版）
             systemPrompt += '\n\n【特殊指令】（谨慎使用，不要滥用）';
             systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复';
             systemPrompt += '\n消息[RECALL] - 撤回（说错话时用）';
-            systemPrompt += '\n[图片:描述] - 意念传图（单独一行，仅在需要描述场景时偶尔使用）';
-            systemPrompt += '\n⚠️⚠️⚠️ 图片格式【最重要规则】：';
-            systemPrompt += '\n   - 只能使用 [图片:描述文字] 格式，例如：[图片:一只可爱的小猫]';
-            systemPrompt += '\n   - 系统会自动把描述文字转换成图片卡片显示';
-            systemPrompt += '\n   - 🚫 绝对禁止发送：base64编码、data:image开头的数据、任何长串字符！';
-            systemPrompt += '\n   - 🚫 如果你发送编码数据，消息会被系统自动删除！';
-            systemPrompt += '\n[语音:内容] - 语音消息（单独一行，极少使用，只在特别亲密或撒娇时才用）';
+            systemPrompt += '\n[图片:描述] - 意念传图（极少使用，只在必要时用）';
+            systemPrompt += '\n[语音:内容] - 语音消息（极少使用，只在特别亲密或撒娇时才用）';
             systemPrompt += '\n[转账:金额:备注] - 转账（单独一行，不重复发）';
             systemPrompt += '\n[领取转账] - 领取用户转账（已领取不重复）';
             systemPrompt += '\n[换头像] - 当用户提到换头像并发送图片时，使用此指令将用户发送的图片设为你的新头像（单独一行）';
             
-            systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账/换头像必须单独一行！';
-            systemPrompt += '\n⚠️ 重要：日常对话请直接用文字回复，不要频繁使用语音消息！语音消息应该非常罕见！';
-            systemPrompt += '\n🚫 严禁发送：base64编码、二进制数据、长串编码！只能用[图片:描述]格式！';
-
-            // --- 身份隔离铁律 ---
-            systemPrompt += '\n\n[CRITICAL: 你必须严格区分用户和你自己的身份。用户发出的表情和情绪仅属于用户，严禁你在回复中认领这些情绪或复读用户的表情描述。]';
-            systemPrompt += '\n[严禁复读任何带中括号的系统说明文本，如"[表情: xxx]""[用户发送了...]"等，这些是系统内部标注，不是对话内容。]';
+            systemPrompt += '\n\n⚠️ 重要：不要频繁发意念图！不要复述用户发的图片信息！';
+            systemPrompt += '\n⚠️ 严禁复读任何带中括号的系统说明文本，如"[表情: xxx]""[用户发送了...]"等。';
 
             // --- Memory Integration (强化版) ---
             const memories = API.Memory.getMemories(charId);
@@ -1018,10 +957,11 @@ const API = {
                     systemPrompt += '\n你可以使用以下表情包来表达情绪，根据你的人设性格决定发送频率：';
                     systemPrompt += '\n- 如果人设活泼开朗，可以多发表情包';
                     systemPrompt += '\n- 如果人设冷淡高冷，可以少发或不发';
-                    systemPrompt += '\n- ⚠️ 表情包和[图片:描述]是完全不同的功能！表情包是预设的URL，[图片:描述]是文字传图';
-                    systemPrompt += '\n- 发送表情包时，只需要单独一行输出完整的URL即可，不要添加任何markdown格式、括号、感叹号或其他修饰符号';
-                    systemPrompt += '\n- 错误示例：![表情](URL) 或 [表情](URL) 或 ![](URL) 或 [图片:表情包URL]';
-                    systemPrompt += '\n- 正确示例：直接输出URL，如 https://example.com/emoji.png';
+                    systemPrompt += '\n- 🚫 重要：表情包和[图片:描述]是完全不同的功能！绝对不要混淆！';
+                    systemPrompt += '\n- 表情包：直接发送预设的URL链接，如 https://example.com/emoji.png';
+                    systemPrompt += '\n- 意念图：使用[图片:描述]格式，系统会生成文字卡片';
+                    systemPrompt += '\n- 🚫 绝对禁止：把表情包URL写成[图片:表情包URL]格式！';
+                    systemPrompt += '\n- 🚫 绝对禁止：把表情包描述写成[图片:表情包含义]格式！';
                     systemPrompt += '\n- ⚠️ 只能使用下面列表中的表情包URL，不要自己编造URL！';
                     systemPrompt += '\n\n可用表情包列表（含义: URL）：\n' + emojiList;
                 }
@@ -1212,7 +1152,7 @@ const API = {
             // 不污染用户消息内容，避免破坏 AI 分条发送的格式
             messages.push({
                 role: 'system',
-                content: '⚠️⚠️⚠️ 【最高优先级】你必须像真人发微信一样回复！\n\n1. 必须发送【至少5条消息】，用换行符分隔\n2. 每条消息可以很短，几个字也行\n3. 口语化、自然、随意\n4. 严格按照角色人设回复\n5. 禁止动作描写、心理描写、括号注释\n\n示例格式：\n哈哈\n你说的对\n我也这么觉得\n不过话说回来\n你最近怎么样啊'
+                content: '⚠️ 重要：必须发送多条短消息，用换行符分隔。口语化、自然。严格按照角色人设回复。\n\n示例格式：\n哈哈\n你说的对\n我也这么觉得\n不过话说回来\n你最近怎么样啊'
             });
 
             const response = await fetch(config.endpoint + '/chat/completions', {
@@ -1365,12 +1305,15 @@ const API = {
                 return msgMatches;
             }
             
-            // 兜底方案：如果没有<msg>标签，智能分割
-            console.log('[SmartSplit] ⚠️ AI没有使用<msg>标签！使用兜底方案');
+            // 兜底方案：如果没有<msg>标签，强制智能分割
+            console.log('[SmartSplit] ⚠️ AI没有使用<msg>标签！使用强制分割方案');
             
-            // 如果文本太长，尝试按句号、问号、感叹号分割
-            if (cleanReply.length > 200) {
-                console.log('[SmartSplit] 文本较长，按标点符号分割');
+            // 首先按换行符分割
+            let segments = cleanReply.split(/\n+/).filter(t => t.trim());
+            
+            // 如果只有一段或段数太少，强制按标点符号分割
+            if (segments.length <= 1 || cleanReply.length > 100) {
+                console.log('[SmartSplit] 强制按标点符号分割');
                 const sentences = cleanReply.split(/([。！？.!?]+)/).filter(s => s.trim());
                 const result = [];
                 let current = '';
@@ -1378,7 +1321,7 @@ const API = {
                 for (let i = 0; i < sentences.length; i++) {
                     current += sentences[i];
                     // 如果遇到标点符号，或者当前句子够长了，就分割
-                    if (/[。！？.!?]+/.test(sentences[i]) || current.length > 100) {
+                    if (/[。！？.!?]+/.test(sentences[i]) || current.length > 50) {
                         if (current.trim()) {
                             result.push(current.trim());
                             current = '';
@@ -1389,12 +1332,32 @@ const API = {
                     result.push(current.trim());
                 }
                 
+                // 如果分割结果还是只有一条，强制按字符长度分割
+                if (result.length <= 1 && cleanReply.length > 50) {
+                    console.log('[SmartSplit] 强制按字符长度分割');
+                    const words = cleanReply.split(/\s+/);
+                    const forcedResult = [];
+                    let currentChunk = '';
+                    
+                    for (const word of words) {
+                        if (currentChunk.length + word.length > 30 && currentChunk.trim()) {
+                            forcedResult.push(currentChunk.trim());
+                            currentChunk = word;
+                        } else {
+                            currentChunk += (currentChunk ? ' ' : '') + word;
+                        }
+                    }
+                    if (currentChunk.trim()) {
+                        forcedResult.push(currentChunk.trim());
+                    }
+                    
+                    console.log('[SmartSplit] 强制分割结果:', forcedResult.length, forcedResult);
+                    return forcedResult.length > 0 ? forcedResult : [cleanReply];
+                }
+                
                 console.log('[SmartSplit] 按标点分割结果:', result.length, result);
-                return result.length > 0 ? result : [cleanReply];
+                segments = result.length > 0 ? result : [cleanReply];
             }
-            
-            // 如果文本不长，按换行符分割但限制数量
-            let segments = cleanReply.split(/\n+/).filter(t => t.trim());
             
             // 如果分割后太多段，合并一些
             if (segments.length > 10) {
@@ -1403,7 +1366,7 @@ const API = {
                 let current = '';
                 
                 for (let i = 0; i < segments.length; i++) {
-                    if (current.length + segments[i].length < 150) {
+                    if (current.length + segments[i].length < 100) {
                         current += (current ? ' ' : '') + segments[i];
                     } else {
                         if (current) merged.push(current);
@@ -1416,7 +1379,7 @@ const API = {
                 return merged;
             }
             
-            console.log('[SmartSplit] 兜底方案结果:', segments.length, segments);
+            console.log('[SmartSplit] 最终分割结果:', segments.length, segments);
             return segments.length > 0 ? segments : [cleanReply];
         },
 

@@ -144,11 +144,16 @@
                                 <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-floppy-disk text-xl text-gray-600"></i></div>
                                 <span class="text-xs">存档</span>
                             </button>
+                            <!-- 文件按钮 -->
+                            <button type="button" onclick="FileHandler.openFilePicker()" class="flex flex-col items-center gap-1.5 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-file text-xl text-gray-600"></i></div>
+                                <span class="text-xs">文件</span>
+                            </button>
                         </div>
                     </div>
                 </div>
                 <!-- Page Indicators -->
-                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-2">
+                <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-2">
                     <div id="expand-indicator-0" class="w-2 h-2 rounded-full bg-gray-400 transition-all"></div>
                     <div id="expand-indicator-1" class="w-2 h-2 rounded-full bg-gray-300 transition-all"></div>
                 </div>
@@ -179,6 +184,8 @@
     <!-- Hidden file inputs for camera and gallery - 移到panel外面确保始终可用 -->
     <input type="file" id="camera-input" class="hidden" accept="image/*" capture="environment">
     <input type="file" id="gallery-input" class="hidden" accept="image/*" onchange="ChatInterface.handleGallerySelect(this)">
+    <!-- 文件选择输入 - 支持多种文件类型 -->
+    <input type="file" id="file-input" class="hidden" accept=".txt,.md,.json,.js,.ts,.html,.css,.xml,.csv,.log,.py,.java,.c,.cpp,.h,.hpp,.sh,.bat,.yaml,.yml,.ini,.conf,.cfg,.sql,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.tar,.gz" onchange="FileHandler.handleFileSelect(this)">
     
     <!-- Text Drawing Modal - 放在 panel-container 外面，确保始终可见 -->
     <div id="text-drawing-modal" class="hidden absolute inset-0 bg-black/50 flex items-center justify-center z-[100]">

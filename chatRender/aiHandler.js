@@ -56,14 +56,21 @@ const AIHandler = {
                 }
                 
                 // --- 前端物理过滤：抹除AI回复中残留的系统描述和旁白 ---
+                // 但保留有效的功能性指令（如文件、语音、转账等）
+                
                 // 清除表情包系统描述复读（如 [用户发送了一个表情包...] ）
                 text = text.replace(/\[用户发送了一个表情包[^\]]*\]/g, '').trim();
+                // 清除图片信息复述（如 [用户发送了一张图片...] ）
+                text = text.replace(/\[用户发送了一张图片[^\]]*\]/g, '').trim();
+                text = text.replace(/\[发送了一张图片[^\]]*\]/g, '').trim();
                 // 清除发件人标记复读（如 [发件人: User] [发件人: You]）
                 text = text.replace(/\[发件人:\s*(?:User|You)\]\s*/g, '').trim();
                 // 清除整行旁白（整条消息就是 *旁白内容*，前后无其他文字）
                 if (/^\*[^*]+\*$/.test(text.trim())) { text = ''; }
-                // 清除系统说明复读（如 [表情: xxx] 被AI原样输出时）
-                text = text.replace(/\[表情:\s*[^\]]+\]/g, '').trim();
+                // 清除系统说明复读（如 [表情: xxx] 被AI原样输出时），但保留功能性指令
+                if (!/^\[(?:文件|FILE|语音|VOICE|转账|TRANSFER|图片|IMAGE|换头像|CHANGE_AVATAR|领取转账|RECEIVE_TRANSFER)[：:]/i.test(text)) {
+                    text = text.replace(/\[表情:\s*[^\]]+\]/g, '').trim();
+                }
                 // 清除线上模式锁死指令复读
                 text = text.replace(/\[手机网聊模式[^\]]*\]/g, '').trim();
 
@@ -202,9 +209,43 @@ const AIHandler = {
                     const imageDescMatch = text.match(/^\[(?:图片|IMAGE|图像|画面)[：:]\s*(.+?)\s*\]$/i);
                     if (imageDescMatch) {
                         const imageDescription = imageDescMatch[1];
-                        // 使用 Canvas 生成白底文字卡片
-                        text = ChatInterface.generateTextImageCard(imageDescription);
-                        isTextImageCard = true;
+                        
+                        // 🚫 检查是否是表情包URL或表情包含义，如果是则跳过意念图生成
+                        const isEmojiUrl = /^https?:\/\//.test(imageDescription);
+                        const isEmojiMeaning = Object.values(emojiMeaningToUrl).includes(imageDescription) ||
+                                             Object.keys(emojiMeaningToUrl).some(meaning => meaning.includes(imageDescription));
+                        
+                        if (isEmojiUrl || isEmojiMeaning) {
+                            console.log('[AIHandler] 🚫 检测到表情包内容被误写成意念图格式，已修正');
+                            // 如果是URL，直接使用URL；如果是含义，转换为对应URL
+                            if (isEmojiUrl) {
+                                text = imageDescription;
+                            } else {
+                                // 查找对应的表情包URL
+                                const matchedUrl = Object.keys(emojiMeaningToUrl).find(meaning =>
+                                    meaning.includes(imageDescription) || imageDescription.includes(meaning)
+                                );
+                                text = matchedUrl ? emojiMeaningToUrl[matchedUrl] : imageDescription;
+                            }
+                        } else {
+                            // 检查最近是否频繁发送意念图，如果是则跳过
+                            const history = API.Chat.getHistory(ChatInterface.currentCharId);
+                            const recentMessages = history.slice(-5); // 检查最近5条消息
+                            const recentImageCount = recentMessages.filter(msg =>
+                                msg.sender === 'ai' && msg.type === 'image' &&
+                                msg.content && msg.content.startsWith('data:image/')
+                            ).length;
+                            
+                            if (recentImageCount >= 2) {
+                                console.log('[AIHandler] 🚫 最近已发送过多意念图，跳过此次发送');
+                                // 跳过意念图，将其转换为普通文字
+                                text = '（' + imageDescription + '）';
+                            } else {
+                                // 使用 Canvas 生成白底文字卡片
+                                text = ChatInterface.generateTextImageCard(imageDescription);
+                                isTextImageCard = true;
+                            }
+                        }
                     }
                 }
                 
@@ -223,6 +264,23 @@ const AIHandler = {
                         voiceContent = voiceMatch[1];
                         isVoiceMessage = true;
                         console.log('[AIHandler] 检测到语音消息:', voiceContent);
+                    }
+                }
+                
+                // AI文件消息：检测 [文件:文件名:内容] 或 [FILE:filename:content] 格式
+                let isFileMessage = false;
+                let fileName = '';
+                let fileContent = '';
+                let fileDescription = '';
+                if (!isTransferMessage && !isVoiceMessage) {
+                    // 匹配格式：[文件:filename:content] 或 [文件:filename:content:description]
+                    const fileMatch = text.match(/^\[(?:文件|FILE)[：:]\s*([^：:]+?)\s*[：:]\s*([\s\S]*?)\s*(?:[：:]\s*(.+?))?\s*\]$/i);
+                    if (fileMatch) {
+                        fileName = fileMatch[1].trim();
+                        fileContent = fileMatch[2].trim();
+                        fileDescription = fileMatch[3] ? fileMatch[3].trim() : `AI为您生成了文件: ${fileName}`;
+                        isFileMessage = true;
+                        console.log('[AIHandler] 检测到文件消息:', fileName, '内容长度:', fileContent.length);
                     }
                 }
                 
@@ -302,6 +360,19 @@ const AIHandler = {
                             transcription: voiceContent
                         }
                     };
+                } else if (isFileMessage) {
+                    // AI文件消息
+                    msg = {
+                        id: msgId,
+                        sender: 'ai',
+                        content: fileContent,
+                        type: 'ai_file',
+                        timestamp: Date.now(),
+                        quote: quote,
+                        fileName: fileName,
+                        description: fileDescription
+                    };
+                    console.log('[AIHandler] 📄 创建AI文件消息:', fileName);
                 } else {
                     // 判断消息类型：
                     // 1. isImageUrl - HTTP图片URL

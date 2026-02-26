@@ -738,6 +738,35 @@ const ChatInterface = {
         // 关闭模态框
         modal.classList.add('hidden');
         this._editingMessageIndex = null;
+    },
+
+    // ==================== 文件处理代理 ====================
+    openFilePicker: function() {
+        FileHandler.openFilePicker();
+    },
+
+    handleFileSelect: function(input) {
+        FileHandler.handleFileSelect(input);
+    },
+
+    sendAIFile: function(fileName, content, description) {
+        FileHandler.sendAIFile(this.currentCharId, fileName, content, description);
+    },
+
+    downloadAIFile: function(fileName, content) {
+        FileHandler.downloadAIFile(fileName, content);
+    },
+
+    viewFileContent: function(messageIndex) {
+        FileHandler.viewFileContent(messageIndex);
+    },
+
+    closeFileViewModal: function() {
+        FileHandler.closeFileViewModal();
+    },
+
+    copyFileContent: function() {
+        FileHandler.copyFileContent();
     }
 };
 

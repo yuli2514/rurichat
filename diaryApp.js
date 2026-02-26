@@ -79,6 +79,10 @@ const DiaryApp = {
 
         // 触摸事件
         container.addEventListener('touchstart', (e) => {
+            // 如果点击的是按钮或其子元素，不触发滑动
+            if (e.target.closest('button')) {
+                return;
+            }
             handleStart(e.touches[0].clientX);
         });
 
@@ -92,6 +96,10 @@ const DiaryApp = {
 
         // 鼠标事件（电脑端）
         container.addEventListener('mousedown', (e) => {
+            // 如果点击的是按钮或其子元素，不触发滑动
+            if (e.target.closest('button')) {
+                return;
+            }
             e.preventDefault();
             handleStart(e.clientX);
         });

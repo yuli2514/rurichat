@@ -67,6 +67,12 @@ const MessageBuilder = {
                 quoteContent = '[表情包]';
             } else if (quotedMsg.type === 'image') {
                 quoteContent = '[图片]';
+            } else if (quotedMsg.type === 'file' || quotedMsg.type === 'ai_file') {
+                quoteContent = '[文件: ' + (quotedMsg.fileName || '未知文件') + ']';
+            } else if (quotedMsg.type === 'voice') {
+                quoteContent = '[语音消息]';
+            } else if (quotedMsg.type === 'transfer') {
+                quoteContent = '[转账]';
             } else {
                 quoteContent = quotedMsg.content.substring(0, 40) + (quotedMsg.content.length > 40 ? '...' : '');
             }
@@ -299,6 +305,64 @@ const MessageBuilder = {
     },
 
     /**
+     * 构建文件消息HTML
+     * @param {Object} params - 参数对象
+     * @returns {string} - 文件消息HTML
+     */
+    buildFileMessage: function(params) {
+        const { msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, showAvatarTimestamp, showBubbleTimestamp } = params;
+        
+        const fileName = msg.fileName || '未知文件';
+        const fileSize = msg.fileSize ? FileHandler.formatFileSize(msg.fileSize) : '';
+        const fileIcon = FileHandler.getFileIcon(fileName);
+        const isAIFile = msg.type === 'ai_file';
+        
+        const bubbleClass = isMe ? 'bubble bubble-user file-bubble' : 'bubble bubble-ai file-bubble';
+        const avatarTimestampHtml = showAvatarTimestamp ? this.buildAvatarTimestamp(msg.timestamp) : '';
+        const bubbleTimestampHtml = showBubbleTimestamp ? this.buildBubbleTimestamp(msg.timestamp) : '';
+        
+        // AI文件的下载按钮
+        const downloadButton = isAIFile ?
+            '<button onclick="FileHandler.downloadAIFile(\'' + fileName.replace(/'/g, "\\'") + '\', `' + msg.content.replace(/`/g, '\\`') + '`)" ' +
+            'class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 active:scale-95 transition">' +
+            '<i class="fa-solid fa-download mr-1"></i>下载文件</button>' : '';
+        
+        // 文件点击事件 - 查看文件内容
+        const fileClickEvent = deleteMode ?
+            'ChatInterface.toggleDeleteSelection(' + index + ')' :
+            'FileHandler.viewFileContent(' + index + ')';
+        
+        return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+            checkboxHtml +
+            '<div class="flex flex-col items-center shrink-0">' +
+                '<img src="' + avatar + '" class="' + avatarClass + ' w-10 h-10 rounded-full object-cover bg-gray-200 shrink-0 chat-avatar" loading="lazy">' +
+                avatarTimestampHtml +
+            '</div>' +
+            '<div class="max-w-[70%]">' +
+                '<div class="flex items-end gap-1 ' + (isMe ? 'flex-row-reverse' : '') + '">' +
+                    '<div onclick="' + fileClickEvent + '" ' +
+                         'oncontextmenu="ChatInterface.showContextMenu(event, ' + index + ')" ' +
+                         'ontouchstart="ChatInterface.handleTouchStart(event, ' + index + ')" ' +
+                         'ontouchmove="ChatInterface.handleTouchMove(event)" ' +
+                         'ontouchend="ChatInterface.handleTouchEnd(event)" ' +
+                        'class="relative cursor-pointer active:brightness-95 transition prevent-select ' + bubbleClass + '">' +
+                        '<div class="flex items-center gap-3">' +
+                            '<i class="fa-solid ' + fileIcon + ' text-2xl text-blue-500"></i>' +
+                            '<div class="flex-1">' +
+                                '<div class="font-medium text-sm">' + fileName + '</div>' +
+                                (fileSize ? '<div class="text-xs text-gray-500">' + fileSize + '</div>' : '') +
+                                (isAIFile && msg.description ? '<div class="text-xs text-gray-600 mt-1">' + msg.description + '</div>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        downloadButton +
+                    '</div>' +
+                    bubbleTimestampHtml +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    },
+
+    /**
      * 构建单条消息的完整HTML
      * @param {Object} params - 参数对象
      * @returns {string} - 消息HTML
@@ -328,6 +392,7 @@ const MessageBuilder = {
         const isImage = msg.type === 'image' || msg.type === 'emoji';
         const isVoice = msg.type === 'voice';
         const isTransfer = msg.type === 'transfer';
+        const isFile = msg.type === 'file' || msg.type === 'ai_file';
         
         if (isImage) {
             const imageClass = this.getImageClass(isMe, msg);
@@ -340,6 +405,10 @@ const MessageBuilder = {
             });
         } else if (isTransfer) {
             return this.buildTransferMessage({
+                msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, showAvatarTimestamp, showBubbleTimestamp
+            });
+        } else if (isFile) {
+            return this.buildFileMessage({
                 msg, index, isMe, avatar, avatarClass, checkboxHtml, deleteMode, showAvatarTimestamp, showBubbleTimestamp
             });
         } else {

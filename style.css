@@ -446,6 +446,30 @@
             50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
         }
 
+        /* File Bubble Style - 文件消息气泡 */
+        .file-bubble {
+            min-width: 200px;
+            max-width: 280px;
+            padding: 12px 16px;
+        }
+        .file-content-preview {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .file-bubble .fa-file,
+        .file-bubble .fa-file-text,
+        .file-bubble .fa-file-code,
+        .file-bubble .fa-file-pdf,
+        .file-bubble .fa-file-word,
+        .file-bubble .fa-file-excel,
+        .file-bubble .fa-file-powerpoint,
+        .file-bubble .fa-file-archive {
+            flex-shrink: 0;
+        }
+
         /* 总结按钮图标闪烁动画 */
         .summary-icon-pulse {
             animation: summary-pulse 0.8s ease-in-out infinite;
