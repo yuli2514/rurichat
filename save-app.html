@@ -1,0 +1,149 @@
+<!-- 存档管理应用 -->
+<div id="save-app" class="fixed inset-0 z-[100] flex flex-col hidden bg-white">
+    <!-- 顶部导航栏 -->
+    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
+        <button onclick="SaveApp.close()" class="text-[#333333] text-base w-10 flex justify-start">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <h1 class="font-bold text-base text-gray-900">存档管理</h1>
+        <div class="flex gap-2">
+            <button onclick="SaveApp.openSaveModal()" class="text-[#333333] text-sm px-2 py-1 active:scale-95 transition">
+                保存
+            </button>
+            <button onclick="SaveApp.startFresh()" class="text-[#333333] text-sm px-2 py-1 active:scale-95 transition">
+                新开始
+            </button>
+        </div>
+    </div>
+
+    <!-- 存档列表 -->
+    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div id="save-list-container" class="space-y-3">
+            <!-- 存档卡片将动态插入这里 -->
+        </div>
+        
+        <!-- 空状态提示 -->
+        <div id="save-empty-state" class="hidden text-center py-12">
+            <i class="fa-solid fa-folder-open text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-400 text-sm">暂无存档</p>
+            <p class="text-gray-400 text-xs mt-2">点击右上角"保存当前"创建存档</p>
+        </div>
+    </div>
+</div>
+
+<!-- 保存存档模态框 -->
+<div id="save-modal" class="fixed inset-0 bg-black/50 z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm shadow-lg">
+        <div class="p-5">
+            <h2 class="text-lg font-bold mb-4 text-gray-900">保存当前状态</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm text-gray-700 mb-2">存档名称</label>
+                <input
+                    type="text"
+                    id="save-name-input"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-400"
+                    placeholder="例如：第一章结束"
+                    maxlength="50"
+                >
+            </div>
+
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                <p class="text-xs text-gray-600 leading-relaxed">
+                    将保存：线上聊天、线下剧情、角色记忆、角色人设、用户人设
+                </p>
+            </div>
+
+            <div class="flex gap-2">
+                <button
+                    onclick="SaveApp.closeSaveModal()"
+                    class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition"
+                >
+                    取消
+                </button>
+                <button
+                    onclick="SaveApp.confirmSave()"
+                    class="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg active:scale-95 transition"
+                >
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 存档详情模态框 -->
+<div id="save-detail-modal" class="fixed inset-0 bg-black/50 z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-lg max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-gray-200">
+            <div class="flex justify-between items-start mb-2">
+                <h2 id="save-detail-name" class="text-lg font-bold text-gray-900 flex-1 mr-2"></h2>
+                <button onclick="SaveApp.closeDetailModal()" class="text-gray-400">
+                    <i class="fa-solid fa-times text-lg"></i>
+                </button>
+            </div>
+            <p id="save-detail-time" class="text-sm text-gray-500"></p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5">
+            <div class="space-y-3">
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <h3 class="text-sm font-bold text-gray-700 mb-2">存档内容</h3>
+                    <div class="space-y-1.5 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">线上聊天记录</span>
+                            <span id="save-stat-online" class="text-gray-900">0 条</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">线下剧情记录</span>
+                            <span id="save-stat-offline" class="text-gray-900">0 条</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">角色记忆</span>
+                            <span id="save-stat-memories" class="text-gray-900">0 条</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">用户人设</span>
+                            <span id="save-stat-personas" class="text-gray-900">0 个</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        加载此存档将覆盖当前的聊天记录和记忆，建议先保存当前状态
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-5 border-t border-gray-200 space-y-2">
+            <button
+                onclick="SaveApp.confirmLoad()"
+                class="w-full px-4 py-2.5 bg-gray-800 text-white rounded-lg active:scale-95 transition"
+            >
+                加载此存档
+            </button>
+            <div class="flex gap-2">
+                <button
+                    onclick="SaveApp.overwriteCurrentSave()"
+                    class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition text-sm"
+                >
+                    覆盖
+                </button>
+                <button
+                    onclick="SaveApp.exportCurrentSave()"
+                    class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition text-sm"
+                >
+                    导出
+                </button>
+                <button
+                    onclick="SaveApp.deleteCurrentSave()"
+                    class="flex-1 px-4 py-2 bg-gray-100 text-red-600 rounded-lg active:scale-95 transition text-sm"
+                >
+                    删除
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
