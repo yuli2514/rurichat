@@ -610,7 +610,7 @@
 
         /* 扩展面板滑动容器样式 */
         #expand-pages-container {
-            touch-action: pan-x !important; /* 只允许水平滑动 */
+            touch-action: none !important; /* 禁用默认触摸行为，由JS完全控制 */
             -webkit-overflow-scrolling: touch !important;
             user-select: none !important;
             -webkit-user-select: none !important;

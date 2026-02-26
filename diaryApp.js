@@ -43,6 +43,13 @@ const DiaryApp = {
             return;
         }
 
+        // 防止重复初始化
+        if (container._swipeInitialized) {
+            console.log('扩展面板滑动已初始化，跳过');
+            return;
+        }
+        container._swipeInitialized = true;
+
         console.log('初始化扩展面板滑动功能');
         let startX = 0;
         let currentX = 0;
