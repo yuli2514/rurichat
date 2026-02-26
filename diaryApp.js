@@ -71,6 +71,7 @@ const DiaryApp = {
 
         // 触摸事件处理
         const handleStart = (clientX) => {
+            console.log('[DiaryApp] handleStart called, clientX:', clientX);
             startX = clientX;
             currentX = clientX;
             isDragging = true;
@@ -79,6 +80,7 @@ const DiaryApp = {
 
         const handleMove = (clientX) => {
             if (!isDragging) return;
+            console.log('[DiaryApp] handleMove called, clientX:', clientX, 'diff:', clientX - startX);
             currentX = clientX;
             const diff = currentX - startX;
             const offset = -currentPage * 50 + (diff / container.offsetWidth) * 50;
@@ -87,6 +89,7 @@ const DiaryApp = {
 
         const handleEnd = () => {
             if (!isDragging) return;
+            console.log('[DiaryApp] handleEnd called, diff:', currentX - startX, 'currentPage:', currentPage);
             isDragging = false;
             container.style.transition = 'transform 0.3s';
 
@@ -95,8 +98,10 @@ const DiaryApp = {
 
             if (diff < -threshold && currentPage < 1) {
                 currentPage++;
+                console.log('[DiaryApp] Swiping to page:', currentPage);
             } else if (diff > threshold && currentPage > 0) {
                 currentPage--;
+                console.log('[DiaryApp] Swiping to page:', currentPage);
             }
 
             container.style.transform = `translateX(-${currentPage * 50}%)`;
@@ -105,6 +110,7 @@ const DiaryApp = {
 
         // 触摸事件 - 只在空白区域触发
         container.addEventListener('touchstart', (e) => {
+            console.log('[DiaryApp] touchstart event, target:', e.target.tagName, e.target.className);
             // 检查是否点击在按钮或其子元素上
             const target = e.target;
             if (target.tagName === 'BUTTON' ||
@@ -112,14 +118,17 @@ const DiaryApp = {
                 target.tagName === 'I' ||  // 图标
                 target.tagName === 'SPAN' || // 文字
                 target.classList.contains('w-12')) { // 按钮图标容器
+                console.log('[DiaryApp] touchstart blocked by button detection');
                 return;
             }
             
+            console.log('[DiaryApp] touchstart allowed, starting drag');
             handleStart(e.touches[0].clientX);
         }, { passive: true });
 
         container.addEventListener('touchmove', (e) => {
             if (isDragging) {
+                console.log('[DiaryApp] touchmove event, preventing default');
                 e.preventDefault();
                 handleMove(e.touches[0].clientX);
             }
@@ -127,6 +136,7 @@ const DiaryApp = {
 
         container.addEventListener('touchend', (e) => {
             if (isDragging) {
+                console.log('[DiaryApp] touchend event');
                 handleEnd();
             }
         }, { passive: true });

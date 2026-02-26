@@ -75,8 +75,10 @@ function initializeApp() {
 
         // 5. Global Layout Lock (Prevent Body Scroll)
         document.body.addEventListener('touchmove', function(e) {
-            if (e.target.closest('.overflow-y-auto') || e.target.closest('.overflow-x-auto')) {
-                return; // Allow scrolling in specific areas
+            if (e.target.closest('.overflow-y-auto') ||
+                e.target.closest('.overflow-x-auto') ||
+                e.target.closest('#expand-pages-container')) {
+                return; // Allow scrolling in specific areas and expand panel swiping
             }
             e.preventDefault();
         }, { passive: false });
