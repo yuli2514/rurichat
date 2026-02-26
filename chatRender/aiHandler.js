@@ -30,19 +30,31 @@ const AIHandler = {
         try {
             const bubbles = await API.Chat.generateReply(ChatInterface.currentCharId);
             const history = API.Chat.getHistory(ChatInterface.currentCharId);
+            
+            // 生成本次AI回复的唯一标识（用于轮数计算去重）
+            const replyId = 'reply_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-            // 获取表情包映射（含义 -> URL）
+            // 获取表情包映射（含义 -> URL）支持多选表情包分组
             const char = API.Chat.getChar(ChatInterface.currentCharId);
             const settings = char && char.settings ? char.settings : {};
             let emojiMeaningToUrl = {};
-            if (settings.emojiGroupId) {
-                const emojis = API.Emoji.getGroupEmojis(settings.emojiGroupId);
-                emojis.forEach(e => {
-                    emojiMeaningToUrl[e.meaning] = e.url;
+            const emojiGroupIds = settings.emojiGroupIds || (settings.emojiGroupId ? [settings.emojiGroupId] : []);
+            if (emojiGroupIds.length > 0) {
+                emojiGroupIds.forEach(groupId => {
+                    const emojis = API.Emoji.getGroupEmojis(groupId);
+                    emojis.forEach(e => {
+                        emojiMeaningToUrl[e.meaning] = e.url;
+                    });
                 });
             }
             
             for (let text of bubbles) {
+                // 🚫 最优先拦截：检测编码数据，直接跳过
+                if (text && text.length > 15 && /^[A-Za-z0-9+/=\s\n\r]+$/.test(text) && !/[\u4e00-\u9fa5]/.test(text)) {
+                    console.error('[AIHandler] 🚫 在最早阶段拦截编码数据，跳过消息:', text.substring(0, 30) + '...');
+                    continue;
+                }
+                
                 // --- 前端物理过滤：抹除AI回复中残留的系统描述和旁白 ---
                 // 清除表情包系统描述复读（如 [用户发送了一个表情包...] ）
                 text = text.replace(/\[用户发送了一个表情包[^\]]*\]/g, '').trim();
@@ -63,6 +75,47 @@ const AIHandler = {
                 
                 // 跳过空消息（包括被过滤后变空的消息）
                 if (!text || text.trim() === '') continue;
+                
+                // 🔍 调试：记录每条AI消息
+                console.log('[AIHandler] 处理AI消息:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+                
+                // 🖼️ 检测AI发送的base64图片数据，标记为图片类型而非文本
+                let isBase64Image = false;
+                if (text.startsWith('data:image/')) {
+                    console.log('[AIHandler] 🖼️ 检测到AI发送的base64图片');
+                    isBase64Image = true;
+                    // 不拦截，后面会标记为 type: 'image' 进行渲染
+                }
+                
+                // 🚫 拦截其他非图片的编码数据
+                const textLen = text.length;
+                const hasChinese = /[\u4e00-\u9fa5]/.test(text);
+                const hasNormalPunctuation = /[，。！？、；：""''（）【】]/.test(text);
+                const isBase64Like = /^[A-Za-z0-9+/=\s\n\r]+$/.test(text);
+                const isHexLike = /^[A-Fa-f0-9]+$/.test(text);
+                
+                // 只拦截非图片的编码数据
+                const isNonImageEncodedData = !isBase64Image && (
+                    text.startsWith('data:') ||        // 非图片的data: URL
+                    // 长度>50且是纯base64字符，没有中文和正常标点
+                    (textLen > 50 && !hasChinese && !hasNormalPunctuation && isBase64Like) ||
+                    // 检测十六进制编码（长度>100的纯十六进制）
+                    (textLen > 100 && isHexLike) ||
+                    // 检测转义编码
+                    (textLen > 50 && text.includes('\\x')) ||
+                    // 检测数字数组编码
+                    (textLen > 50 && /^[0-9,\s]+$/.test(text) && text.includes(','))
+                );
+                
+                if (isNonImageEncodedData) {
+                    console.warn('[AIHandler] 🚫 检测到非图片编码数据，正在拦截！');
+                    console.log('[AIHandler] 文本长度:', textLen);
+                    console.log('[AIHandler] 前100字符:', text.substring(0, 100));
+                    
+                    // 跳过这条消息，不显示
+                    console.log('[AIHandler] ✅ 已跳过编码数据消息');
+                    continue;
+                }
                 
                 // 清理AI可能添加的markdown图片格式：![xxx](url) -> url
                 const markdownImgMatch = text.match(/^!\[.*?\]\((.+?)\)$/);
@@ -156,18 +209,33 @@ const AIHandler = {
                 }
                 
                 // AI语音消息：检测 [语音:xxx] 或 [VOICE:xxx] 格式
+                // 支持更宽松的匹配，允许前后有空格
                 let isVoiceMessage = false;
                 let voiceContent = null;
                 if (!isTransferMessage) {
-                    const voiceMatch = text.match(/^\[(?:语音|VOICE|voice)[：:]\s*(.+?)\s*\]$/i);
+                    // 先尝试严格匹配整行
+                    let voiceMatch = text.match(/^\[(?:语音|VOICE|voice)[：:]\s*(.+?)\s*\]$/i);
+                    // 如果没匹配到，尝试宽松匹配（可能有前后空格或其他字符）
+                    if (!voiceMatch) {
+                        voiceMatch = text.match(/\[(?:语音|VOICE|voice)[：:]\s*(.+?)\s*\]/i);
+                    }
                     if (voiceMatch) {
                         voiceContent = voiceMatch[1];
                         isVoiceMessage = true;
+                        console.log('[AIHandler] 检测到语音消息:', voiceContent);
                     }
                 }
                 
-                const isImageUrl = text.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i) ||
-                                   text.startsWith('data:image/');
+                // 检查是否是图片URL：
+                // 1. 以常见图片扩展名结尾（可能带参数）
+                // 2. 是已知的表情包URL（在emojiMeaningToUrl的值中）
+                // 3. URL中包含图片扩展名（不一定在结尾）
+                const isKnownEmojiUrl = Object.values(emojiMeaningToUrl).includes(text);
+                const hasImageExtension = /\.(jpg|jpeg|png|gif|webp)/i.test(text);
+                const isImageUrl = text.match(/^https?:\/\//) && (
+                    hasImageExtension ||
+                    isKnownEmojiUrl
+                );
                 
                 // 解析引用格式 [QUOTE:content]
                 let quote = null;
@@ -235,14 +303,24 @@ const AIHandler = {
                         }
                     };
                 } else {
+                    // 判断消息类型：
+                    // 1. isImageUrl - HTTP图片URL
+                    // 2. isBase64Image - data:image/ 开头的base64图片
+                    // 3. isTextImageCard - 文字意念传图生成的图片
+                    const msgType = (isImageUrl || isBase64Image || isTextImageCard) ? 'image' : 'text';
+                    
                     msg = {
                         id: msgId,
                         sender: 'ai',
                         content: text,
-                        type: isImageUrl ? 'image' : 'text',
+                        type: msgType,
                         timestamp: Date.now(),
                         quote: quote
                     };
+                    
+                    if (isBase64Image) {
+                        console.log('[AIHandler] 🖼️ 将base64图片标记为image类型');
+                    }
                 }
                 const updatedHistory = API.Chat.addMessage(ChatInterface.currentCharId, msg);
                 // 使用增量追加代替全量重渲染，避免卡顿

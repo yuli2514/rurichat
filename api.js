@@ -894,31 +894,60 @@ const API = {
             systemPrompt += '\n⚠️ 你现在是【线上聊天】，模拟真人发微信/QQ！';
             systemPrompt += '\n';
             systemPrompt += '\n★★★ 最重要的规则 ★★★';
-            systemPrompt += '\n你必须像真人发微信一样自然地回复！';
+            systemPrompt += '\n🚨 强制要求：你的回复必须严格按照以下格式！';
+            systemPrompt += '\n<msg>第一条消息内容</msg>';
+            systemPrompt += '\n<msg>第二条消息内容</msg>';
+            systemPrompt += '\n<msg>第三条消息内容</msg>';
+            systemPrompt += '\n<msg>第四条消息内容</msg>';
+            systemPrompt += '\n<msg>第五条消息内容</msg>';
             systemPrompt += '\n';
-            systemPrompt += '\n【真人发消息的特点】';
+            systemPrompt += '\n⚠️ 绝对不允许直接输出文本！必须用<msg>标签包裹！';
+            systemPrompt += '\n⚠️ 每次回复至少5条<msg>标签！每个标签是一条消息气泡！';
+            systemPrompt += '\n';
+            systemPrompt += '\n【真人发消息的特点 - 长短结合，灵活自然】';
+            systemPrompt += '\n- 有时候发很多短句（每条几个字）';
+            systemPrompt += '\n- 有时候一两句话放在一条消息里';
+            systemPrompt += '\n- 特殊情况下（比如讲故事、写小作文）可以有一条较长的消息，但前后还是要有其他短消息';
             systemPrompt += '\n- 口语化，用语气词：嗯、啊、哈哈、emmm、额、呃、诶、哦';
             systemPrompt += '\n- 说话随意自然，不会像写作文一样';
-            systemPrompt += '\n- 一条消息可以包含多句话，用逗号、句号等标点连接';
-            systemPrompt += '\n- 换行表示分开发送多条消息，不换行就是一条消息';
-            systemPrompt += '\n- 根据情况自由决定发几条消息，每条消息多长';
+            systemPrompt += '\n- 不要频繁发语音消息！语音消息应该非常罕见！';
             systemPrompt += '\n';
-            systemPrompt += '\n【格式示例】';
-            systemPrompt += '\n哈哈哈你说的这个我知道，之前还看过相关的，挺有意思的。你是怎么知道的呀？';
+            systemPrompt += '\n【格式示例 - 日常聊天】';
+            systemPrompt += '\n<msg>哈哈哈</msg>';
+            systemPrompt += '\n<msg>你说的这个我知道</msg>';
+            systemPrompt += '\n<msg>之前还看过相关的</msg>';
+            systemPrompt += '\n<msg>挺有意思的</msg>';
+            systemPrompt += '\n<msg>你是怎么知道的呀</msg>';
+            systemPrompt += '\n';
+            systemPrompt += '\n【格式示例 - 写小作文时】';
+            systemPrompt += '\n<msg>好嘞</msg>';
+            systemPrompt += '\n<msg>那我给你写一个</msg>';
+            systemPrompt += '\n<msg>（这里是一段较长的小作文内容，可以有很多句话...）</msg>';
+            systemPrompt += '\n<msg>写完啦</msg>';
+            systemPrompt += '\n<msg>你看看怎么样</msg>';
             systemPrompt += '\n';
             systemPrompt += '\n【禁止事项】';
             systemPrompt += '\n- 禁止动作描写（*微笑*、*点头*等）';
             systemPrompt += '\n- 禁止心理描写';
             systemPrompt += '\n- 禁止场景描写';
             systemPrompt += '\n- 禁止括号注释';
+            systemPrompt += '\n- 禁止只发1-2条消息（至少5条！）';
+            systemPrompt += '\n- 禁止频繁发语音消息！';
             systemPrompt += '\n';
-            systemPrompt += '\n记住：你必须严格按照角色人设来回复，表达方式要像真人发微信！';
+            systemPrompt += '\n🔥 最终提醒：你的每一句话都必须用<msg>标签包裹！';
+            systemPrompt += '\n🔥 格式示例：<msg>哈哈</msg><msg>你说得对</msg><msg>还有什么问题吗</msg>';
+            systemPrompt += '\n🔥 绝对不要直接输出文本，必须用标签！每次至少5个<msg>标签！';
             
             // 特殊功能指令（精简版）
             systemPrompt += '\n\n【特殊指令】（谨慎使用，不要滥用）';
             systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复';
             systemPrompt += '\n消息[RECALL] - 撤回（说错话时用）';
-            systemPrompt += '\n[图片:描述] - 文字传图（单独一行，仅在需要描述场景时偶尔使用）';
+            systemPrompt += '\n[图片:描述] - 意念传图（单独一行，仅在需要描述场景时偶尔使用）';
+            systemPrompt += '\n⚠️⚠️⚠️ 图片格式【最重要规则】：';
+            systemPrompt += '\n   - 只能使用 [图片:描述文字] 格式，例如：[图片:一只可爱的小猫]';
+            systemPrompt += '\n   - 系统会自动把描述文字转换成图片卡片显示';
+            systemPrompt += '\n   - 🚫 绝对禁止发送：base64编码、data:image开头的数据、任何长串字符！';
+            systemPrompt += '\n   - 🚫 如果你发送编码数据，消息会被系统自动删除！';
             systemPrompt += '\n[语音:内容] - 语音消息（单独一行，极少使用，只在特别亲密或撒娇时才用）';
             systemPrompt += '\n[转账:金额:备注] - 转账（单独一行，不重复发）';
             systemPrompt += '\n[领取转账] - 领取用户转账（已领取不重复）';
@@ -926,6 +955,7 @@ const API = {
             
             systemPrompt += '\n\n⚠️ 格式要求：表情包URL/语音/图片/转账/换头像必须单独一行！';
             systemPrompt += '\n⚠️ 重要：日常对话请直接用文字回复，不要频繁使用语音消息！语音消息应该非常罕见！';
+            systemPrompt += '\n🚫 严禁发送：base64编码、二进制数据、长串编码！只能用[图片:描述]格式！';
 
             // --- 身份隔离铁律 ---
             systemPrompt += '\n\n[CRITICAL: 你必须严格区分用户和你自己的身份。用户发出的表情和情绪仅属于用户，严禁你在回复中认领这些情绪或复读用户的表情描述。]';
@@ -1254,10 +1284,34 @@ const API = {
                 }
                 
                 // 接收完整内容后进行智能分段
-                console.log('[generateReply] AI原始回复:', fullReply);
+                console.log('[generateReply] 🔍 AI原始回复长度:', fullReply.length);
+                console.log('[generateReply] 🔍 前100字符:', fullReply.substring(0, 100));
                 
                 if (!fullReply.trim()) {
                     throw new Error('AI返回内容为空');
+                }
+                
+                // 🚫 在分段前检测并拦截编码数据
+                const cleanedReply = fullReply.trim();
+                
+                // 检测是否是data:image格式的base64图片
+                const isDataImageUrl = cleanedReply.startsWith('data:image/');
+                
+                // 检测是否是纯编码数据：长度>50且主要是base64字符，不包含中文
+                const isPureEncodedData = cleanedReply.length > 50 &&
+                    /^[A-Za-z0-9+/=\s\n\r,;:]+$/.test(cleanedReply) &&
+                    !/[\u4e00-\u9fa5]/.test(cleanedReply);
+                
+                const isEncodedData = isDataImageUrl || isPureEncodedData;
+                
+                if (isEncodedData) {
+                    console.error('[generateReply] 🚫 检测到AI发送编码数据，已拦截！');
+                    console.log('[generateReply] 是data:image格式:', isDataImageUrl);
+                    console.log('[generateReply] 是纯编码数据:', isPureEncodedData);
+                    console.log('[generateReply] 编码数据长度:', cleanedReply.length);
+                    console.log('[generateReply] 前100字符:', cleanedReply.substring(0, 100));
+                    // 直接返回空数组，不显示任何消息
+                    return [];
                 }
                 
                 // 智能分段逻辑:确保AI回复被拆分成多条消息
@@ -1272,100 +1326,98 @@ const API = {
         },
 
         /**
-         * 智能分段函数 - 合并短消息，保护特殊指令
-         * 把AI回复中连续的短文本合并成较长的消息，让对话更自然
-         * 特殊指令（语音、图片、转账、表情包URL）单独成一条
+         * 基于HTML标签的智能分段函数
+         * 解析AI回复中的<msg>标签，每个标签内容作为一条消息
+         * 如果没有标签，则按换行符分割作为兜底方案
          */
         _smartSplitReply: function(fullReply) {
             console.log('[SmartSplit] 原始回复:', fullReply);
             
-            // 清理可能的特殊字符
             let cleanReply = fullReply.trim();
             
-            // 第零步：提取并保护特殊指令（语音、图片、转账等）
-            // 用占位符替换，分段后再还原
-            const specialCommands = [];
-            const placeholder = '___SPECIAL_CMD_';
+            // 首先尝试解析<msg>标签
+            const msgTagRegex = /<msg>([\s\S]*?)<\/msg>/gi;
+            const msgMatches = [];
+            let match;
             
-            // 匹配 [语音:xxx]、[图片:xxx]、[转账:xxx:xxx]、[表情·xxx]、[表情包:xxx] 等格式
-            // 使用 [\s\S] 来匹配包括换行符在内的所有字符
-            cleanReply = cleanReply.replace(/\[(?:语音|VOICE|voice|图片|IMAGE|image|转账|TRANSFER|换头像|领取转账|RECALL|表情|表情包)[：:·][\s\S]*?\]/gi, (match) => {
-                const idx = specialCommands.length;
-                specialCommands.push(match);
-                console.log('[SmartSplit] 保护特殊指令:', match);
-                return '\n' + placeholder + idx + '___\n';
-            });
-            
-            // 也保护单独的指令如 [换头像]、[领取转账]、[RECALL]
-            cleanReply = cleanReply.replace(/\[(?:换头像|领取转账|RECALL)\]/gi, (match) => {
-                const idx = specialCommands.length;
-                specialCommands.push(match);
-                console.log('[SmartSplit] 保护特殊指令:', match);
-                return '\n' + placeholder + idx + '___\n';
-            });
-            
-            // 也保护URL（http/https开头的链接）- 表情包URL
-            cleanReply = cleanReply.replace(/https?:\/\/[^\s\n]+/gi, (match) => {
-                const idx = specialCommands.length;
-                specialCommands.push(match);
-                console.log('[SmartSplit] 保护URL:', match);
-                return '\n' + placeholder + idx + '___\n';
-            });
-            
-            // 按换行符分割
-            let segments = cleanReply.split(/\n+/).filter(t => t.trim());
-            console.log('[SmartSplit] 换行分割后条数:', segments.length);
-            
-            // 合并连续的普通文本消息，特殊指令单独成一条
-            const merged = [];
-            let currentText = '';
-            
-            for (const seg of segments) {
-                const trimmed = seg.trim();
-                
-                // 如果是特殊指令占位符，单独成一条
-                if (trimmed.includes(placeholder)) {
-                    // 先把之前累积的文本作为一条消息
-                    if (currentText) {
-                        merged.push(currentText);
-                        currentText = '';
-                    }
-                    merged.push(trimmed);
-                } else {
-                    // 普通文本，合并到当前消息
-                    if (currentText) {
-                        // 用逗号或句号连接
-                        const lastChar = currentText[currentText.length - 1];
-                        if ('。！？…~.!?'.includes(lastChar)) {
-                            currentText += trimmed;
-                        } else {
-                            currentText += '，' + trimmed;
-                        }
+            while ((match = msgTagRegex.exec(cleanReply)) !== null) {
+                const content = match[1].trim();
+                if (content) {
+                    // 🚫 在每个<msg>标签内容中检测编码数据
+                    const isEncodedInMsg = content.startsWith('data:image/') ||
+                        content.startsWith('data:') ||
+                        (content.length > 50 && /^[A-Za-z0-9+/=\s\n\r,;:]+$/.test(content) && !/[\u4e00-\u9fa5]/.test(content));
+                    
+                    if (isEncodedInMsg) {
+                        console.error('[SmartSplit] 🚫 在<msg>标签内检测到编码数据，已跳过！');
+                        console.log('[SmartSplit] 编码内容前50字符:', content.substring(0, 50));
+                        // 跳过编码数据，不添加到结果中
                     } else {
-                        currentText = trimmed;
+                        msgMatches.push(content);
                     }
                 }
             }
             
-            // 别忘了最后一条
-            if (currentText) {
-                merged.push(currentText);
+            // 如果找到了<msg>标签，使用标签内容
+            if (msgMatches.length > 0) {
+                console.log('[SmartSplit] 找到', msgMatches.length, '个<msg>标签');
+                console.log('[SmartSplit] 标签解析结果:', msgMatches);
+                return msgMatches;
             }
             
-            console.log('[SmartSplit] 合并后条数:', merged.length);
+            // 兜底方案：如果没有<msg>标签，智能分割
+            console.log('[SmartSplit] ⚠️ AI没有使用<msg>标签！使用兜底方案');
             
-            // 还原特殊指令和URL
-            const result = merged.map(seg => {
-                let restored = seg.trim();
-                for (let i = 0; i < specialCommands.length; i++) {
-                    restored = restored.replace(placeholder + i + '___', specialCommands[i]);
+            // 如果文本太长，尝试按句号、问号、感叹号分割
+            if (cleanReply.length > 200) {
+                console.log('[SmartSplit] 文本较长，按标点符号分割');
+                const sentences = cleanReply.split(/([。！？.!?]+)/).filter(s => s.trim());
+                const result = [];
+                let current = '';
+                
+                for (let i = 0; i < sentences.length; i++) {
+                    current += sentences[i];
+                    // 如果遇到标点符号，或者当前句子够长了，就分割
+                    if (/[。！？.!?]+/.test(sentences[i]) || current.length > 100) {
+                        if (current.trim()) {
+                            result.push(current.trim());
+                            current = '';
+                        }
+                    }
                 }
-                return restored;
-            }).filter(s => s && s.trim());
+                if (current.trim()) {
+                    result.push(current.trim());
+                }
+                
+                console.log('[SmartSplit] 按标点分割结果:', result.length, result);
+                return result.length > 0 ? result : [cleanReply];
+            }
             
-            console.log('[SmartSplit] 最终结果:', result.length, result);
+            // 如果文本不长，按换行符分割但限制数量
+            let segments = cleanReply.split(/\n+/).filter(t => t.trim());
             
-            return result;
+            // 如果分割后太多段，合并一些
+            if (segments.length > 10) {
+                console.log('[SmartSplit] 分割段数过多，进行合并');
+                const merged = [];
+                let current = '';
+                
+                for (let i = 0; i < segments.length; i++) {
+                    if (current.length + segments[i].length < 150) {
+                        current += (current ? ' ' : '') + segments[i];
+                    } else {
+                        if (current) merged.push(current);
+                        current = segments[i];
+                    }
+                }
+                if (current) merged.push(current);
+                
+                console.log('[SmartSplit] 合并后结果:', merged.length, merged);
+                return merged;
+            }
+            
+            console.log('[SmartSplit] 兜底方案结果:', segments.length, segments);
+            return segments.length > 0 ? segments : [cleanReply];
         },
 
         /**
@@ -1494,14 +1546,40 @@ const API = {
         /**
          * 获取统一的轮数计数器（线上+线下合并计算）
          * 返回：{ totalRounds: 总轮数, onlineRounds: 线上轮数, offlineRounds: 线下轮数 }
+         *
+         * 注意：一次AI回复可能被分成多条消息，但应该只算1轮
+         * 通过检测连续的AI消息来判断是否属于同一次回复
          */
         _getUnifiedRoundCount: function(charId) {
             const onlineHistory = this.getHistory(charId);
             const offlineHistory = API.Offline.getHistory(charId);
             
-            // 只计算AI回复的轮数（1次AI回复 = 1轮）
-            const onlineRounds = onlineHistory.filter(m => m.sender === 'ai' || m.sender === 'assistant').length;
-            const offlineRounds = offlineHistory.filter(m => m.sender === 'ai').length;
+            // 计算AI回复轮数：连续的AI消息只算1轮
+            // 当遇到用户消息后，下一个AI消息才算新的一轮
+            const countRounds = (history) => {
+                let rounds = 0;
+                let lastSenderWasAI = false;
+                
+                for (const msg of history) {
+                    const isAI = msg.sender === 'ai' || msg.sender === 'assistant' || msg.sender === 'char';
+                    const isUser = msg.sender === 'user';
+                    
+                    if (isAI && !lastSenderWasAI) {
+                        // 从非AI消息切换到AI消息，算一轮
+                        rounds++;
+                        lastSenderWasAI = true;
+                    } else if (isUser) {
+                        // 用户消息，重置标记
+                        lastSenderWasAI = false;
+                    }
+                    // 连续的AI消息不增加轮数
+                }
+                
+                return rounds;
+            };
+            
+            const onlineRounds = countRounds(onlineHistory);
+            const offlineRounds = countRounds(offlineHistory);
             const totalRounds = onlineRounds + offlineRounds;
             
             return { totalRounds, onlineRounds, offlineRounds };
@@ -2098,7 +2176,21 @@ const API = {
                 if (!fullReply.trim()) {
                     throw new Error('AI返回内容为空');
                 }
-                return fullReply.trim();
+                
+                // 🚫 检测并拦截编码数据
+                const cleanedReply = fullReply.trim();
+                const isDataImageUrl = cleanedReply.startsWith('data:image/');
+                const isPureEncodedData = cleanedReply.length > 50 &&
+                    /^[A-Za-z0-9+/=\s\n\r,;:]+$/.test(cleanedReply) &&
+                    !/[\u4e00-\u9fa5]/.test(cleanedReply);
+                
+                if (isDataImageUrl || isPureEncodedData) {
+                    console.error('[OfflineStream] 🚫 检测到AI发送编码数据，已拦截！');
+                    console.log('[OfflineStream] 编码数据长度:', cleanedReply.length);
+                    return '[AI尝试发送了图片数据，但线下模式不支持图片]';
+                }
+                
+                return cleanedReply;
                 
             } catch (e) {
                 console.error('[OfflineStream] 读取失败:', e);
