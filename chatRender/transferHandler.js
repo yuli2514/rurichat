@@ -27,7 +27,6 @@ const TransferHandler = {
      * 打开转账界面
      */
     openTransferPanel: function(event) {
-        console.log('[TransferHandler] openTransferPanel called');
         
         // 阻止事件冒泡，防止触发其他监听器
         if (event) {
@@ -45,7 +44,6 @@ const TransferHandler = {
         this.currentRemark = '';
         
         const charId = ChatInterface.currentCharId;
-        console.log('[TransferHandler] charId:', charId);
         const char = API.Chat.getChar(charId);
         const charName = char ? char.remark : '对方';
         
@@ -102,7 +100,6 @@ const TransferHandler = {
         overlay.addEventListener('click', (e) => {
             // 如果面板刚打开，不处理关闭
             if (this.panelJustOpened) {
-                console.log('[TransferHandler] Panel just opened, ignoring close');
                 return;
             }
             if (e.target === overlay) {

@@ -81,18 +81,21 @@ const DiaryApp = {
             this.updatePageIndicators(currentPage);
         };
 
-        // 触摸事件
+        // 触摸事件 - 只在空白区域触发
         container.addEventListener('touchstart', (e) => {
-            // 更严格的按钮检测
-            if (e.target.tagName === 'BUTTON' ||
-                e.target.closest('button') ||
-                e.target.classList.contains('btn') ||
-                e.target.closest('.btn')) {
+            // 检查是否点击在按钮或其子元素上
+            const target = e.target;
+            if (target.tagName === 'BUTTON' ||
+                target.closest('button') ||
+                target.tagName === 'I' ||  // 图标
+                target.tagName === 'SPAN' || // 文字
+                target.classList.contains('w-12') || // 按钮图标容器
+                target.closest('.grid')) { // 按钮网格区域
                 return;
             }
-            e.preventDefault();
+            
             handleStart(e.touches[0].clientX);
-        }, { passive: false });
+        }, { passive: true });
 
         container.addEventListener('touchmove', (e) => {
             if (isDragging) {
@@ -105,7 +108,7 @@ const DiaryApp = {
             if (isDragging) {
                 handleEnd();
             }
-        }, { passive: false });
+        }, { passive: true });
 
         // 鼠标事件（电脑端）
         container.addEventListener('mousedown', (e) => {

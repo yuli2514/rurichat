@@ -140,7 +140,7 @@
                                 <span class="text-xs">日记</span>
                             </button>
                             <!-- 存档按钮 -->
-                            <button type="button" onclick="console.log('存档按钮被点击'); if (typeof SaveApp !== 'undefined') { SaveApp.open(); } else { alert('SaveApp 未加载，请刷新页面'); }" class="flex flex-col items-center gap-1.5 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
+                            <button type="button" onclick="if (typeof SaveApp !== 'undefined') { SaveApp.open(); } else { alert('SaveApp 未加载，请刷新页面'); }" class="flex flex-col items-center gap-1.5 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
                                 <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-gray-200"><i class="fa-solid fa-floppy-disk text-xl text-gray-600"></i></div>
                                 <span class="text-xs">存档</span>
                             </button>

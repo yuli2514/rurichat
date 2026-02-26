@@ -10,23 +10,17 @@ const SaveApp = {
      * 打开存档管理界面
      */
     open: function() {
-        console.log('[SaveApp] Opening save app...');
-        console.log('[SaveApp] ChatInterface exists:', typeof ChatInterface !== 'undefined');
-        console.log('[SaveApp] ChatInterface.currentCharId:', typeof ChatInterface !== 'undefined' ? ChatInterface.currentCharId : 'N/A');
         
         // 获取当前角色ID
         if (typeof ChatInterface !== 'undefined' && ChatInterface.currentCharId) {
             this.currentCharId = ChatInterface.currentCharId;
-            console.log('[SaveApp] Using charId:', this.currentCharId);
         } else {
-            console.error('[SaveApp] No character selected');
             alert('请先选择一个角色进入聊天界面');
             return;
         }
 
         const saveAppEl = document.getElementById('save-app');
         if (!saveAppEl) {
-            console.error('[SaveApp] save-app element not found!');
             alert('存档界面加载失败，请刷新页面');
             return;
         }
@@ -343,6 +337,29 @@ const SaveApp = {
             console.error('[SaveApp] Delete failed:', e);
             alert('❌ 删除失败：' + e.message);
         }
+    },
+
+    /**
+     * 导入存档
+     */
+    importSave: function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                await SaveManager.importSave(file);
+                this.renderSaveList();
+                alert('✅ 存档导入成功！');
+            } catch (error) {
+                console.error('[SaveApp] Import failed:', error);
+                alert('❌ 导入失败：' + error.message);
+            }
+        };
+        input.click();
     },
 
     /**
