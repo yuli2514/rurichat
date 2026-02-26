@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扩展面板滑动测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        
+        .test-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .panel-expand {
+            height: 192px;
+            overflow: hidden;
+            position: relative;
+            background: #f7f7f7;
+        }
+        
+        .expand-pages-container {
+            display: flex;
+            transition: transform 0.3s;
+            height: 100%;
+            width: 200%;
+            touch-action: pan-x !important;
+            -webkit-overflow-scrolling: touch !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+        
+        .page {
+            width: 50%;
+            padding: 16px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        
+        .btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: #666;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            padding: 0;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-icon {
+            width: 48px;
+            height: 48px;
+            background: white;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e0e0e0;
+            font-size: 20px;
+        }
+        
+        .btn-text {
+            font-size: 12px;
+        }
+        
+        .indicators {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+        
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: all 0.3s;
+        }
+        
+        .indicator.active {
+            background: #666;
+        }
+        
+        .info {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>扩展面板滑动测试</h2>
+        <p>在移动端左右滑动下方面板测试滑动功能</p>
+    </div>
+    
+    <div class="test-container">
+        <div class="panel-expand">
+            <div id="expand-pages-container" class="expand-pages-container">
+                <!-- Page 1 -->
+                <div class="page">
+                    <div class="grid">
+                        <button class="btn">
+                            <div class="btn-icon">🔄</div>
+                            <span class="btn-text">重回</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">📷</div>
+                            <span class="btn-text">拍照</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">🖼️</div>
+                            <span class="btn-text">照片</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">🎤</div>
+                            <span class="btn-text">语音</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">💰</div>
+                            <span class="btn-text">转账</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">📞</div>
+                            <span class="btn-text">语音通话</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">📹</div>
+                            <span class="btn-text">视频通话</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">✈️</div>
+                            <span class="btn-text">线下模式</span>
+                        </button>
+                    </div>
+                </div>
+                <!-- Page 2 -->
+                <div class="page">
+                    <div class="grid">
+                        <button class="btn">
+                            <div class="btn-icon">📖</div>
+                            <span class="btn-text">日记</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">💾</div>
+                            <span class="btn-text">存档</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">📄</div>
+                            <span class="btn-text">文件</span>
+                        </button>
+                        <button class="btn">
+                            <div class="btn-icon">⚙️</div>
+                            <span class="btn-text">设置</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Page Indicators -->
+            <div class="indicators">
+                <div id="expand-indicator-0" class="indicator active"></div>
+                <div id="expand-indicator-1" class="indicator"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 扩展面板滑动功能
+        function initExpandPanelSwipe() {
+            const container = document.getElementById('expand-pages-container');
+            if (!container) return;
+
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            let currentPage = 0;
+
+            const handleStart = (clientX) => {
+                startX = clientX;
+                currentX = clientX;
+                isDragging = true;
+                container.style.transition = 'none';
+                console.log('滑动开始:', { startX, currentPage });
+            };
+
+            const handleMove = (clientX) => {
+                if (!isDragging) return;
+                currentX = clientX;
+                const diff = currentX - startX;
+                const containerWidth = container.offsetWidth || container.clientWidth;
+                const offset = -currentPage * 50 + (diff / containerWidth) * 50;
+                const clampedOffset = Math.max(-50, Math.min(0, offset));
+                container.style.transform = `translateX(${clampedOffset}%)`;
+            };
+
+            const handleEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                container.style.transition = 'transform 0.3s';
+
+                const diff = currentX - startX;
+                const containerWidth = container.offsetWidth || container.clientWidth;
+                const threshold = containerWidth * 0.15;
+
+                console.log('滑动结束:', { diff, threshold, currentPage, containerWidth });
+
+                if (diff < -threshold && currentPage < 1) {
+                    currentPage++;
+                    console.log('切换到第二页');
+                } else if (diff > threshold && currentPage > 0) {
+                    currentPage--;
+                    console.log('切换到第一页');
+                }
+
+                container.style.transform = `translateX(-${currentPage * 50}%)`;
+                updatePageIndicators(currentPage);
+            };
+
+            // 触摸事件
+            container.addEventListener('touchstart', (e) => {
+                if (e.target.closest('button')) return;
+                handleStart(e.touches[0].clientX);
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    handleMove(e.touches[0].clientX);
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchend', (e) => {
+                handleEnd();
+            }, { passive: false });
+
+            container.addEventListener('touchcancel', (e) => {
+                if (isDragging) {
+                    isDragging = false;
+                    container.style.transition = 'transform 0.3s';
+                    container.style.transform = `translateX(-${currentPage * 50}%)`;
+                    console.log('触摸被取消，重置位置');
+                }
+            }, { passive: false });
+
+            // 鼠标事件（电脑端）
+            container.addEventListener('mousedown', (e) => {
+                if (e.target.closest('button')) return;
+                e.preventDefault();
+                handleStart(e.clientX);
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    handleMove(e.clientX);
+                }
+            });
+
+            container.addEventListener('mouseup', (e) => {
+                handleEnd();
+            });
+
+            container.addEventListener('mouseleave', (e) => {
+                if (isDragging) {
+                    handleEnd();
+                }
+            });
+        }
+
+        function updatePageIndicators(page) {
+            for (let i = 0; i < 2; i++) {
+                const indicator = document.getElementById(`expand-indicator-${i}`);
+                if (indicator) {
+                    if (i === page) {
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                    }
+                }
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initExpandPanelSwipe();
+        });
+    </script>
+</body>
+</html>

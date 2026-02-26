@@ -36,8 +36,13 @@ const DiaryApp = {
      */
     initExpandPanelSwipe: function() {
         const container = document.getElementById('expand-pages-container');
-        if (!container) return;
+        if (!container) {
+            console.warn('扩展面板容器未找到，延迟重试...');
+            setTimeout(() => this.initExpandPanelSwipe(), 500);
+            return;
+        }
 
+        console.log('初始化扩展面板滑动功能');
         let startX = 0;
         let currentX = 0;
         let isDragging = false;
@@ -49,14 +54,18 @@ const DiaryApp = {
             currentX = clientX; // 初始化currentX，防止没有move事件时diff计算错误
             isDragging = true;
             container.style.transition = 'none';
+            console.log('扩展面板滑动开始:', { startX, currentPage });
         };
 
         const handleMove = (clientX) => {
             if (!isDragging) return;
             currentX = clientX;
             const diff = currentX - startX;
-            const offset = -currentPage * 50 + (diff / container.offsetWidth) * 50;
-            container.style.transform = `translateX(${offset}%)`;
+            const containerWidth = container.offsetWidth || container.clientWidth;
+            const offset = -currentPage * 50 + (diff / containerWidth) * 50;
+            // 限制滑动范围，防止滑动超出边界
+            const clampedOffset = Math.max(-50, Math.min(0, offset));
+            container.style.transform = `translateX(${clampedOffset}%)`;
         };
 
         const handleEnd = () => {
@@ -65,12 +74,17 @@ const DiaryApp = {
             container.style.transition = 'transform 0.3s';
 
             const diff = currentX - startX;
-            const threshold = container.offsetWidth * 0.2;
+            const containerWidth = container.offsetWidth || container.clientWidth;
+            const threshold = containerWidth * 0.15; // 降低阈值，让滑动更敏感
+
+            console.log('扩展面板滑动结束:', { diff, threshold, currentPage, containerWidth });
 
             if (diff < -threshold && currentPage < 1) {
                 currentPage++;
+                console.log('切换到第二页');
             } else if (diff > threshold && currentPage > 0) {
                 currentPage--;
+                console.log('切换到第一页');
             }
 
             container.style.transform = `translateX(-${currentPage * 50}%)`;
@@ -84,15 +98,28 @@ const DiaryApp = {
                 return;
             }
             handleStart(e.touches[0].clientX);
-        });
+        }, { passive: false }); // 允许preventDefault
 
         container.addEventListener('touchmove', (e) => {
-            handleMove(e.touches[0].clientX);
-        });
+            if (isDragging) {
+                e.preventDefault(); // 阻止默认滚动行为
+                handleMove(e.touches[0].clientX);
+            }
+        }, { passive: false }); // 允许preventDefault
 
         container.addEventListener('touchend', (e) => {
             handleEnd();
-        });
+        }, { passive: false }); // 允许preventDefault
+
+        // 处理触摸取消事件（比如被其他手势中断）
+        container.addEventListener('touchcancel', (e) => {
+            if (isDragging) {
+                isDragging = false;
+                container.style.transition = 'transform 0.3s';
+                container.style.transform = `translateX(-${currentPage * 50}%)`;
+                console.log('触摸被取消，重置位置');
+            }
+        }, { passive: false });
 
         // 鼠标事件（电脑端）
         container.addEventListener('mousedown', (e) => {

@@ -874,9 +874,10 @@ const API = {
             const ctxLength = settings.contextLength || 20;
             
             // 构建线上聊天系统提示词
-            let systemPrompt = '这是线上聊天，扮演角色进行聊天，必须遵守人设。要口语化。模仿真人短句聊天。';
+            let systemPrompt = '这是线上聊天，扮演角色进行聊天，必须遵守人设。要口语化。模仿真人线上聊天习惯。';
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
+            systemPrompt += '\n\n重要：必须发送5条以上的消息。模仿真人发微信的习惯，每条消息自然表达。';
 
             // --- 角色感知现实世界 ---
             if (settings.realWorldAwareness) {
@@ -889,7 +890,7 @@ const API = {
             
             // 特殊功能指令（精简版）
             systemPrompt += '\n\n【特殊指令】（谨慎使用，不要滥用）';
-            systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复';
+            systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复（注意：必须使用冒号:，不要用其他符号）';
             systemPrompt += '\n消息[RECALL] - 撤回（说错话时用）';
             systemPrompt += '\n[图片:描述] - 意念传图（极少使用，只在必要时用）';
             systemPrompt += '\n[语音:内容] - 语音消息（极少使用，只在特别亲密或撒娇时才用）';
@@ -1152,7 +1153,7 @@ const API = {
             // 不污染用户消息内容，避免破坏 AI 分条发送的格式
             messages.push({
                 role: 'system',
-                content: '⚠️ 重要：必须发送多条短消息，用换行符分隔。口语化、自然。严格按照角色人设回复。\n\n示例格式：\n哈哈\n你说的对\n我也这么觉得\n不过话说回来\n你最近怎么样啊'
+                content: '重要：必须发送5条以上的消息。按照角色人设自然回复，模仿真人线上聊天习惯。每条消息用换行分隔。\n\n示例格式：\n哈哈\n你说的对\n我也这么觉得\n不过话说回来\n你最近怎么样\n还有什么想聊的'
             });
 
             const response = await fetch(config.endpoint + '/chat/completions', {
@@ -1305,82 +1306,22 @@ const API = {
                 return msgMatches;
             }
             
-            // 兜底方案：如果没有<msg>标签，强制智能分割
-            console.log('[SmartSplit] ⚠️ AI没有使用<msg>标签！使用强制分割方案');
+            // 兜底方案：如果没有<msg>标签，按换行符自然分割
+            console.log('[SmartSplit] ⚠️ AI没有使用<msg>标签！使用自然分割方案');
             
-            // 首先按换行符分割
+            // 按换行符分割，这是最自然的方式
             let segments = cleanReply.split(/\n+/).filter(t => t.trim());
+            console.log('[SmartSplit] 按换行符分割得到', segments.length, '段');
             
-            // 如果只有一段或段数太少，强制按标点符号分割
-            if (segments.length <= 1 || cleanReply.length > 100) {
-                console.log('[SmartSplit] 强制按标点符号分割');
-                const sentences = cleanReply.split(/([。！？.!?]+)/).filter(s => s.trim());
-                const result = [];
-                let current = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    current += sentences[i];
-                    // 如果遇到标点符号，或者当前句子够长了，就分割
-                    if (/[。！？.!?]+/.test(sentences[i]) || current.length > 50) {
-                        if (current.trim()) {
-                            result.push(current.trim());
-                            current = '';
-                        }
-                    }
-                }
-                if (current.trim()) {
-                    result.push(current.trim());
-                }
-                
-                // 如果分割结果还是只有一条，强制按字符长度分割
-                if (result.length <= 1 && cleanReply.length > 50) {
-                    console.log('[SmartSplit] 强制按字符长度分割');
-                    const words = cleanReply.split(/\s+/);
-                    const forcedResult = [];
-                    let currentChunk = '';
-                    
-                    for (const word of words) {
-                        if (currentChunk.length + word.length > 30 && currentChunk.trim()) {
-                            forcedResult.push(currentChunk.trim());
-                            currentChunk = word;
-                        } else {
-                            currentChunk += (currentChunk ? ' ' : '') + word;
-                        }
-                    }
-                    if (currentChunk.trim()) {
-                        forcedResult.push(currentChunk.trim());
-                    }
-                    
-                    console.log('[SmartSplit] 强制分割结果:', forcedResult.length, forcedResult);
-                    return forcedResult.length > 0 ? forcedResult : [cleanReply];
-                }
-                
-                console.log('[SmartSplit] 按标点分割结果:', result.length, result);
-                segments = result.length > 0 ? result : [cleanReply];
+            // 如果有多段，直接使用
+            if (segments.length > 1) {
+                console.log('[SmartSplit] 使用换行分割结果:', segments);
+                return segments;
             }
             
-            // 如果分割后太多段，合并一些
-            if (segments.length > 10) {
-                console.log('[SmartSplit] 分割段数过多，进行合并');
-                const merged = [];
-                let current = '';
-                
-                for (let i = 0; i < segments.length; i++) {
-                    if (current.length + segments[i].length < 100) {
-                        current += (current ? ' ' : '') + segments[i];
-                    } else {
-                        if (current) merged.push(current);
-                        current = segments[i];
-                    }
-                }
-                if (current) merged.push(current);
-                
-                console.log('[SmartSplit] 合并后结果:', merged.length, merged);
-                return merged;
-            }
-            
-            console.log('[SmartSplit] 最终分割结果:', segments.length, segments);
-            return segments.length > 0 ? segments : [cleanReply];
+            // 如果只有一段，不强制分割，直接返回
+            console.log('[SmartSplit] 只有一段，不强制分割，直接返回');
+            return [cleanReply];
         },
 
         /**

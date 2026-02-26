@@ -608,6 +608,14 @@
             min-height: 0 !important;
         }
 
+        /* 扩展面板滑动容器样式 */
+        #expand-pages-container {
+            touch-action: pan-x !important; /* 只允许水平滑动 */
+            -webkit-overflow-scrolling: touch !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+
         /* Page 1 content - prevent stretching */
         #slider-track > div:first-child {
             display: flex !important;

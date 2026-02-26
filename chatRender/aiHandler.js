@@ -65,6 +65,8 @@ const AIHandler = {
                 text = text.replace(/\[发送了一张图片[^\]]*\]/g, '').trim();
                 // 清除发件人标记复读（如 [发件人: User] [发件人: You]）
                 text = text.replace(/\[发件人:\s*(?:User|You)\]\s*/g, '').trim();
+                // 清除错误的引用格式（如 [QUOTE•内容] 应该是 [QUOTE:内容]）
+                text = text.replace(/\[QUOTE[•·]\s*([^\]]+)\]/g, '').trim();
                 // 清除整行旁白（整条消息就是 *旁白内容*，前后无其他文字）
                 if (/^\*[^*]+\*$/.test(text.trim())) { text = ''; }
                 // 清除系统说明复读（如 [表情: xxx] 被AI原样输出时），但保留功能性指令
@@ -295,9 +297,9 @@ const AIHandler = {
                     isKnownEmojiUrl
                 );
                 
-                // 解析引用格式 [QUOTE:content]
+                // 解析引用格式 [QUOTE:content] 或 [QUOTE•content]（容错处理）
                 let quote = null;
-                const quoteMatch = text.match(/^\[QUOTE:(.+?)\]/);
+                const quoteMatch = text.match(/^\[QUOTE[：:•·]\s*(.+?)\]/);
                 if (quoteMatch) {
                     const quoteContent = quoteMatch[1];
                     text = text.replace(quoteMatch[0], '').trim();

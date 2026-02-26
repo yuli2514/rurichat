@@ -37,7 +37,7 @@ const SwipeLogic = {
             this.startY = e.touches[0].clientY;
             this.isDragging = true;
             track.style.transition = 'none';
-        }, { passive: true });
+        }, { passive: false }); // 允许preventDefault
 
         container.addEventListener('touchmove', (e) => {
             if (!this.isDragging) return;
@@ -48,12 +48,13 @@ const SwipeLogic = {
             
             // Only handle horizontal swipes
             if (Math.abs(diffX) > Math.abs(diffY)) {
+                e.preventDefault(); // 阻止默认滚动行为
                 const baseOffset = this.currentPage * -50;
                 const dragOffset = (diffX / container.clientWidth) * 50;
                 const newOffset = Math.max(-50, Math.min(0, baseOffset + dragOffset));
                 track.style.transform = `translateX(${newOffset}%)`;
             }
-        }, { passive: true });
+        }, { passive: false }); // 允许preventDefault
 
         container.addEventListener('touchend', (e) => {
             if (!this.isDragging) return;
@@ -71,7 +72,7 @@ const SwipeLogic = {
             }
             
             this.updatePosition();
-        }, { passive: true });
+        }, { passive: false }); // 允许preventDefault
 
         // Mouse events for desktop
         container.addEventListener('mousedown', (e) => {
