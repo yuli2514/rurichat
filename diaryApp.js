@@ -62,10 +62,11 @@ const DiaryApp = {
             if (!isDragging) return;
             currentX = clientX;
             const diff = currentX - startX;
-            const panelWidth = panel.offsetWidth || panel.clientWidth;
+            const panelWidth = panel.clientWidth || window.innerWidth;
             const offset = -currentPage * 50 + (diff / panelWidth) * 50;
             const clampedOffset = Math.max(-50, Math.min(0, offset));
             container.style.transform = `translateX(${clampedOffset}%)`;
+            console.log('滑动中:', { diff, panelWidth, offset, clampedOffset });
         };
 
         const handleEnd = () => {
@@ -74,8 +75,8 @@ const DiaryApp = {
             container.style.transition = 'transform 0.3s';
 
             const diff = currentX - startX;
-            const panelWidth = panel.offsetWidth || panel.clientWidth;
-            const threshold = panelWidth * 0.2;
+            const panelWidth = panel.clientWidth || window.innerWidth;
+            const threshold = panelWidth * 0.25;
 
             console.log('扩展面板滑动结束:', { diff, threshold, currentPage, panelWidth });
 

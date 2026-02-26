@@ -1313,22 +1313,33 @@ const API = {
             let segments = cleanReply.split(/\n+/).filter(t => t.trim());
             console.log('[SmartSplit] 按换行符分割得到', segments.length, '段');
             
-            // 如果有多段，直接使用
-            if (segments.length > 1) {
-                console.log('[SmartSplit] 使用换行分割结果:', segments);
+            // 如果分割结果少于5段，尝试按标点符号进一步分割
+            if (segments.length < 5) {
+                console.log('[SmartSplit] 段数不足5段，尝试按标点分割');
+                const allSegments = [];
+                for (const seg of segments) {
+                    const punctSplit = this._splitByPunctuation(seg);
+                    allSegments.push(...punctSplit);
+                }
+                if (allSegments.length >= 5) {
+                    console.log('[SmartSplit] 按标点分割后得到', allSegments.length, '段');
+                    return allSegments;
+                }
+                // 如果标点分割后还是不够，返回标点分割的结果（至少比原来多）
+                if (allSegments.length > segments.length) {
+                    console.log('[SmartSplit] 使用标点分割结果:', allSegments.length, '段');
+                    return allSegments;
+                }
+            }
+            
+            // 如果换行分割已经足够，直接使用
+            if (segments.length > 0) {
+                console.log('[SmartSplit] 使用换行分割结果:', segments.length, '段');
                 return segments;
             }
             
-            // 如果只有一段，尝试按标点符号分割（确保多条消息）
-            console.log('[SmartSplit] 只有一段，尝试按标点分割');
-            const punctSplit = this._splitByPunctuation(cleanReply);
-            if (punctSplit.length > 1) {
-                console.log('[SmartSplit] 按标点分割得到', punctSplit.length, '段');
-                return punctSplit;
-            }
-            
-            // 如果还是只有一段，直接返回
-            console.log('[SmartSplit] 无法分割，返回原文');
+            // 最后兜底，返回原文
+            console.log('[SmartSplit] 返回原文');
             return [cleanReply];
         },
 
