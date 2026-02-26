@@ -38,6 +38,10 @@ const DiaryApp = {
         const container = document.getElementById('expand-pages-container');
         if (!container) return;
 
+        // 防止重复初始化
+        if (container._swipeInitialized) return;
+        container._swipeInitialized = true;
+
         let startX = 0;
         let currentX = 0;
         let isDragging = false;
@@ -46,7 +50,7 @@ const DiaryApp = {
         // 触摸事件处理
         const handleStart = (clientX) => {
             startX = clientX;
-            currentX = clientX; // 初始化currentX，防止没有move事件时diff计算错误
+            currentX = clientX;
             isDragging = true;
             container.style.transition = 'none';
         };
@@ -79,25 +83,37 @@ const DiaryApp = {
 
         // 触摸事件
         container.addEventListener('touchstart', (e) => {
-            // 如果点击的是按钮或其子元素，不触发滑动
-            if (e.target.closest('button')) {
+            // 更严格的按钮检测
+            if (e.target.tagName === 'BUTTON' ||
+                e.target.closest('button') ||
+                e.target.classList.contains('btn') ||
+                e.target.closest('.btn')) {
                 return;
             }
+            e.preventDefault();
             handleStart(e.touches[0].clientX);
-        });
+        }, { passive: false });
 
         container.addEventListener('touchmove', (e) => {
-            handleMove(e.touches[0].clientX);
-        });
+            if (isDragging) {
+                e.preventDefault();
+                handleMove(e.touches[0].clientX);
+            }
+        }, { passive: false });
 
         container.addEventListener('touchend', (e) => {
-            handleEnd();
-        });
+            if (isDragging) {
+                handleEnd();
+            }
+        }, { passive: false });
 
         // 鼠标事件（电脑端）
         container.addEventListener('mousedown', (e) => {
-            // 如果点击的是按钮或其子元素，不触发滑动
-            if (e.target.closest('button')) {
+            // 更严格的按钮检测
+            if (e.target.tagName === 'BUTTON' ||
+                e.target.closest('button') ||
+                e.target.classList.contains('btn') ||
+                e.target.closest('.btn')) {
                 return;
             }
             e.preventDefault();
@@ -112,7 +128,9 @@ const DiaryApp = {
         });
 
         container.addEventListener('mouseup', (e) => {
-            handleEnd();
+            if (isDragging) {
+                handleEnd();
+            }
         });
 
         container.addEventListener('mouseleave', (e) => {

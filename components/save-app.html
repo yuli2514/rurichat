@@ -1,110 +1,116 @@
-<!-- 存档管理应用 -->
-<div id="save-app" class="absolute inset-0 z-[70] flex flex-col hidden bg-white">
-    <!-- 顶部导航栏 -->
-    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
-        <button onclick="SaveApp.close()" class="text-[#333333] text-base w-10 flex justify-start">
-            <i class="fa-solid fa-chevron-left"></i>
-        </button>
-        <h1 class="font-bold text-base text-gray-900">存档管理</h1>
-        <div class="flex gap-2">
-            <button onclick="SaveApp.openSaveModal()" class="text-[#333333] text-sm px-2 py-1 active:scale-95 transition">
-                保存
-            </button>
-            <button onclick="SaveApp.startFresh()" class="text-[#333333] text-sm px-2 py-1 active:scale-95 transition">
-                新开始
-            </button>
+<!-- 存档管理界面 -->
+<div id="save-app" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden">
+        <!-- 头部 -->
+        <div class="bg-gradient-to-r from-gray-800 to-gray-700 text-white p-5">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold">存档管理</h2>
+                <button onclick="SaveApp.close()" class="text-white hover:text-gray-300 transition">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
         </div>
-    </div>
 
-    <!-- 存档列表 -->
-    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
-        <div id="save-list-container" class="space-y-3">
-            <!-- 存档卡片将动态插入这里 -->
+        <!-- 操作按钮 -->
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex gap-2">
+                <button
+                    onclick="SaveApp.openSaveModal()"
+                    class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg active:scale-95 transition text-sm font-medium"
+                >
+                    <i class="fa-solid fa-save mr-2"></i>保存当前状态
+                </button>
+                <button
+                    onclick="SaveApp.importSave()"
+                    class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition text-sm"
+                >
+                    <i class="fa-solid fa-upload"></i>
+                </button>
+            </div>
+            <button
+                onclick="SaveApp.startFresh()"
+                class="w-full mt-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg active:scale-95 transition text-sm"
+            >
+                <i class="fa-solid fa-refresh mr-2"></i>全新开始
+            </button>
         </div>
-        
-        <!-- 空状态提示 -->
-        <div id="save-empty-state" class="hidden text-center py-12">
-            <i class="fa-solid fa-folder-open text-6xl text-gray-300 mb-4"></i>
-            <p class="text-gray-400 text-sm">暂无存档</p>
-            <p class="text-gray-400 text-xs mt-2">点击右上角"保存当前"创建存档</p>
+
+        <!-- 存档列表 -->
+        <div class="flex-1 overflow-y-auto max-h-96">
+            <div id="save-list-container" class="p-4 space-y-3">
+                <!-- 存档项目将在这里动态生成 -->
+            </div>
+
+            <!-- 空状态提示 -->
+            <div id="save-empty-state" class="hidden text-center py-12">
+                <i class="fa-solid fa-folder-open text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg font-medium mb-2">暂无存档</p>
+                <p class="text-gray-400 text-sm">点击上方"保存当前状态"创建第一个存档</p>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- 保存存档模态框 -->
-<div id="save-modal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-sm shadow-lg">
+<div id="save-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div class="p-5 border-b border-gray-200">
+            <h3 class="text-lg font-bold text-gray-900">保存存档</h3>
+        </div>
         <div class="p-5">
-            <h2 class="text-lg font-bold mb-4 text-gray-900">保存当前状态</h2>
-            
-            <div class="mb-4">
-                <label class="block text-sm text-gray-700 mb-2">存档名称</label>
-                <input
-                    type="text"
-                    id="save-name-input"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-400"
-                    placeholder="例如：第一章结束"
-                    maxlength="50"
-                >
-            </div>
-
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                <p class="text-xs text-gray-600 leading-relaxed">
-                    将保存：线上聊天、线下剧情、角色记忆、角色人设、用户人设
-                </p>
-            </div>
-
-            <div class="flex gap-2">
-                <button
-                    onclick="SaveApp.closeSaveModal()"
-                    class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition"
-                >
-                    取消
-                </button>
-                <button
-                    onclick="SaveApp.confirmSave()"
-                    class="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg active:scale-95 transition"
-                >
-                    保存
-                </button>
-            </div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">存档名称</label>
+            <input
+                type="text"
+                id="save-name-input"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="输入存档名称..."
+            />
+        </div>
+        <div class="p-5 border-t border-gray-200 flex gap-3">
+            <button
+                onclick="SaveApp.closeSaveModal()"
+                class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition"
+            >
+                取消
+            </button>
+            <button
+                onclick="SaveApp.confirmSave()"
+                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg active:scale-95 transition"
+            >
+                保存
+            </button>
         </div>
     </div>
 </div>
 
 <!-- 存档详情模态框 -->
-<div id="save-detail-modal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-md shadow-lg max-h-[80vh] overflow-hidden flex flex-col">
+<div id="save-detail-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div class="p-5 border-b border-gray-200">
-            <div class="flex justify-between items-start mb-2">
-                <h2 id="save-detail-name" class="text-lg font-bold text-gray-900 flex-1 mr-2"></h2>
-                <button onclick="SaveApp.closeDetailModal()" class="text-gray-400">
-                    <i class="fa-solid fa-times text-lg"></i>
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900">存档详情</h3>
+                <button onclick="SaveApp.closeDetailModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-times"></i>
                 </button>
             </div>
-            <p id="save-detail-time" class="text-sm text-gray-500"></p>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-5">
-            <div class="space-y-3">
-                <div class="bg-gray-50 rounded-lg p-3">
-                    <h3 class="text-sm font-bold text-gray-700 mb-2">存档内容</h3>
-                    <div class="space-y-1.5 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">线上聊天记录</span>
-                            <span id="save-stat-online" class="text-gray-900">0 条</span>
+        <div class="p-5">
+            <div class="space-y-4">
+                <div>
+                    <h4 id="detail-save-name" class="text-xl font-bold text-gray-900 mb-1">存档名称</h4>
+                    <p id="detail-save-date" class="text-sm text-gray-500">保存时间</p>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div class="grid grid-cols-2 gap-3 text-center">
+                        <div>
+                            <div id="detail-message-count" class="text-2xl font-bold text-blue-600">0</div>
+                            <div class="text-xs text-gray-500">消息数量</div>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">线下剧情记录</span>
-                            <span id="save-stat-offline" class="text-gray-900">0 条</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">角色记忆</span>
-                            <span id="save-stat-memories" class="text-gray-900">0 条</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">用户人设</span>
-                            <span id="save-stat-personas" class="text-gray-900">0 个</span>
+                        <div>
+                            <div id="detail-memory-count" class="text-2xl font-bold text-green-600">0</div>
+                            <div class="text-xs text-gray-500">记忆条目</div>
                         </div>
                     </div>
                 </div>
@@ -126,12 +132,6 @@
             </button>
             <div class="flex gap-2">
                 <button
-                    onclick="SaveApp.overwriteCurrentSave()"
-                    class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition text-sm"
-                >
-                    覆盖
-                </button>
-                <button
                     onclick="SaveApp.exportCurrentSave()"
                     class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition text-sm"
                 >
@@ -147,336 +147,3 @@
         </div>
     </div>
 </div>
-    currentCharId: null,
-    currentSaveId: null,
-
-    /**
-     * 打开存档管理界面
-     */
-    open: function() {
-        console.log('[SaveApp] Opening save app...');
-        console.log('[SaveApp] ChatInterface exists:', typeof ChatInterface !== 'undefined');
-        console.log('[SaveApp] ChatInterface.currentCharId:', typeof ChatInterface !== 'undefined' ? ChatInterface.currentCharId : 'N/A');
-        
-        // 获取当前角色ID
-        if (typeof ChatInterface !== 'undefined' && ChatInterface.currentCharId) {
-            this.currentCharId = ChatInterface.currentCharId;
-            console.log('[SaveApp] Using charId:', this.currentCharId);
-        } else {
-            console.error('[SaveApp] No character selected');
-            alert('请先选择一个角色进入聊天界面');
-            return;
-        }
-
-        const saveAppEl = document.getElementById('save-app');
-        if (!saveAppEl) {
-            console.error('[SaveApp] save-app element not found!');
-            alert('存档界面加载失败，请刷新页面');
-            return;
-        }
-
-        saveAppEl.classList.remove('hidden');
-        this.renderSaveList();
-        console.log('[SaveApp] Save app opened successfully');
-    },
-
-    /**
-     * 关闭存档管理界面
-     */
-    close: function() {
-        document.getElementById('save-app').classList.add('hidden');
-        this.currentCharId = null;
-    },
-
-    /**
-     * 渲染存档列表
-     */
-    renderSaveList: function() {
-        const container = document.getElementById('save-list-container');
-        const emptyState = document.getElementById('save-empty-state');
-        const saves = SaveManager.getAllSaves();
-
-        if (saves.length === 0) {
-            container.innerHTML = '';
-            emptyState.classList.remove('hidden');
-            return;
-        }
-
-        emptyState.classList.add('hidden');
-        
-        container.innerHTML = saves.map(save => {
-            const date = new Date(save.timestamp);
-            const dateStr = date.toLocaleDateString('zh-CN', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-
-            const stats = SaveManager.getSaveStats(save.id);
-            const totalMessages = stats.onlineMessages + stats.offlineMessages;
-
-            return `
-                <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition cursor-pointer"
-                     onclick="SaveApp.openDetailModal('${save.id}')">
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-bold text-gray-800 text-base flex-1 mr-2">${this._escapeHtml(save.name)}</h3>
-                        <span class="text-xs text-gray-400 shrink-0">${dateStr}</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                        <span><i class="fa-solid fa-user mr-1"></i>${this._escapeHtml(save.charName)}</span>
-                        <span>•</span>
-                        <span><i class="fa-solid fa-message mr-1"></i>${totalMessages} 条消息</span>
-                        <span>•</span>
-                        <span><i class="fa-solid fa-brain mr-1"></i>${stats.memories} 条记忆</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <button 
-                            onclick="event.stopPropagation(); SaveApp.quickLoad('${save.id}')" 
-                            class="flex-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-xs font-medium"
-                        >
-                            <i class="fa-solid fa-upload mr-1"></i>加载
-                        </button>
-                        <button 
-                            onclick="event.stopPropagation(); SaveApp.exportSave('${save.id}')" 
-                            class="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition text-xs"
-                        >
-                            <i class="fa-solid fa-download"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    },
-
-    /**
-     * 打开保存存档模态框
-     */
-    openSaveModal: function() {
-        if (!this.currentCharId) {
-            alert('请先选择一个角色');
-            return;
-        }
-
-        const char = API.Chat.getChar(this.currentCharId);
-        if (!char) {
-            alert('角色不存在');
-            return;
-        }
-
-        // 生成默认存档名称
-        const date = new Date();
-        const defaultName = `${char.name}_${date.getMonth() + 1}月${date.getDate()}日`;
-        document.getElementById('save-name-input').value = defaultName;
-
-        document.getElementById('save-modal').classList.remove('hidden');
-        
-        // 聚焦输入框并选中文本
-        setTimeout(() => {
-            const input = document.getElementById('save-name-input');
-            input.focus();
-            input.select();
-        }, 100);
-    },
-
-    /**
-     * 关闭保存存档模态框
-     */
-    closeSaveModal: function() {
-        document.getElementById('save-modal').classList.add('hidden');
-    },
-
-    /**
-     * 确认保存存档
-     */
-    confirmSave: function() {
-        const saveName = document.getElementById('save-name-input').value.trim();
-        
-        if (!saveName) {
-            alert('请输入存档名称');
-            return;
-        }
-
-        try {
-            SaveManager.createSave(this.currentCharId, saveName);
-            this.closeSaveModal();
-            this.renderSaveList();
-            alert('✅ 存档保存成功！');
-        } catch (e) {
-            console.error('[SaveApp] Save failed:', e);
-            alert('❌ 保存失败：' + e.message);
-        }
-    },
-
-    /**
-     * 全新开始
-     */
-    startFresh: function() {
-        if (!this.currentCharId) {
-            alert('请先选择一个角色');
-            return;
-        }
-
-        const char = API.Chat.getChar(this.currentCharId);
-        if (!char) {
-            alert('角色不存在');
-            return;
-        }
-
-        if (!confirm(`⚠️ 确定要全新开始吗？\n\n这将清空【${char.name}】的所有聊天记录和记忆，但保留角色人设。\n\n建议先保存当前状态！`)) {
-            return;
-        }
-
-        if (!confirm('再次确认：真的要清空所有聊天和记忆吗？此操作不可撤销！')) {
-            return;
-        }
-
-        try {
-            SaveManager.startFresh(this.currentCharId);
-            alert('✅ 已清空聊天和记忆，可以开始新的故事了！');
-            
-            // 如果当前在聊天界面，刷新显示
-            if (typeof ChatInterface !== 'undefined' && ChatInterface.currentCharId === this.currentCharId) {
-                ChatInterface.renderMessages();
-            }
-        } catch (e) {
-            console.error('[SaveApp] Start fresh failed:', e);
-            alert('❌ 操作失败：' + e.message);
-        }
-    },
-
-    /**
-     * 打开存档详情模态框
-     */
-    openDetailModal: function(saveId) {
-        this.currentSaveId = saveId;
-        const saves = SaveManager.getAllSaves();
-        const save = saves.find(s => s.id === saveId);
-        
-        if (!save) {
-            alert('存档不存在');
-            return;
-        }
-
-        const stats = SaveManager.getSaveStats(saveId);
-        const date = new Date(save.timestamp);
-        const dateStr = date.toLocaleString('zh-CN');
-
-        document.getElementById('save-detail-name').textContent = save.name;
-        document.getElementById('save-detail-time').textContent = `保存于 ${dateStr}`;
-        document.getElementById('save-stat-online').textContent = `${stats.onlineMessages} 条`;
-        document.getElementById('save-stat-offline').textContent = `${stats.offlineMessages} 条`;
-        document.getElementById('save-stat-memories').textContent = `${stats.memories} 条`;
-        document.getElementById('save-stat-personas').textContent = `${stats.userPersonas} 个`;
-
-        document.getElementById('save-detail-modal').classList.remove('hidden');
-    },
-
-    /**
-     * 关闭存档详情模态框
-     */
-    closeDetailModal: function() {
-        document.getElementById('save-detail-modal').classList.add('hidden');
-        this.currentSaveId = null;
-    },
-
-    /**
-     * 确认加载存档
-     */
-    confirmLoad: function() {
-        if (!this.currentSaveId) return;
-
-        if (!confirm('⚠️ 加载此存档将覆盖当前的聊天记录和记忆，确定继续吗？\n\n建议先保存当前状态！')) {
-            return;
-        }
-
-        try {
-            const save = SaveManager.loadSave(this.currentSaveId);
-            this.closeDetailModal();
-            this.close();
-            alert(`✅ 存档【${save.name}】加载成功！`);
-            
-            // 如果当前在聊天界面，刷新显示
-            if (typeof ChatInterface !== 'undefined' && ChatInterface.currentCharId === save.charId) {
-                ChatInterface.renderMessages();
-            }
-            
-            // 刷新记忆APP（如果打开）
-            if (typeof MemoryApp !== 'undefined' && MemoryApp.currentCharId === save.charId) {
-                MemoryApp.renderMemories();
-            }
-        } catch (e) {
-            console.error('[SaveApp] Load failed:', e);
-            alert('❌ 加载失败：' + e.message);
-        }
-    },
-
-    /**
-     * 快速加载存档（从列表直接加载）
-     */
-    quickLoad: function(saveId) {
-        this.currentSaveId = saveId;
-        this.confirmLoad();
-    },
-
-    /**
-     * 导出当前查看的存档
-     */
-    exportCurrentSave: function() {
-        if (!this.currentSaveId) return;
-        
-        try {
-            SaveManager.exportSave(this.currentSaveId);
-        } catch (e) {
-            console.error('[SaveApp] Export failed:', e);
-            alert('❌ 导出失败：' + e.message);
-        }
-    },
-
-    /**
-     * 导出指定存档
-     */
-    exportSave: function(saveId) {
-        try {
-            SaveManager.exportSave(saveId);
-        } catch (e) {
-            console.error('[SaveApp] Export failed:', e);
-            alert('❌ 导出失败：' + e.message);
-        }
-    },
-
-    /**
-     * 删除当前查看的存档
-     */
-    deleteCurrentSave: function() {
-        if (!this.currentSaveId) return;
-
-        if (!confirm('确定要删除这个存档吗？此操作不可撤销！')) {
-            return;
-        }
-
-        try {
-            SaveManager.deleteSave(this.currentSaveId);
-            this.closeDetailModal();
-            this.renderSaveList();
-            alert('✅ 存档已删除');
-        } catch (e) {
-            console.error('[SaveApp] Delete failed:', e);
-            alert('❌ 删除失败：' + e.message);
-        }
-    },
-
-    /**
-     * HTML转义（防止XSS）
-     */
-    _escapeHtml: function(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-};
-
-// 导出到全局
-window.SaveApp = SaveApp;
-</script>
