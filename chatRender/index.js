@@ -508,8 +508,7 @@ const ChatInterface = {
         if (panelName === 'expand') {
             const expandContainer = document.getElementById('expand-pages-container');
             if (expandContainer) {
-                expandContainer.style.transition = 'none';
-                expandContainer.style.transform = 'translateX(0%)';
+                expandContainer.scrollTo({ left: 0, behavior: 'auto' });
                 DiaryApp.updatePageIndicators(0);
             }
         }

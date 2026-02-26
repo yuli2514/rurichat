@@ -90,10 +90,10 @@
             </div>
 
             <!-- Expand Panel with Swipe Pages -->
-            <div id="panel-expand" class="hidden h-48 overflow-hidden relative">
-                <div id="expand-pages-container" class="flex transition-transform duration-300 h-full" style="width: 200%;">
+            <div id="panel-expand" class="hidden h-48 relative">
+                <div id="expand-pages-container" class="flex transition-transform duration-300 h-full overflow-x-auto" style="scroll-snap-type: x mandatory;">
                     <!-- Page 1 -->
-                    <div class="w-1/2 p-4 overflow-hidden shrink-0">
+                    <div class="p-4 overflow-hidden shrink-0" style="scroll-snap-align: start; width: 100%; min-width: 100%;">
                         <div class="grid grid-cols-4 gap-4">
                             <!-- 第一排：重回、拍照、照片、语音 -->
                             <button type="button" onclick="ChatInterface.regenerateLastAI()" class="flex flex-col items-center gap-1.5 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
@@ -132,7 +132,7 @@
                         </div>
                     </div>
                     <!-- Page 2 -->
-                    <div class="w-1/2 p-4 overflow-hidden shrink-0">
+                    <div class="p-4 overflow-hidden shrink-0" style="scroll-snap-align: start; width: 100%; min-width: 100%;">
                         <div class="grid grid-cols-4 gap-4">
                             <!-- 日记按钮 -->
                             <button type="button" onclick="DiaryApp.open()" class="flex flex-col items-center gap-1.5 text-gray-500 cursor-pointer active:scale-95 transition touch-manipulation bg-transparent border-none p-0">
@@ -154,8 +154,8 @@
                 </div>
                 <!-- Page Indicators -->
                 <div class="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-2">
-                    <div id="expand-indicator-0" class="w-2 h-2 rounded-full bg-gray-400 transition-all"></div>
-                    <div id="expand-indicator-1" class="w-2 h-2 rounded-full bg-gray-300 transition-all"></div>
+                    <div id="expand-indicator-0" class="w-2 h-2 rounded-full bg-gray-400 transition-all cursor-pointer" onclick="DiaryApp.scrollToPage(0)"></div>
+                    <div id="expand-indicator-1" class="w-2 h-2 rounded-full bg-gray-300 transition-all cursor-pointer" onclick="DiaryApp.scrollToPage(1)"></div>
                 </div>
             </div>
 

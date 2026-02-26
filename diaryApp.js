@@ -69,46 +69,93 @@ const DiaryApp = {
         let isDragging = false;
         let currentPage = 0;
 
-        // 触摸事件处理
+        // 滚动到指定页面的内部方法
+        const scrollToPage = (page) => {
+            const pageWidth = container.offsetWidth; // 每页占100%宽度
+            const scrollLeft = page * pageWidth;
+            container.scrollTo({
+                left: scrollLeft,
+                behavior: 'smooth'
+            });
+            currentPage = page;
+            this.updatePageIndicators(currentPage);
+        };
+
+        // 监听滚动事件来更新页面指示器（仅用于原生滚动）
+        let scrollTimeout;
+        let isManualDrag = false;
+        
+        container.addEventListener('scroll', () => {
+            if (isManualDrag) return; // 如果是手动拖拽，不更新指示器
+            
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const pageWidth = container.offsetWidth;
+                const newPage = Math.round(container.scrollLeft / pageWidth);
+                if (newPage !== currentPage) {
+                    currentPage = newPage;
+                    this.updatePageIndicators(currentPage);
+                }
+            }, 100);
+        });
+
+        // 混合事件处理 - 支持移动端原生滚动和电脑端拖拽
         const handleStart = (clientX) => {
             console.log('[DiaryApp] handleStart called, clientX:', clientX);
             startX = clientX;
             currentX = clientX;
             isDragging = true;
-            container.style.transition = 'none';
+            isManualDrag = true;
+            
+            // 电脑端需要禁用滚动行为
+            if (event.type === 'mousedown') {
+                container.style.overflowX = 'hidden';
+            }
         };
 
         const handleMove = (clientX) => {
             if (!isDragging) return;
-            console.log('[DiaryApp] handleMove called, clientX:', clientX, 'diff:', clientX - startX);
             currentX = clientX;
-            const diff = currentX - startX;
-            const offset = -currentPage * 50 + (diff / container.offsetWidth) * 50;
-            container.style.transform = `translateX(${offset}%)`;
+            
+            // 电脑端实时更新位置
+            if (event.type === 'mousemove') {
+                const diff = currentX - startX;
+                const pageWidth = container.offsetWidth;
+                const baseScrollLeft = currentPage * pageWidth;
+                const newScrollLeft = Math.max(0, Math.min(pageWidth, baseScrollLeft - diff));
+                container.scrollLeft = newScrollLeft;
+            }
         };
 
         const handleEnd = () => {
             if (!isDragging) return;
             console.log('[DiaryApp] handleEnd called, diff:', currentX - startX, 'currentPage:', currentPage);
             isDragging = false;
-            container.style.transition = 'transform 0.3s';
+            isManualDrag = false;
 
             const diff = currentX - startX;
-            const threshold = container.offsetWidth * 0.2;
+            const threshold = 50;
 
-            if (diff < -threshold && currentPage < 1) {
-                currentPage++;
-                console.log('[DiaryApp] Swiping to page:', currentPage);
-            } else if (diff > threshold && currentPage > 0) {
-                currentPage--;
-                console.log('[DiaryApp] Swiping to page:', currentPage);
+            // 恢复滚动行为
+            container.style.overflowX = 'auto';
+
+            // 根据滑动距离决定切换页面
+            if (Math.abs(diff) > threshold) {
+                if (diff < 0 && currentPage < 1) {
+                    scrollToPage(1);
+                } else if (diff > 0 && currentPage > 0) {
+                    scrollToPage(0);
+                } else {
+                    // 回弹到当前页面
+                    scrollToPage(currentPage);
+                }
+            } else {
+                // 回弹到当前页面
+                scrollToPage(currentPage);
             }
-
-            container.style.transform = `translateX(-${currentPage * 50}%)`;
-            this.updatePageIndicators(currentPage);
         };
 
-        // 触摸事件 - 只在空白区域触发
+        // 简化的触摸事件 - 主要依赖原生滚动
         container.addEventListener('touchstart', (e) => {
             console.log('[DiaryApp] touchstart event, target:', e.target.tagName, e.target.className);
             // 检查是否点击在按钮或其子元素上
@@ -122,17 +169,15 @@ const DiaryApp = {
                 return;
             }
             
-            console.log('[DiaryApp] touchstart allowed, starting drag');
+            console.log('[DiaryApp] touchstart allowed');
             handleStart(e.touches[0].clientX);
         }, { passive: true });
 
         container.addEventListener('touchmove', (e) => {
             if (isDragging) {
-                console.log('[DiaryApp] touchmove event, preventing default');
-                e.preventDefault();
                 handleMove(e.touches[0].clientX);
             }
-        }, { passive: false });
+        }, { passive: true });
 
         container.addEventListener('touchend', (e) => {
             if (isDragging) {
@@ -141,7 +186,7 @@ const DiaryApp = {
             }
         }, { passive: true });
 
-        // 鼠标事件（电脑端）
+        // 鼠标事件（电脑端拖拽支持）
         container.addEventListener('mousedown', (e) => {
             // 检查是否点击在按钮或其子元素上
             const target = e.target;
@@ -174,6 +219,17 @@ const DiaryApp = {
                 handleEnd();
             }
         });
+
+        // 鼠标滚轮支持（电脑端）
+        container.addEventListener('wheel', (e) => {
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                // 水平滚动
+                e.preventDefault();
+                const pageWidth = container.offsetWidth;
+                const newScrollLeft = container.scrollLeft + e.deltaX;
+                container.scrollTo({ left: newScrollLeft, behavior: 'auto' });
+            }
+        }, { passive: false });
     },
 
     /**
@@ -192,6 +248,22 @@ const DiaryApp = {
                 }
             }
         }
+    },
+
+    /**
+     * 滚动到指定页面（公共方法）
+     */
+    scrollToPage: function(page) {
+        const container = document.getElementById('expand-pages-container');
+        if (!container) return;
+        
+        const pageWidth = container.offsetWidth;
+        const scrollLeft = page * pageWidth;
+        container.scrollTo({
+            left: scrollLeft,
+            behavior: 'smooth'
+        });
+        this.updatePageIndicators(page);
     },
 
     /**
