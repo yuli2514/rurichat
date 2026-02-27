@@ -1289,6 +1289,9 @@ const SettingsManager = {
             this.updateDimensions();
         }
 
+        // 加载移动端控制台设置
+        this.loadMobileConsoleSettings();
+
         // 加载GitHub备份配置
         const githubToken = localStorage.getItem('github_backup_token');
         const githubRepo = localStorage.getItem('github_backup_repo');
@@ -1392,5 +1395,34 @@ const SettingsManager = {
         presets.splice(index, 1);
         localStorage.setItem('fontPresets', JSON.stringify(presets));
         this.renderFontPresets();
+    },
+
+    /**
+     * 切换移动端控制台
+     */
+    toggleMobileConsole: function() {
+        const checkbox = document.getElementById('toggle-mobile-console');
+        const enabled = checkbox.checked;
+        
+        localStorage.setItem('mobileConsoleEnabled', enabled);
+        
+        if (typeof MobileConsole !== 'undefined') {
+            if (enabled) {
+                MobileConsole.enable();
+            } else {
+                MobileConsole.disable();
+            }
+        }
+    },
+
+    /**
+     * 加载移动端控制台设置
+     */
+    loadMobileConsoleSettings: function() {
+        const enabled = localStorage.getItem('mobileConsoleEnabled') === 'true';
+        const checkbox = document.getElementById('toggle-mobile-console');
+        if (checkbox) {
+            checkbox.checked = enabled;
+        }
     }
 };

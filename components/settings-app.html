@@ -231,6 +231,20 @@
                 </div>
             </div>
 
+            <!-- Mobile Console -->
+            <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                <div class="flex items-center justify-between p-4">
+                    <div>
+                        <span class="text-sm font-medium">移动端调试控制台</span>
+                        <p class="text-xs text-gray-400 mt-1">在移动设备上显示调试信息</p>
+                    </div>
+                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="toggle-mobile-console" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300" onchange="SettingsManager.toggleMobileConsole()"/>
+                        <label for="toggle-mobile-console" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+            </div>
+
             <!-- Custom Size -->
             <div class="bg-white rounded-xl p-4 shadow-sm">
                 <label class="block text-xs text-gray-500 uppercase font-bold mb-3">自定义尺寸 (px)</label>
