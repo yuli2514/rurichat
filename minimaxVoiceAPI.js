@@ -6,9 +6,9 @@
 const MinimaxVoiceAPI = {
     // API 端点配置
     endpoints: {
-        mainland: 'https://api.minimax.chat/v1/text_to_speech',
-        overseas: 'https://api.minimax.chat/v1/text_to_speech', 
-        official: 'https://api.minimax.chat/v1/text_to_speech'
+        mainland: 'https://rurichat.vercel.app/proxy',
+        overseas: 'https://rurichat.vercel.app/proxy',
+        official: 'https://rurichat.vercel.app/proxy'
     },
 
     /**
@@ -61,39 +61,39 @@ const MinimaxVoiceAPI = {
             throw new Error('语音ID不能为空');
         }
 
-        const endpoint = `${this.endpoints[params.version]}?GroupId=${params.groupId}`;
+        const endpoint = this.endpoints[params.version];
         
         const requestBody = {
-            model: params.model,
-            text: text.trim(),
-            voice_id: voiceId,
-            speed: params.speed || 1.0,
-            vol: 1.0,
-            pitch: 0
+            url: `https://api.minimax.chat/v1/text_to_speech?GroupId=${params.groupId}`,
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${params.apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: {
+                model: params.model,
+                text: text.trim(),
+                voice_id: voiceId,
+                speed: params.speed || 1.0,
+                vol: 1.0,
+                pitch: 0
+            }
         };
 
-        console.log('=== Minimax API 请求详情 ===');
-        console.log('端点:', endpoint);
+        console.log('=== Minimax API 代理请求详情 ===');
+        console.log('代理端点:', endpoint);
+        console.log('目标URL:', requestBody.url);
         console.log('请求体:', JSON.stringify(requestBody, null, 2));
-        console.log('各字段检查:');
-        console.log('  - model:', requestBody.model, '(类型:', typeof requestBody.model, ')');
-        console.log('  - text:', requestBody.text, '(类型:', typeof requestBody.text, ', 长度:', requestBody.text?.length, ')');
-        console.log('  - voice_id:', requestBody.voice_id, '(类型:', typeof requestBody.voice_id, ')');
-        console.log('  - speed:', requestBody.speed, '(类型:', typeof requestBody.speed, ')');
-        console.log('  - vol:', requestBody.vol, '(类型:', typeof requestBody.vol, ')');
-        console.log('  - pitch:', requestBody.pitch, '(类型:', typeof requestBody.pitch, ')');
 
         try {
-            console.log('[MinimaxAPI] 发送请求到:', endpoint);
+            console.log('[MinimaxAPI] 通过代理发送请求');
             
             const fetchOptions = {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${params.apiKey}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(requestBody),
-                referrerPolicy: 'strict-origin-when-cross-origin'
+                body: JSON.stringify(requestBody)
             };
             
             const response = await fetch(endpoint, fetchOptions);
