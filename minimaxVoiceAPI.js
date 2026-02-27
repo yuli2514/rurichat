@@ -6,9 +6,9 @@
 const MinimaxVoiceAPI = {
     // API 端点配置
     endpoints: {
-        mainland: 'https://rurichat.vercel.app/proxy',
-        overseas: 'https://rurichat.vercel.app/proxy',
-        official: 'https://rurichat.vercel.app/proxy'
+        mainland: '/api/proxy',
+        overseas: '/api/proxy',
+        official: '/api/proxy'
     },
 
     /**
