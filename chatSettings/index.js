@@ -470,28 +470,91 @@ const ChatSettings = {
     },
 
     testCharacterVoice: async function() {
-        const charId = ChatInterface.currentCharId;
-        if (!charId) return;
-
-        const voiceConfig = {
-            voiceId: document.getElementById('setting-voice-id').value.trim(),
-            language: document.getElementById('setting-voice-language').value,
-            speed: parseFloat(document.getElementById('setting-voice-speed').value) || 1.0
-        };
-
-        const testText = voiceConfig.language === 'zh' ? '你好，这是语音测试' :
-                        voiceConfig.language === 'en' ? 'Hello, this is a voice test' :
-                        voiceConfig.language === 'ja' ? 'こんにちは、これは音声テストです' :
-                        voiceConfig.language === 'ko' ? '안녕하세요, 이것은 음성 테스트입니다' :
-                        '你好，这是语音测试';
-
+        console.log('[ChatSettings] 开始角色语音测试');
+        
         try {
+            const charId = ChatInterface.currentCharId;
+            if (!charId) {
+                throw new Error('未选择角色');
+            }
+
+            // 检查必需的DOM元素
+            const voiceIdEl = document.getElementById('setting-voice-id');
+            const languageEl = document.getElementById('setting-voice-language');
+            const speedEl = document.getElementById('setting-voice-speed');
+            
+            if (!voiceIdEl || !languageEl || !speedEl) {
+                throw new Error('语音配置界面未正确加载');
+            }
+
+            const voiceConfig = {
+                voiceId: voiceIdEl.value.trim(),
+                language: languageEl.value,
+                speed: parseFloat(speedEl.value) || 1.0
+            };
+
+            console.log('[ChatSettings] 语音配置:', voiceConfig);
+
+            if (!voiceConfig.voiceId) {
+                throw new Error('请输入语音ID');
+            }
+
+            // 检查全局配置
+            const globalConfig = MinimaxVoiceAPI.getConfig();
+            if (!globalConfig.groupId || !globalConfig.apiKey) {
+                throw new Error('请先在设置中配置Minimax语音的Group ID和API Key');
+            }
+
+            const testText = voiceConfig.language === 'zh' ? '你好，这是语音测试' :
+                            voiceConfig.language === 'en' ? 'Hello, this is a voice test' :
+                            voiceConfig.language === 'ja' ? 'こんにちは、これは音声テストです' :
+                            voiceConfig.language === 'ko' ? '안녕하세요, 이것은 음성 테스트입니다' :
+                            '你好，这是语音测试';
+
+            console.log('[ChatSettings] 测试文本:', testText);
+
             const audioUrl = await MinimaxVoiceAPI.synthesize(testText, voiceConfig);
+            console.log('[ChatSettings] 语音合成成功，播放音频');
+            
             const audio = new Audio(audioUrl);
-            audio.play();
+            await audio.play();
+            
+            console.log('[ChatSettings] 语音测试完成');
+            
         } catch (error) {
-            console.error('角色语音测试失败:', error);
-            alert('语音测试失败: ' + error.message);
+            console.error('[ChatSettings] 角色语音测试失败:', error);
+            
+            // 移动端友好的错误显示
+            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const errorMsg = '语音测试失败: ' + error.message;
+            
+            if (isMobile) {
+                // 移动端使用更显眼的方式显示错误
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: #ff4444;
+                    color: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    z-index: 9999;
+                    max-width: 80%;
+                    text-align: center;
+                `;
+                errorDiv.textContent = errorMsg;
+                document.body.appendChild(errorDiv);
+                
+                setTimeout(() => {
+                    if (errorDiv.parentNode) {
+                        errorDiv.parentNode.removeChild(errorDiv);
+                    }
+                }, 5000);
+            } else {
+                alert(errorMsg);
+            }
         }
     },
 

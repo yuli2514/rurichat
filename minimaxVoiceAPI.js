@@ -8,10 +8,16 @@ const MinimaxVoiceAPI = {
     endpoints: {
         mainland: 'https://api.minimax.chat/v1/text_to_speech',
         overseas: 'https://api.minimax.chat/v1/text_to_speech',
-        official: 'https://api.minimax.chat/v1/text_to_speech',
-        // 移动端代理端点
-        proxy: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.minimax.chat/v1/text_to_speech')
+        official: 'https://api.minimax.chat/v1/text_to_speech'
     },
+
+    // 移动端代理列表
+    mobileProxies: [
+        'https://api.allorigins.win/raw?url=',
+        'https://cors-anywhere.herokuapp.com/',
+        'https://thingproxy.freeboard.io/fetch/',
+        'https://api.codetabs.com/v1/proxy?quest='
+    ],
 
     /**
      * 获取配置
@@ -88,31 +94,23 @@ const MinimaxVoiceAPI = {
         try {
             const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // 移动端使用代理端点
-            let actualEndpoint = endpoint;
             if (isMobile) {
-                console.log('[MinimaxAPI] 移动端检测，使用代理端点');
-                actualEndpoint = this.endpoints.proxy + `?GroupId=${params.groupId}`;
+                console.log('[MinimaxAPI] 移动端检测，尝试多个代理');
+                return await this.tryMobileProxies(text, params, requestBody, endpoint);
+            } else {
+                console.log('[MinimaxAPI] 桌面端，直接请求');
+                const fetchOptions = {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${params.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                };
+                
+                const response = await fetch(endpoint, fetchOptions);
+                return await this.handleResponse(response);
             }
-            
-            console.log('[MinimaxAPI] 发送请求到:', actualEndpoint);
-            
-            const fetchOptions = {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${params.apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            };
-            
-            // 移动端添加额外选项
-            if (isMobile) {
-                fetchOptions.mode = 'cors';
-                fetchOptions.cache = 'no-cache';
-            }
-            
-            const response = await fetch(actualEndpoint, fetchOptions);
 
             if (!response.ok) {
                 let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
@@ -291,6 +289,66 @@ const MinimaxVoiceAPI = {
                 reject(new Error('发送请求失败: ' + e.message));
             }
         });
+    },
+
+    /**
+     * 移动端尝试多个代理
+     */
+    tryMobileProxies: async function(text, params, requestBody, originalEndpoint) {
+        const targetUrl = `${originalEndpoint}?GroupId=${params.groupId}`;
+        
+        for (let i = 0; i < this.mobileProxies.length; i++) {
+            const proxy = this.mobileProxies[i];
+            console.log(`[MinimaxAPI] 尝试代理 ${i + 1}/${this.mobileProxies.length}: ${proxy}`);
+            
+            try {
+                let proxyUrl;
+                if (proxy.includes('allorigins.win')) {
+                    proxyUrl = proxy + encodeURIComponent(targetUrl);
+                } else if (proxy.includes('codetabs.com')) {
+                    proxyUrl = proxy + encodeURIComponent(targetUrl);
+                } else {
+                    proxyUrl = proxy + targetUrl;
+                }
+                
+                console.log('[MinimaxAPI] 代理URL:', proxyUrl);
+                
+                const fetchOptions = {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${params.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    mode: 'cors',
+                    cache: 'no-cache'
+                };
+                
+                const response = await fetch(proxyUrl, fetchOptions);
+                
+                if (response.ok) {
+                    console.log(`[MinimaxAPI] 代理 ${i + 1} 成功`);
+                    return await this.handleResponse(response);
+                } else {
+                    console.log(`[MinimaxAPI] 代理 ${i + 1} 返回错误状态: ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.log(`[MinimaxAPI] 代理 ${i + 1} 失败:`, error.message);
+                
+                // 如果是最后一个代理，尝试XMLHttpRequest
+                if (i === this.mobileProxies.length - 1) {
+                    console.log('[MinimaxAPI] 所有代理失败，尝试XMLHttpRequest');
+                    try {
+                        return await this.synthesizeWithXHR(text, params, requestBody, originalEndpoint);
+                    } catch (xhrError) {
+                        console.error('[MinimaxAPI] XMLHttpRequest也失败:', xhrError);
+                    }
+                }
+            }
+        }
+        
+        throw new Error('所有代理和备用方案都失败，移动端网络可能受限');
     },
 
     /**

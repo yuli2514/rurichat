@@ -786,12 +786,36 @@ const VoiceHandler = {
             // 支持 objectURL（blob:开头）和 base64（data:开头）两种格式
             const audioSrc = voiceData.audioBase64;
             console.log('[VoiceHandler] 播放AI语音:', audioSrc);
+            
             const audio = new Audio(audioSrc);
+            
+            // 移动端兼容性处理
+            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) {
+                console.log('[VoiceHandler] 检测到移动端，使用兼容模式播放');
+                // 移动端需要设置一些属性
+                audio.preload = 'auto';
+                audio.controls = false;
+            }
+            
             audio.play().catch(err => {
                 console.error('音频播放失败:', err);
+                console.error('错误详情:', {
+                    name: err.name,
+                    message: err.message,
+                    audioSrc: audioSrc.substring(0, 50) + '...',
+                    isMobile: isMobile,
+                    userAgent: navigator.userAgent
+                });
+                
                 // objectURL 可能已过期，尝试提示用户
                 if (audioSrc.startsWith('blob:')) {
                     console.warn('[VoiceHandler] objectURL 可能已过期，无法回放');
+                }
+                
+                // 移动端特殊处理
+                if (isMobile) {
+                    console.warn('[VoiceHandler] 移动端音频播放失败，可能需要用户手动交互');
                 }
             });
         } else {
