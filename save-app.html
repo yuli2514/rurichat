@@ -1,12 +1,21 @@
 <!-- 存档管理应用 -->
-<div id="save-app" class="fixed inset-0 z-[100] flex flex-col hidden bg-white">
+<div id="save-app" class="absolute inset-0 z-[100] flex flex-col hidden" style="background: #f5f5f5;">
     <!-- 顶部导航栏 -->
-    <div class="h-24 bg-white px-4 pt-10 flex items-center justify-between shrink-0 border-b border-gray-200 sticky top-0 z-20">
-        <button onclick="SaveApp.close()" class="text-[#333333] text-base w-10 flex justify-start">
-            <i class="fa-solid fa-chevron-left"></i>
-        </button>
-        <h1 class="font-bold text-base text-gray-900">存档管理</h1>
-        <div class="flex gap-2">
+    <div class="h-24 px-4 pt-10 flex items-center shrink-0 z-20 relative" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0,0,0,0.05);">
+        <!-- Left: Back -->
+        <div class="absolute left-4 bottom-4 z-30">
+            <button onclick="SaveApp.close()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 active:scale-95 transition">
+                <i class="fa-solid fa-chevron-left text-gray-700 text-sm"></i>
+            </button>
+        </div>
+
+        <!-- Center: Title -->
+        <div class="flex-1 flex justify-center items-center h-10 mb-3">
+            <h1 class="font-bold text-base text-gray-900">存档管理</h1>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="absolute right-4 bottom-4 z-30 flex items-center gap-1">
             <button onclick="SaveApp.openSaveModal()" class="text-[#333333] text-sm px-2 py-1 active:scale-95 transition">
                 保存
             </button>
@@ -32,7 +41,7 @@
 </div>
 
 <!-- 保存存档模态框 -->
-<div id="save-modal" class="fixed inset-0 bg-black/50 z-[80] hidden flex items-center justify-center p-4">
+<div id="save-modal" class="absolute inset-0 bg-black/50 z-[110] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-sm shadow-lg">
         <div class="p-5">
             <h2 class="text-lg font-bold mb-4 text-gray-900">保存当前状态</h2>
@@ -73,7 +82,7 @@
 </div>
 
 <!-- 存档详情模态框 -->
-<div id="save-detail-modal" class="fixed inset-0 bg-black/50 z-[80] hidden flex items-center justify-center p-4">
+<div id="save-detail-modal" class="absolute inset-0 bg-black/50 z-[110] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-md shadow-lg max-h-[80vh] overflow-hidden flex flex-col">
         <div class="p-5 border-b border-gray-200">
             <div class="flex justify-between items-start mb-2">
