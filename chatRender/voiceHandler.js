@@ -785,6 +785,7 @@ const VoiceHandler = {
         if (voiceData.audioBase64 && !voiceData.isFake) {
             // 支持 objectURL（blob:开头）和 base64（data:开头）两种格式
             const audioSrc = voiceData.audioBase64;
+            console.log('[VoiceHandler] 播放AI语音:', audioSrc);
             const audio = new Audio(audioSrc);
             audio.play().catch(err => {
                 console.error('音频播放失败:', err);
@@ -793,6 +794,8 @@ const VoiceHandler = {
                     console.warn('[VoiceHandler] objectURL 可能已过期，无法回放');
                 }
             });
+        } else {
+            console.log('[VoiceHandler] 无法播放语音 - audioBase64:', voiceData.audioBase64, 'isFake:', voiceData.isFake);
         }
     }
 };

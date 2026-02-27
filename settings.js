@@ -115,6 +115,33 @@ const SettingsManager = {
         this.renderPresets();
     },
 
+    // Minimax 语音相关函数
+    saveMinimaxVoiceSettings: function() {
+        const config = {
+            groupId: document.getElementById('minimax-group-id').value.trim(),
+            apiKey: document.getElementById('minimax-api-key').value.trim(),
+            version: document.getElementById('minimax-version').value,
+            model: document.getElementById('minimax-model').value
+        };
+
+        if (!config.groupId || !config.apiKey) {
+            alert('请填写完整的 Group ID 和 API Key');
+            return;
+        }
+
+        localStorage.setItem('minimaxVoiceConfig', JSON.stringify(config));
+        alert('Minimax 语音配置已保存');
+    },
+
+    loadMinimaxVoiceSettings: function() {
+        const config = JSON.parse(localStorage.getItem('minimaxVoiceConfig') || '{}');
+        
+        if (config.groupId) document.getElementById('minimax-group-id').value = config.groupId;
+        if (config.apiKey) document.getElementById('minimax-api-key').value = config.apiKey;
+        if (config.version) document.getElementById('minimax-version').value = config.version;
+        if (config.model) document.getElementById('minimax-model').value = config.model;
+    },
+
     deletePreset: function(index) {
         if (!confirm('确定要删除这个预设吗？')) return;
         let presets = API.Settings.getPresets();
@@ -1227,6 +1254,9 @@ const SettingsManager = {
         document.getElementById('api-temp-val').textContent = temp;
         
         this.renderPresets();
+
+        // 加载 Minimax 语音设置
+        this.loadMinimaxVoiceSettings();
 
         const customFont = localStorage.getItem('customFont');
         if (customFont) {

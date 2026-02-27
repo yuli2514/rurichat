@@ -253,6 +253,9 @@ const ChatSettings = {
         CssManager.applyCustomCss(customCss, true);
         
         CssManager.renderCssPresets();
+        
+        // 加载语音配置
+        this.loadVoiceConfig();
     },
 
     // ==================== 保存方法 ====================
@@ -396,6 +399,99 @@ const ChatSettings = {
         // 重新渲染消息以应用时间戳
         if (typeof ChatInterface !== 'undefined') {
             ChatInterface.renderMessages();
+        }
+    },
+
+    // ==================== 语音配置 ====================
+    
+    toggleVoiceConfig: function() {
+        const enabled = document.getElementById('setting-voice-enabled').checked;
+        const options = document.getElementById('voice-config-options');
+        if (options) {
+            options.classList.toggle('hidden', !enabled);
+        }
+        this.saveVoiceConfig();
+    },
+
+    saveVoiceConfig: function() {
+        const charId = ChatInterface.currentCharId;
+        if (!charId) return;
+
+        const voiceConfig = {
+            enabled: document.getElementById('setting-voice-enabled').checked,
+            voiceId: document.getElementById('setting-voice-id').value.trim(),
+            language: document.getElementById('setting-voice-language').value,
+            speed: parseFloat(document.getElementById('setting-voice-speed').value) || 1.0
+        };
+
+        // 保存到角色语音配置
+        MinimaxVoiceAPI.saveCharacterVoiceConfig(charId, voiceConfig);
+        
+        // 同时保存到角色设置中
+        this.updateCharSettings({ voiceConfig: voiceConfig });
+        
+        alert('语音配置已保存');
+    },
+
+    loadVoiceConfig: function() {
+        const charId = ChatInterface.currentCharId;
+        if (!charId) return;
+
+        const voiceConfig = MinimaxVoiceAPI.getCharacterVoiceConfig(charId) || {};
+        
+        const enabledCheckbox = document.getElementById('setting-voice-enabled');
+        if (enabledCheckbox) {
+            enabledCheckbox.checked = voiceConfig.enabled || false;
+        }
+
+        const voiceIdInput = document.getElementById('setting-voice-id');
+        if (voiceIdInput) {
+            voiceIdInput.value = voiceConfig.voiceId || '';
+        }
+
+        const languageSelect = document.getElementById('setting-voice-language');
+        if (languageSelect) {
+            languageSelect.value = voiceConfig.language || '';
+        }
+
+        const speedSlider = document.getElementById('setting-voice-speed');
+        const speedVal = document.getElementById('setting-voice-speed-val');
+        if (speedSlider && speedVal) {
+            const speed = voiceConfig.speed || 1.0;
+            speedSlider.value = speed;
+            speedVal.textContent = speed;
+        }
+
+        // 显示/隐藏配置选项
+        const options = document.getElementById('voice-config-options');
+        if (options) {
+            options.classList.toggle('hidden', !voiceConfig.enabled);
+        }
+    },
+
+    testCharacterVoice: async function() {
+        const charId = ChatInterface.currentCharId;
+        if (!charId) return;
+
+        const voiceConfig = {
+            voiceId: document.getElementById('setting-voice-id').value.trim(),
+            language: document.getElementById('setting-voice-language').value,
+            speed: parseFloat(document.getElementById('setting-voice-speed').value) || 1.0
+        };
+
+        const testText = voiceConfig.language === 'zh' ? '你好，这是语音测试' :
+                        voiceConfig.language === 'en' ? 'Hello, this is a voice test' :
+                        voiceConfig.language === 'ja' ? 'こんにちは、これは音声テストです' :
+                        voiceConfig.language === 'ko' ? '안녕하세요, 이것은 음성 테스트입니다' :
+                        '你好，这是语音测试';
+
+        try {
+            const audioUrl = await MinimaxVoiceAPI.synthesize(testText, voiceConfig);
+            const audio = new Audio(audioUrl);
+            audio.play();
+        } catch (error) {
+            console.error('角色语音测试失败:', error);
+            alert('语音测试失败: ' + error.message);
         }
     },
 

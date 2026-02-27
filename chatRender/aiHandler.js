@@ -347,7 +347,7 @@ const AIHandler = {
                         }
                     };
                 } else if (isVoiceMessage) {
-                    // AI语音消息
+                    // AI语音消息 - 支持 Minimax 语音合成
                     const voiceDuration = Math.max(1, Math.ceil(voiceContent.length / 3.5));
                     msg = {
                         id: msgId,
@@ -361,9 +361,13 @@ const AIHandler = {
                             duration: voiceDuration,
                             audioBase64: null,
                             isFake: true,
-                            transcription: voiceContent
+                            transcription: voiceContent,
+                            needsSynthesis: true // 标记需要语音合成
                         }
                     };
+                    
+                    // 异步生成语音
+                    this.synthesizeVoiceForMessage(msg, ChatInterface.currentCharId);
                 } else if (isFileMessage) {
                     // AI文件消息
                     msg = {
@@ -547,6 +551,61 @@ const AIHandler = {
                 ChatInterface.renderMessages();
                 break;
             }
+        }
+    },
+
+    /**
+     * 为AI消息合成语音
+     * @param {Object} msg - 消息对象
+     * @param {string} charId - 角色ID
+     */
+    synthesizeVoiceForMessage: async function(msg, charId) {
+        try {
+            // 检查角色是否启用了语音配置
+            const voiceConfig = MinimaxVoiceAPI.getCharacterVoiceConfig(charId);
+            if (!voiceConfig || !voiceConfig.enabled) {
+                console.log('[AIHandler] 角色未启用语音配置，跳过语音合成');
+                return;
+            }
+
+            // 检查全局minimax配置
+            const globalConfig = MinimaxVoiceAPI.getConfig();
+            if (!globalConfig.groupId || !globalConfig.apiKey) {
+                console.log('[AIHandler] Minimax语音未配置，跳过语音合成');
+                return;
+            }
+
+            console.log('[AIHandler] 开始为AI消息合成语音:', msg.content);
+
+            // 合成语音
+            const audioUrl = await MinimaxVoiceAPI.synthesize(msg.content, {
+                voiceId: voiceConfig.voiceId,
+                language: voiceConfig.language,
+                speed: voiceConfig.speed
+            });
+
+            // 更新消息的语音数据
+            msg.voiceData.audioBase64 = audioUrl;
+            msg.voiceData.isFake = false;
+            msg.voiceData.needsSynthesis = false;
+
+            // 更新存储的消息
+            const history = API.Chat.getHistory(charId);
+            const msgIndex = history.findIndex(m => m.id === msg.id);
+            if (msgIndex !== -1) {
+                history[msgIndex] = msg;
+                API.Chat.saveHistory(charId, history);
+            }
+
+            // 重新渲染消息以显示语音播放按钮
+            ChatInterface.renderMessages();
+
+            console.log('[AIHandler] AI消息语音合成完成');
+
+        } catch (error) {
+            console.error('[AIHandler] AI消息语音合成失败:', error);
+            // 合成失败时，保持为伪造语音
+            msg.voiceData.needsSynthesis = false;
         }
     }
 };

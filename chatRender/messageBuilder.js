@@ -216,11 +216,13 @@ const MessageBuilder = {
         const avatarTimestampHtml = showAvatarTimestamp ? this.buildAvatarTimestamp(msg.timestamp) : '';
         const bubbleTimestampHtml = showBubbleTimestamp ? this.buildBubbleTimestamp(msg.timestamp) : '';
         
-        // 文字展开区域：只有伪造语音或AI语音才显示
-        const textAreaHtml = hasRealAudio ? '' :
-            '<div id="voice-text-' + index + '" class="hidden mt-1 text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-lg max-w-full break-words">' +
+        // 文字展开区域：AI语音消息始终显示文字，用户语音消息只有伪造时才显示
+        const isAIVoice = msg.sender === 'ai';
+        const shouldShowText = isAIVoice || !hasRealAudio;
+        const textAreaHtml = shouldShowText ?
+            '<div id="voice-text-' + index + '" class="' + (isAIVoice ? '' : 'hidden ') + 'mt-1 text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-lg max-w-full break-words">' +
                 transcription +
-            '</div>';
+            '</div>' : '';
         
         return '<div class="flex gap-2 items-start ' + (isMe ? 'flex-row-reverse' : '') + '">' +
             checkboxHtml +

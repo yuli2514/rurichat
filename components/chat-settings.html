@@ -302,6 +302,56 @@
             </div>
         </div>
 
+        <!-- Voice Configuration -->
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center cursor-pointer" onclick="document.getElementById('voice-config-content').classList.toggle('hidden'); document.getElementById('voice-config-arrow').classList.toggle('rotate-90')">
+                <span class="text-sm font-bold text-gray-700">语音配置</span>
+                <i id="voice-config-arrow" class="fa-solid fa-chevron-right text-gray-300 text-xs transition-transform duration-200"></i>
+            </div>
+            <div id="voice-config-content" class="p-4 bg-gray-50 space-y-3 hidden">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-600">启用 Minimax 语音</span>
+                    <div class="relative inline-block w-10 align-middle select-none">
+                        <input type="checkbox" id="setting-voice-enabled" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="ChatSettings.toggleVoiceConfig()"/>
+                        <label for="setting-voice-enabled" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+                
+                <div id="voice-config-options" class="hidden space-y-3 pt-2 border-t border-gray-200">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">克隆语音 ID</label>
+                        <input type="text" id="setting-voice-id" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 text-xs" placeholder="输入专属语音ID（可选）">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">语言</label>
+                        <select id="setting-voice-language" class="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 text-xs">
+                            <option value="">使用默认语言</option>
+                            <option value="zh">中文</option>
+                            <option value="en">英文</option>
+                            <option value="ja">日文</option>
+                            <option value="ko">韩文</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-gray-600">语速</label>
+                            <span id="setting-voice-speed-val" class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded">1.0</span>
+                        </div>
+                        <input type="range" id="setting-voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-500" oninput="document.getElementById('setting-voice-speed-val').textContent = this.value">
+                        <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                            <span>0.5x (慢)</span>
+                            <span>1.0x (正常)</span>
+                            <span>2.0x (快)</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="ChatSettings.testCharacterVoice()" class="flex-1 bg-red-100 text-red-600 font-medium py-2 rounded-md text-xs active:scale-95 transition">测试语音</button>
+                        <button onclick="ChatSettings.saveVoiceConfig()" class="flex-1 bg-red-500 text-white font-medium py-2 rounded-md text-xs active:scale-95 transition">保存配置</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
          <!-- Memory System -->
          <div class="bg-white rounded-xl overflow-hidden shadow-sm p-4 space-y-4">
             <h3 class="text-sm font-bold text-gray-700">记忆与上下文</h3>
