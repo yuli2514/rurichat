@@ -7,8 +7,10 @@ const MinimaxVoiceAPI = {
     // API 端点配置
     endpoints: {
         mainland: 'https://api.minimax.chat/v1/text_to_speech',
-        overseas: 'https://api.minimax.chat/v1/text_to_speech', 
-        official: 'https://api.minimax.chat/v1/text_to_speech'
+        overseas: 'https://api.minimax.chat/v1/text_to_speech',
+        official: 'https://api.minimax.chat/v1/text_to_speech',
+        // 移动端代理端点
+        proxy: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.minimax.chat/v1/text_to_speech')
     },
 
     /**
@@ -85,48 +87,32 @@ const MinimaxVoiceAPI = {
 
         try {
             const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            console.log('[MinimaxAPI] 发送请求到:', endpoint);
             
-            // 移动端使用简化的请求头，避免触发 CORS 预检
+            // 移动端使用代理端点
+            let actualEndpoint = endpoint;
+            if (isMobile) {
+                console.log('[MinimaxAPI] 移动端检测，使用代理端点');
+                actualEndpoint = this.endpoints.proxy + `?GroupId=${params.groupId}`;
+            }
+            
+            console.log('[MinimaxAPI] 发送请求到:', actualEndpoint);
+            
             const fetchOptions = {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${params.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(requestBody)
             };
             
-            // 只在非移动端或确认支持的情况下添加自定义头
-            if (!isMobile) {
-                fetchOptions.headers = {
-                    'Authorization': `Bearer ${params.apiKey}`,
-                    'Content-Type': 'application/json'
-                };
-            } else {
-                // 移动端尝试不同的方式
-                console.log('[MinimaxAPI] 移动端模式，尝试简化请求');
-                
-                // 方式1: 通过 URL 参数传递认证信息
-                const mobileEndpoint = `${endpoint}&apiKey=${encodeURIComponent(params.apiKey)}`;
-                fetchOptions.headers = {
-                    'Content-Type': 'application/json'
-                };
-                
-                try {
-                    const response = await fetch(mobileEndpoint, fetchOptions);
-                    if (response.ok) {
-                        console.log('[MinimaxAPI] 移动端URL参数方式成功');
-                        return await this.handleResponse(response);
-                    }
-                } catch (urlError) {
-                    console.log('[MinimaxAPI] URL参数方式失败，尝试标准方式');
-                }
-                
-                // 方式2: 标准方式
-                fetchOptions.headers = {
-                    'Authorization': `Bearer ${params.apiKey}`,
-                    'Content-Type': 'application/json'
-                };
+            // 移动端添加额外选项
+            if (isMobile) {
+                fetchOptions.mode = 'cors';
+                fetchOptions.cache = 'no-cache';
             }
             
-            const response = await fetch(endpoint, fetchOptions);
+            const response = await fetch(actualEndpoint, fetchOptions);
 
             if (!response.ok) {
                 let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
