@@ -193,6 +193,25 @@ const MinimaxVoiceAPI = {
 
         } catch (error) {
             console.error('Minimax语音合成失败:', error);
+            console.error('错误详情:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+                userAgent: navigator.userAgent,
+                isMobile: /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            });
+            
+            // 为移动端提供更友好的错误信息
+            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                if (error.message.includes('fetch')) {
+                    throw new Error('移动端网络请求失败，请检查网络连接');
+                } else if (error.message.includes('CORS')) {
+                    throw new Error('移动端跨域请求被阻止');
+                } else if (error.message.includes('blob')) {
+                    throw new Error('移动端音频处理失败');
+                }
+            }
+            
             throw error;
         }
     },
