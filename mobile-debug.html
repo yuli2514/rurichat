@@ -162,7 +162,7 @@
             
             // 测试2: 测试 Minimax 域名连通性
             try {
-                const response = await fetch('https://api.minimax.chat/', {
+                const response = await fetch('https://rurichat.vercel.app/proxy/', {
                     method: 'HEAD',
                     mode: 'no-cors'
                 });
@@ -177,7 +177,7 @@
             
             // 测试4: 测试 CORS 预检
             try {
-                const response = await fetch('https://api.minimax.chat/v1/text_to_speech', {
+                const response = await fetch('https://rurichat.vercel.app/proxy/v1/text_to_speech', {
                     method: 'OPTIONS',
                     mode: 'cors'
                 });
@@ -201,7 +201,7 @@
             console.log('开始 Minimax API 测试');
             
             try {
-                const endpoint = `https://api.minimax.chat/v1/text_to_speech?GroupId=${groupId}`;
+                const endpoint = `https://rurichat.vercel.app/proxy/v1/text_to_speech?GroupId=${groupId}`;
                 const requestBody = {
                     model: 'speech-01',
                     text: '你好，这是测试',

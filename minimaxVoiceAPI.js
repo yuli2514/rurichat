@@ -64,7 +64,7 @@ const MinimaxVoiceAPI = {
         const endpoint = this.endpoints[params.version];
         
         const requestBody = {
-            url: `https://api.minimax.chat/v1/text_to_speech?GroupId=${params.groupId}`,
+            url: `https://rurichat.vercel.app/proxy/v1/text_to_speech?GroupId=${params.groupId}`,
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${params.apiKey}`,
