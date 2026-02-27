@@ -31,6 +31,11 @@ const SaveApp = {
             return;
         }
 
+        // 隐藏聊天界面
+        const chatInterface = document.getElementById('super-chat-interface');
+        if (chatInterface) chatInterface.classList.add('hidden');
+
+        // 显示存档界面
         saveAppEl.classList.remove('hidden');
         this.renderSaveList();
         console.log('[SaveApp] Save app opened successfully');
@@ -41,6 +46,11 @@ const SaveApp = {
      */
     close: function() {
         document.getElementById('save-app').classList.add('hidden');
+        
+        // 重新显示聊天界面
+        const chatInterface = document.getElementById('super-chat-interface');
+        if (chatInterface) chatInterface.classList.remove('hidden');
+        
         this.currentCharId = null;
     },
 
