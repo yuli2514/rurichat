@@ -7,17 +7,9 @@ const MinimaxVoiceAPI = {
     // API 端点配置
     endpoints: {
         mainland: 'https://api.minimax.chat/v1/text_to_speech',
-        overseas: 'https://api.minimax.chat/v1/text_to_speech',
+        overseas: 'https://api.minimax.chat/v1/text_to_speech', 
         official: 'https://api.minimax.chat/v1/text_to_speech'
     },
-
-    // 移动端代理列表
-    mobileProxies: [
-        'https://api.allorigins.win/raw?url=',
-        'https://cors-anywhere.herokuapp.com/',
-        'https://thingproxy.freeboard.io/fetch/',
-        'https://api.codetabs.com/v1/proxy?quest='
-    ],
 
     /**
      * 获取配置
@@ -92,25 +84,19 @@ const MinimaxVoiceAPI = {
         console.log('  - pitch:', requestBody.pitch, '(类型:', typeof requestBody.pitch, ')');
 
         try {
-            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('[MinimaxAPI] 发送请求到:', endpoint);
             
-            if (isMobile) {
-                console.log('[MinimaxAPI] 移动端检测，尝试多个代理');
-                return await this.tryMobileProxies(text, params, requestBody, endpoint);
-            } else {
-                console.log('[MinimaxAPI] 桌面端，直接请求');
-                const fetchOptions = {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${params.apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                };
-                
-                const response = await fetch(endpoint, fetchOptions);
-                return await this.handleResponse(response);
-            }
+            const fetchOptions = {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${params.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody),
+                referrerPolicy: 'strict-origin-when-cross-origin'
+            };
+            
+            const response = await fetch(endpoint, fetchOptions);
 
             if (!response.ok) {
                 let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
@@ -212,242 +198,8 @@ const MinimaxVoiceAPI = {
 
         } catch (error) {
             console.error('Minimax语音合成失败:', error);
-            console.error('错误详情:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack,
-                userAgent: navigator.userAgent,
-                isMobile: /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-            });
-            
-            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            // 移动端尝试备用请求方式
-            if (isMobile && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
-                console.log('[MinimaxAPI] 移动端fetch失败，尝试XMLHttpRequest备用方案');
-                try {
-                    return await this.synthesizeWithXHR(text, params, requestBody, endpoint);
-                } catch (xhrError) {
-                    console.error('[MinimaxAPI] XMLHttpRequest备用方案也失败:', xhrError);
-                    throw new Error('移动端网络请求失败，请检查网络连接或尝试切换网络');
-                }
-            }
-            
-            // 为移动端提供更友好的错误信息
-            if (isMobile) {
-                if (error.message.includes('fetch')) {
-                    throw new Error('移动端网络请求失败，请检查网络连接');
-                } else if (error.message.includes('CORS')) {
-                    throw new Error('移动端跨域请求被阻止');
-                } else if (error.message.includes('blob')) {
-                    throw new Error('移动端音频处理失败');
-                }
-            }
-            
             throw error;
         }
-    },
-
-    /**
-     * 使用XMLHttpRequest的备用请求方式（移动端兼容）
-     */
-    synthesizeWithXHR: function(text, params, requestBody, endpoint) {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', endpoint, true);
-            xhr.setRequestHeader('Authorization', `Bearer ${params.apiKey}`);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.responseType = 'blob';
-            
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    console.log('[MinimaxAPI] XMLHttpRequest请求成功');
-                    const audioBlob = xhr.response;
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    resolve(audioUrl);
-                } else {
-                    console.error('[MinimaxAPI] XMLHttpRequest请求失败:', xhr.status, xhr.statusText);
-                    reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-                }
-            };
-            
-            xhr.onerror = function() {
-                console.error('[MinimaxAPI] XMLHttpRequest网络错误');
-                reject(new Error('网络连接失败'));
-            };
-            
-            xhr.ontimeout = function() {
-                console.error('[MinimaxAPI] XMLHttpRequest请求超时');
-                reject(new Error('请求超时'));
-            };
-            
-            xhr.timeout = 30000; // 30秒超时
-            
-            try {
-                xhr.send(JSON.stringify(requestBody));
-            } catch (e) {
-                reject(new Error('发送请求失败: ' + e.message));
-            }
-        });
-    },
-
-    /**
-     * 移动端尝试多个代理
-     */
-    tryMobileProxies: async function(text, params, requestBody, originalEndpoint) {
-        const targetUrl = `${originalEndpoint}?GroupId=${params.groupId}`;
-        
-        for (let i = 0; i < this.mobileProxies.length; i++) {
-            const proxy = this.mobileProxies[i];
-            console.log(`[MinimaxAPI] 尝试代理 ${i + 1}/${this.mobileProxies.length}: ${proxy}`);
-            
-            try {
-                let proxyUrl;
-                if (proxy.includes('allorigins.win')) {
-                    proxyUrl = proxy + encodeURIComponent(targetUrl);
-                } else if (proxy.includes('codetabs.com')) {
-                    proxyUrl = proxy + encodeURIComponent(targetUrl);
-                } else {
-                    proxyUrl = proxy + targetUrl;
-                }
-                
-                console.log('[MinimaxAPI] 代理URL:', proxyUrl);
-                
-                const fetchOptions = {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${params.apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody),
-                    mode: 'cors',
-                    cache: 'no-cache'
-                };
-                
-                const response = await fetch(proxyUrl, fetchOptions);
-                
-                if (response.ok) {
-                    console.log(`[MinimaxAPI] 代理 ${i + 1} 成功`);
-                    return await this.handleResponse(response);
-                } else {
-                    console.log(`[MinimaxAPI] 代理 ${i + 1} 返回错误状态: ${response.status}`);
-                }
-                
-            } catch (error) {
-                console.log(`[MinimaxAPI] 代理 ${i + 1} 失败:`, error.message);
-                
-                // 如果是最后一个代理，尝试XMLHttpRequest
-                if (i === this.mobileProxies.length - 1) {
-                    console.log('[MinimaxAPI] 所有代理失败，尝试XMLHttpRequest');
-                    try {
-                        return await this.synthesizeWithXHR(text, params, requestBody, originalEndpoint);
-                    } catch (xhrError) {
-                        console.error('[MinimaxAPI] XMLHttpRequest也失败:', xhrError);
-                    }
-                }
-            }
-        }
-        
-        throw new Error('所有代理和备用方案都失败，移动端网络可能受限');
-    },
-
-    /**
-     * 处理API响应
-     */
-    handleResponse: async function(response) {
-        if (!response.ok) {
-            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-            try {
-                const errorData = await response.json();
-                if (errorData.error && errorData.error.message) {
-                    errorMessage = errorData.error.message;
-                } else if (errorData.message) {
-                    errorMessage = errorData.message;
-                }
-            } catch (e) {
-                // 无法解析错误响应，使用默认错误信息
-            }
-            throw new Error(`API请求失败: ${errorMessage}`);
-        }
-
-        // 检查响应的Content-Type
-        const contentType = response.headers.get('content-type');
-        console.log('响应Content-Type:', contentType);
-        
-        if (contentType && contentType.includes('audio/')) {
-            // 直接返回音频数据
-            console.log('检测到音频响应，直接处理音频数据');
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            console.log('音频URL创建成功:', audioUrl);
-            return audioUrl;
-        }
-        
-        // 尝试解析JSON响应
-        let data;
-        try {
-            data = await response.json();
-            console.log('Minimax API 完整响应:', JSON.stringify(data, null, 2));
-        } catch (e) {
-            // 如果不是JSON，可能是直接的音频数据
-            console.log('无法解析为JSON，尝试作为音频数据处理');
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            console.log('音频URL创建成功:', audioUrl);
-            return audioUrl;
-        }
-        
-        // 检查base_resp状态
-        if (data.base_resp) {
-            console.log('base_resp:', data.base_resp);
-            if (data.base_resp.status_code !== 0 && data.base_resp.status_code !== 1000) {
-                throw new Error(`API错误: ${data.base_resp.status_msg || '未知错误'} (code: ${data.base_resp.status_code})`);
-            }
-        }
-        
-        // 尝试多种可能的响应格式
-        let audioData = null;
-        let audioFormat = 'audio/mpeg';
-        
-        // Minimax API 常见响应格式
-        if (data.data && data.data.audio) {
-            audioData = data.data.audio;
-        } else if (data.extra_info && data.extra_info.audio) {
-            audioData = data.extra_info.audio;
-        } else if (data.audio_file) {
-            audioData = data.audio_file;
-        } else if (data.audio) {
-            audioData = data.audio;
-        } else if (data.result && data.result.audio) {
-            audioData = data.result.audio;
-        } else if (data.choices && data.choices[0] && data.choices[0].audio) {
-            audioData = data.choices[0].audio;
-        } else if (data.audio_url) {
-            return data.audio_url;
-        }
-        
-        if (audioData) {
-            console.log('找到音频数据，类型:', typeof audioData, '长度:', audioData.length);
-            // 检查是否是base64数据
-            if (typeof audioData === 'string') {
-                // 如果是完整的data URL
-                if (audioData.startsWith('data:')) {
-                    return audioData;
-                }
-                // 如果是纯base64，添加data URL前缀
-                const audioBlob = this.base64ToBlob(audioData, audioFormat);
-                return URL.createObjectURL(audioBlob);
-            } else {
-                console.error('音频数据格式不正确:', typeof audioData);
-            }
-        }
-        
-        console.error('API完整响应:', data);
-        console.error('可用的键:', Object.keys(data));
-        if (data.data) {
-            console.error('data字段的键:', Object.keys(data.data));
-        }
-        throw new Error('API响应中没有找到音频数据。响应结构: ' + JSON.stringify(Object.keys(data)));
     },
 
     /**
@@ -505,5 +257,7 @@ const MinimaxVoiceAPI = {
     }
 };
 
-// 导出到全局
-window.MinimaxVoiceAPI = MinimaxVoiceAPI;
+// 导出模块
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MinimaxVoiceAPI;
+}
