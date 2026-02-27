@@ -63,35 +63,29 @@ const MinimaxVoiceAPI = {
 
         const endpoint = this.endpoints[params.version];
         
+        // 直接向代理发送请求，不需要嵌套结构
         const requestBody = {
-            url: `https://rurichat.vercel.app/proxy/v1/text_to_speech?GroupId=${params.groupId}`,
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${params.apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: {
-                model: params.model,
-                text: text.trim(),
-                voice_id: voiceId,
-                speed: params.speed || 1.0,
-                vol: 1.0,
-                pitch: 0
-            }
+            model: params.model,
+            text: text.trim(),
+            voice_id: voiceId,
+            speed: params.speed || 1.0,
+            vol: 1.0,
+            pitch: 0
         };
 
         console.log('=== Minimax API 代理请求详情 ===');
         console.log('代理端点:', endpoint);
-        console.log('目标URL:', requestBody.url);
         console.log('请求体:', JSON.stringify(requestBody, null, 2));
 
         try {
-            console.log('[MinimaxAPI] 通过代理发送请求');
+            console.log('[MinimaxAPI] 通过代理发送请求到:', endpoint);
             
             const fetchOptions = {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${params.apiKey}`,
+                    'Content-Type': 'application/json',
+                    'X-Group-Id': params.groupId
                 },
                 body: JSON.stringify(requestBody)
             };
