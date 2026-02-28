@@ -877,7 +877,9 @@ const API = {
             let systemPrompt = '这是线上聊天，扮演角色进行聊天，必须遵守人设。要口语化。模仿真人线上聊天习惯。';
             systemPrompt += '\n角色名称：' + char.name;
             systemPrompt += '\n角色设定：' + (char.prompt || '无特殊设定');
-            systemPrompt += '\n\n重要：必须发送5条以上的消息。模仿真人发微信的习惯，每条消息自然表达。';
+            systemPrompt += '\n\n重要消息格式：请使用 [' + char.name + '：消息内容] 的格式发送每条消息。';
+            systemPrompt += '\n如果要发送多条消息，每条都要用这个格式包裹。';
+            systemPrompt += '\n代码块、长文本等内容可以包含换行符，只要在同一个方括号内就会作为一条消息显示。';
 
             // --- 角色感知现实世界 ---
             if (settings.realWorldAwareness) {
@@ -1150,10 +1152,10 @@ const API = {
             ].concat(recentHistory);
 
             // --- 线上模式逻辑隔离：在 messages 末尾追加独立 system 消息 ---
-            // 不污染用户消息内容，避免破坏 AI 分条发送的格式
+            // 章鱼喷墨机逻辑：按格式提取消息
             messages.push({
                 role: 'system',
-                content: '重要：必须发送5条以上的消息。按照角色人设自然回复，模仿真人线上聊天习惯。每条消息用换行分隔。\n\n示例格式：\n哈哈\n你说的对\n我也这么觉得\n不过话说回来\n你最近怎么样\n还有什么想聊的'
+                content: '重要：请严格使用 [' + char.name + '：消息内容] 的格式发送每条消息。\n\n示例：\n[' + char.name + '：哈哈，你说得对]\n[' + char.name + '：我也这么觉得]\n[' + char.name + '：```javascript\nconsole.log("代码块也可以包含换行");\n```]\n\n每条消息都必须用这个格式包裹！'
             });
 
             const response = await fetch(config.endpoint + '/chat/completions', {
@@ -1255,10 +1257,11 @@ const API = {
                     return [];
                 }
                 
-                // 智能分段逻辑:确保AI回复被拆分成多条消息
-                const result = this._smartSplitReply(fullReply);
-                console.log('[generateReply] 分段结果:', result);
-                return result;
+                // 🔥 章鱼喷墨机逻辑：按格式切分，不按换行切分
+                console.log('[generateReply] 🔥 使用章鱼喷墨机逻辑，按格式提取消息');
+                const messages = this._getMixedContent(fullReply.trim());
+                console.log('[generateReply] 格式提取结果:', messages);
+                return messages;
                 
             } catch (e) {
                 console.error('[Stream] 读取失败:', e);
@@ -1417,6 +1420,58 @@ const API = {
             }
             
             return [text];
+        },
+
+        /**
+         * 章鱼喷墨机逻辑：按格式提取消息内容
+         * 只有匹配到 [角色名：...] 这种完整包裹的内容，才分发成独立气泡
+         * 这样AI发的代码块虽然有换行，但因为还在同一个方括号里，就会被当作一个气泡发出来
+         */
+        _getMixedContent: function(fullResponse) {
+            console.log('[getMixedContent] 开始解析完整回复:', fullResponse.substring(0, 100) + '...');
+            
+            if (!fullResponse || !fullResponse.trim()) {
+                return [];
+            }
+            
+            const cleanResponse = fullResponse.trim();
+            
+            // 正则匹配 [角色名：内容] 或 [角色名的消息：内容] 格式
+            // 支持多行内容，包括代码块
+            const messagePattern = /\[([^：\]]+)[：:]\s*([\s\S]*?)\]/g;
+            const messages = [];
+            let match;
+            let lastIndex = 0;
+            
+            while ((match = messagePattern.exec(cleanResponse)) !== null) {
+                const roleName = match[1].trim();
+                const content = match[2].trim();
+                
+                console.log('[getMixedContent] 找到格式化消息:', roleName, '内容长度:', content.length);
+                
+                if (content) {
+                    messages.push(content);
+                }
+                lastIndex = messagePattern.lastIndex;
+            }
+            
+            // 如果没有找到任何格式化消息，检查是否有未包裹的内容
+            if (messages.length === 0) {
+                console.log('[getMixedContent] 未找到格式化消息，返回完整内容');
+                return [cleanResponse];
+            }
+            
+            // 检查是否有剩余的未格式化内容（在最后一个匹配之后）
+            if (lastIndex < cleanResponse.length) {
+                const remainingContent = cleanResponse.substring(lastIndex).trim();
+                if (remainingContent) {
+                    console.log('[getMixedContent] 发现剩余内容:', remainingContent.substring(0, 50) + '...');
+                    messages.push(remainingContent);
+                }
+            }
+            
+            console.log('[getMixedContent] 解析完成，共', messages.length, '条消息');
+            return messages.length > 0 ? messages : [cleanResponse];
         },
 
         /**
