@@ -6,7 +6,7 @@
   },
   "headers": [
     {
-      "source": "/api/proxy",
+      "source": "/api/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
@@ -14,7 +14,7 @@
         },
         {
           "key": "Access-Control-Allow-Methods",
-          "value": "POST, OPTIONS"
+          "value": "GET, POST, OPTIONS"
         },
         {
           "key": "Access-Control-Allow-Headers",
@@ -25,6 +25,12 @@
           "value": "86400"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/proxy",
+      "destination": "/api/proxy"
     }
   ]
 }

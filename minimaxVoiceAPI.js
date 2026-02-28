@@ -4,7 +4,21 @@
  */
 
 const MinimaxVoiceAPI = {
-    // API 端点配置
+    // Vercel 部署域名
+    VERCEL_HOST: 'https://rurichat.vercel.app',
+
+    // 获取代理端点（自动判断环境）
+    getProxyEndpoint: function() {
+        var host = window.location.hostname;
+        // 本地开发环境（localhost / 127.0.0.1 / 局域网IP）使用 Vercel 绝对路径
+        if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
+            return this.VERCEL_HOST + '/api/proxy';
+        }
+        // Vercel 生产环境使用相对路径
+        return '/api/proxy';
+    },
+
+    // API 端点配置（保留兼容性）
     endpoints: {
         mainland: '/api/proxy',
         overseas: '/api/proxy',
@@ -61,7 +75,7 @@ const MinimaxVoiceAPI = {
             throw new Error('语音ID不能为空');
         }
 
-        const endpoint = this.endpoints[params.version];
+        const endpoint = this.getProxyEndpoint();
         
         // 直接向代理发送请求，不需要嵌套结构
         const requestBody = {

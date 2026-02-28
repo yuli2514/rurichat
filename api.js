@@ -890,17 +890,18 @@ const API = {
                 systemPrompt += '\n当前时间：' + dateStr + ' ' + timeStr;
             }
             
-            // 特殊功能指令（精简版）
-            systemPrompt += '\n\n【特殊指令】（谨慎使用，不要滥用）';
-            systemPrompt += '\n[QUOTE:关键词]回复内容 - 引用回复（注意：必须使用冒号:，不要用其他符号）';
-            systemPrompt += '\n消息[RECALL] - 撤回（说错话时用）';
-            systemPrompt += '\n[图片:描述] - 意念传图（极少使用，只在必要时用）';
-            systemPrompt += '\n[语音:内容] - 语音消息（极少使用，只在特别亲密或撒娇时才用）';
-            systemPrompt += '\n[转账:金额:备注] - 转账（单独一行，不重复发）';
-            systemPrompt += '\n[领取转账] - 领取用户转账（已领取不重复）';
-            systemPrompt += '\n[换头像] - 当用户提到换头像并发送图片时，使用此指令将用户发送的图片设为你的新头像（单独一行）';
+            // 特殊功能指令（精简版）- 特殊指令放在角色消息内容中使用
+            systemPrompt += '\n\n【特殊指令】（放在 [' + char.name + '：...] 内容中使用，谨慎使用，不要滥用）';
+            systemPrompt += '\n引用回复：[' + char.name + '：[QUOTE:关键词]回复内容]（注意：QUOTE必须使用冒号:）';
+            systemPrompt += '\n撤回消息：[' + char.name + '：消息内容[RECALL]]（说错话时用）';
+            systemPrompt += '\n语音消息：[' + char.name + '：[语音:内容]]（极少使用，只在特别亲密或撒娇时才用）';
+            systemPrompt += '\n转账消息：[' + char.name + '：[转账:金额:备注]]（单独一条，不重复发）';
+            systemPrompt += '\n领取转账：[' + char.name + '：[领取转账]]（已领取不重复）';
+            systemPrompt += '\n换头像：[' + char.name + '：[换头像]]（当用户提到换头像并发送图片时使用）';
+            systemPrompt += '\n表情包：[' + char.name + '：表情包URL]（直接把表情包URL放在消息内容中）';
             
-            systemPrompt += '\n\n⚠️ 重要：不要频繁发意念图！不要复述用户发的图片信息！';
+            systemPrompt += '\n\n🚫🚫🚫 严禁使用意念图 [图片:描述]！除非用户明确要求你发图片，否则绝对不要使用！';
+            systemPrompt += '\n⚠️ 不要复述用户发的图片信息！';
             systemPrompt += '\n⚠️ 严禁复读任何带中括号的系统说明文本，如"[表情: xxx]""[用户发送了...]"等。';
 
             // --- Memory Integration (强化版) ---
@@ -960,11 +961,11 @@ const API = {
                     systemPrompt += '\n你可以使用以下表情包来表达情绪，根据你的人设性格决定发送频率：';
                     systemPrompt += '\n- 如果人设活泼开朗，可以多发表情包';
                     systemPrompt += '\n- 如果人设冷淡高冷，可以少发或不发';
-                    systemPrompt += '\n- 🚫 重要：表情包和[图片:描述]是完全不同的功能！绝对不要混淆！';
-                    systemPrompt += '\n- 表情包：直接发送预设的URL链接，如 https://example.com/emoji.png';
-                    systemPrompt += '\n- 意念图：使用[图片:描述]格式，系统会生成文字卡片';
-                    systemPrompt += '\n- 🚫 绝对禁止：把表情包URL写成[图片:表情包URL]格式！';
-                    systemPrompt += '\n- 🚫 绝对禁止：把表情包描述写成[图片:表情包含义]格式！';
+                    systemPrompt += '\n- 发送表情包的格式：[' + char.name + '：表情包URL]';
+                    systemPrompt += '\n- 例如：[' + char.name + '：https://example.com/happy.png]';
+                    systemPrompt += '\n- 也可以用 [' + char.name + '：[表情包：含义]] 格式';
+                    systemPrompt += '\n- 🚫 绝对禁止使用 [图片:xxx] 意念图功能！';
+                    systemPrompt += '\n- 🚫 绝对禁止把表情包URL写成[图片:表情包URL]格式！';
                     systemPrompt += '\n- ⚠️ 只能使用下面列表中的表情包URL，不要自己编造URL！';
                     systemPrompt += '\n\n可用表情包列表（含义: URL）：\n' + emojiList;
                 }
@@ -1155,7 +1156,7 @@ const API = {
             // 章鱼喷墨机逻辑：按格式提取消息
             messages.push({
                 role: 'system',
-                content: '重要：请严格使用 [' + char.name + '：消息内容] 的格式发送每条消息。\n\n示例：\n[' + char.name + '：哈哈，你说得对]\n[' + char.name + '：我也这么觉得]\n[' + char.name + '：```javascript\nconsole.log("代码块也可以包含换行");\n```]\n\n每条消息都必须用这个格式包裹！'
+                content: '重要：请严格使用 [' + char.name + '：消息内容] 的格式发送每条消息。\n\n示例（普通消息）：\n[' + char.name + '：哈哈，你说得对]\n[' + char.name + '：我也这么觉得]\n\n示例（代码块，换行保留在同一条消息中）：\n[' + char.name + '：```javascript\nconsole.log("hello");\n```]\n\n示例（特殊指令，放在消息内容中）：\n[' + char.name + '：[语音:我想你了]]\n[' + char.name + '：[QUOTE:关键词]这是我的回复]\n[' + char.name + '：https://example.com/emoji.png]\n\n每条消息都必须用 [' + char.name + '：...] 格式包裹！\n🚫 严禁使用 [图片:描述] 意念图功能！'
             });
 
             const response = await fetch(config.endpoint + '/chat/completions', {
@@ -1425,7 +1426,8 @@ const API = {
         /**
          * 章鱼喷墨机逻辑：按格式提取消息内容
          * 只有匹配到 [角色名：...] 这种完整包裹的内容，才分发成独立气泡
-         * 这样AI发的代码块虽然有换行，但因为还在同一个方括号里，就会被当作一个气泡发出来
+         * 特殊指令（语音、图片、QUOTE、转账、表情包等）原样保留在提取的内容中
+         * 代码块虽然有换行，但因为还在同一个方括号里，会被当作一个气泡发出来
          */
         _getMixedContent: function(fullResponse) {
             console.log('[getMixedContent] 开始解析完整回复:', fullResponse.substring(0, 100) + '...');
@@ -1436,42 +1438,128 @@ const API = {
             
             const cleanResponse = fullResponse.trim();
             
-            // 正则匹配 [角色名：内容] 或 [角色名的消息：内容] 格式
-            // 支持多行内容，包括代码块
-            const messagePattern = /\[([^：\]]+)[：:]\s*([\s\S]*?)\]/g;
-            const messages = [];
-            let match;
-            let lastIndex = 0;
+            // 特殊指令关键词列表 - 这些不是角色名，不能被当作消息包裹
+            const specialKeywords = [
+                '语音', 'VOICE', 'voice',
+                '图片', 'IMAGE', 'image',
+                '转账', 'TRANSFER', 'transfer',
+                'QUOTE', 'quote',
+                'RECALL', 'recall',
+                '文件', 'FILE', 'file',
+                '换头像', 'CHANGE_AVATAR',
+                '领取转账', 'RECEIVE_TRANSFER', '收下转账', '接受转账',
+                '表情包',
+                '表情',
+                '自动总结', '手动记忆',
+                'User Persona/Info'
+            ];
             
-            while ((match = messagePattern.exec(cleanResponse)) !== null) {
-                const roleName = match[1].trim();
-                const content = match[2].trim();
-                
-                console.log('[getMixedContent] 找到格式化消息:', roleName, '内容长度:', content.length);
-                
-                if (content) {
-                    messages.push(content);
+            // 构建角色消息的匹配正则
+            // 使用手动扫描方式，逐字符解析，正确处理嵌套方括号
+            const messages = [];
+            let i = 0;
+            let lastMatchEnd = 0;
+            
+            while (i < cleanResponse.length) {
+                // 找到一个 [ 开头
+                if (cleanResponse[i] === '[') {
+                    // 找到冒号位置（中文冒号或英文冒号）
+                    let colonPos = -1;
+                    let j = i + 1;
+                    while (j < cleanResponse.length && j < i + 50) { // 角色名不会超过50字符
+                        if (cleanResponse[j] === '：' || cleanResponse[j] === ':') {
+                            colonPos = j;
+                            break;
+                        }
+                        if (cleanResponse[j] === ']' || cleanResponse[j] === '[') {
+                            break; // 遇到另一个括号，说明不是角色消息格式
+                        }
+                        j++;
+                    }
+                    
+                    if (colonPos > i + 1) {
+                        const roleName = cleanResponse.substring(i + 1, colonPos).trim();
+                        
+                        // 检查是否是特殊指令关键词
+                        const isSpecial = specialKeywords.some(kw =>
+                            roleName === kw || roleName.toLowerCase() === kw.toLowerCase()
+                        );
+                        
+                        if (!isSpecial && roleName.length > 0 && roleName.length < 30) {
+                            // 这是一个角色消息格式 [角色名：内容]
+                            // 找到对应的闭合 ]，需要处理嵌套的 [] 和代码块
+                            let depth = 1;
+                            let k = colonPos + 1;
+                            let inCodeBlock = false;
+                            
+                            while (k < cleanResponse.length && depth > 0) {
+                                // 检测代码块（```）
+                                if (cleanResponse.substring(k, k + 3) === '```') {
+                                    inCodeBlock = !inCodeBlock;
+                                    k += 3;
+                                    continue;
+                                }
+                                
+                                if (!inCodeBlock) {
+                                    if (cleanResponse[k] === '[') {
+                                        // 检查是否是特殊指令的开头，如果是则不增加深度
+                                        let nextColon = cleanResponse.indexOf(':', k + 1);
+                                        let nextColon2 = cleanResponse.indexOf('：', k + 1);
+                                        let nextClose = cleanResponse.indexOf(']', k + 1);
+                                        let effectiveColon = -1;
+                                        if (nextColon > 0 && (nextColon2 < 0 || nextColon < nextColon2)) effectiveColon = nextColon;
+                                        else if (nextColon2 > 0) effectiveColon = nextColon2;
+                                        
+                                        if (effectiveColon > 0 && nextClose > 0 && effectiveColon < nextClose) {
+                                            const innerKey = cleanResponse.substring(k + 1, effectiveColon).trim();
+                                            const isInnerSpecial = specialKeywords.some(kw =>
+                                                innerKey === kw || innerKey.toLowerCase() === kw.toLowerCase()
+                                            );
+                                            if (isInnerSpecial) {
+                                                // 特殊指令内部的括号，跳到闭合]
+                                                let innerClose = cleanResponse.indexOf(']', effectiveColon);
+                                                if (innerClose > 0) {
+                                                    k = innerClose + 1;
+                                                    continue;
+                                                }
+                                            }
+                                        }
+                                        depth++;
+                                    } else if (cleanResponse[k] === ']') {
+                                        depth--;
+                                        if (depth === 0) {
+                                            // 找到了闭合的 ]
+                                            const content = cleanResponse.substring(colonPos + 1, k).trim();
+                                            if (content) {
+                                                console.log('[getMixedContent] 找到角色消息:', roleName, '内容长度:', content.length);
+                                                messages.push(content);
+                                            }
+                                            lastMatchEnd = k + 1;
+                                            i = k + 1;
+                                            break;
+                                        }
+                                    }
+                                }
+                                k++;
+                            }
+                            
+                            if (depth === 0) {
+                                continue; // 已经在上面更新了 i
+                            }
+                        }
+                    }
                 }
-                lastIndex = messagePattern.lastIndex;
+                i++;
             }
             
-            // 如果没有找到任何格式化消息，检查是否有未包裹的内容
+            // 如果没有找到任何格式化消息，返回完整内容作为单条消息
             if (messages.length === 0) {
                 console.log('[getMixedContent] 未找到格式化消息，返回完整内容');
                 return [cleanResponse];
             }
             
-            // 检查是否有剩余的未格式化内容（在最后一个匹配之后）
-            if (lastIndex < cleanResponse.length) {
-                const remainingContent = cleanResponse.substring(lastIndex).trim();
-                if (remainingContent) {
-                    console.log('[getMixedContent] 发现剩余内容:', remainingContent.substring(0, 50) + '...');
-                    messages.push(remainingContent);
-                }
-            }
-            
             console.log('[getMixedContent] 解析完成，共', messages.length, '条消息');
-            return messages.length > 0 ? messages : [cleanResponse];
+            return messages;
         },
 
         /**
