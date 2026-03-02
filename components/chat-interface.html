@@ -17,22 +17,22 @@
     </div>
 
     <!-- Context Menu for Chat Bubbles -->
-    <div id="chat-context-menu" class="absolute hidden bg-white/95 backdrop-blur-md rounded-xl shadow-xl overflow-hidden transform transition-all duration-200 origin-top-left w-36" style="z-index: 9999;">
-        <div class="flex flex-col py-1" onclick="event.stopPropagation()">
-            <button onpointerup="ChatInterface.handleContextAction('copy')" class="context-menu-btn px-4 py-3 text-left text-sm text-gray-800 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
-                <i class="fa-regular fa-copy text-xs"></i> <span>复制</span>
+    <div id="chat-context-menu" class="absolute hidden bg-white/95 backdrop-blur-md rounded-lg shadow-lg overflow-hidden transform transition-all duration-200 origin-top-left w-[88px]" style="z-index: 9999;">
+        <div class="flex flex-col py-0.5" onclick="event.stopPropagation()">
+            <button onpointerup="ChatInterface.handleContextAction('copy')" class="context-menu-btn px-2.5 py-1.5 text-left text-xs text-gray-800 active:bg-gray-100 flex items-center gap-1.5 border-b border-gray-100/50">
+                <i class="fa-regular fa-copy text-[10px]"></i> <span>复制</span>
             </button>
-            <button onpointerup="ChatInterface.handleContextAction('quote')" class="context-menu-btn px-4 py-3 text-left text-sm text-gray-800 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
-                <i class="fa-solid fa-quote-left text-xs"></i> <span>引用</span>
+            <button onpointerup="ChatInterface.handleContextAction('quote')" class="context-menu-btn px-2.5 py-1.5 text-left text-xs text-gray-800 active:bg-gray-100 flex items-center gap-1.5 border-b border-gray-100/50">
+                <i class="fa-solid fa-quote-left text-[10px]"></i> <span>引用</span>
             </button>
-            <button onpointerup="ChatInterface.handleContextAction('edit')" class="context-menu-btn px-4 py-3 text-left text-sm text-gray-800 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
-                <i class="fa-solid fa-pen text-xs"></i> <span>编辑</span>
+            <button onpointerup="ChatInterface.handleContextAction('edit')" class="context-menu-btn px-2.5 py-1.5 text-left text-xs text-gray-800 active:bg-gray-100 flex items-center gap-1.5 border-b border-gray-100/50">
+                <i class="fa-solid fa-pen text-[10px]"></i> <span>编辑</span>
             </button>
-            <button onpointerup="ChatInterface.handleContextAction('recall')" class="context-menu-btn px-4 py-3 text-left text-sm text-orange-500 active:bg-gray-100 flex items-center gap-3 border-b border-gray-100/50">
-                <i class="fa-solid fa-rotate-left text-xs"></i> <span>撤回</span>
+            <button onpointerup="ChatInterface.handleContextAction('recall')" class="context-menu-btn px-2.5 py-1.5 text-left text-xs text-orange-500 active:bg-gray-100 flex items-center gap-1.5 border-b border-gray-100/50">
+                <i class="fa-solid fa-rotate-left text-[10px]"></i> <span>撤回</span>
             </button>
-            <button onpointerup="ChatInterface.handleContextAction('delete')" class="context-menu-btn px-4 py-3 text-left text-sm text-red-500 active:bg-gray-100 flex items-center gap-3">
-                <i class="fa-regular fa-trash-can text-xs"></i> <span>删除</span>
+            <button onpointerup="ChatInterface.handleContextAction('delete')" class="context-menu-btn px-2.5 py-1.5 text-left text-xs text-red-500 active:bg-gray-100 flex items-center gap-1.5">
+                <i class="fa-regular fa-trash-can text-[10px]"></i> <span>删除</span>
             </button>
         </div>
     </div>

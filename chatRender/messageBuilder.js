@@ -80,6 +80,28 @@ const MessageBuilder = {
         } else if (quotedMsg && quotedMsg.recalled) {
             return '<div class="quote-in-bubble"><span class="text-gray-400 italic">引用的消息已撤回</span></div>';
         }
+        
+        // Fallback: 当原始消息在历史中找不到时，使用 msg.quote 中保存的信息
+        if (msg.quote.content || msg.quote.type) {
+            const fallbackAuthor = msg.quote.sender === 'user' ? '我' : (char ? char.remark : '对方');
+            let fallbackContent = '';
+            if (msg.quote.type === 'emoji') {
+                fallbackContent = '[表情包]';
+            } else if (msg.quote.type === 'image') {
+                fallbackContent = '[图片]';
+            } else if (msg.quote.type === 'file' || msg.quote.type === 'ai_file') {
+                fallbackContent = '[文件]';
+            } else if (msg.quote.type === 'voice') {
+                fallbackContent = '[语音消息]';
+            } else if (msg.quote.type === 'transfer') {
+                fallbackContent = '[转账]';
+            } else if (msg.quote.content) {
+                fallbackContent = msg.quote.content.substring(0, 40) + (msg.quote.content.length > 40 ? '...' : '');
+            }
+            if (fallbackContent) {
+                return '<div class="quote-in-bubble"><span class="quote-author">' + fallbackAuthor + ':</span><span>' + fallbackContent + '</span></div>';
+            }
+        }
         return '';
     },
 

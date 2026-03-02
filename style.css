@@ -591,7 +591,7 @@
             pointer-events: auto !important;
             touch-action: manipulation !important;
             -webkit-tap-highlight-color: transparent !important;
-            min-height: 48px !important;
+            min-height: 32px !important;
             cursor: pointer !important;
             user-select: none !important;
             -webkit-user-select: none !important;

@@ -107,8 +107,8 @@ const ChatEventHandlers = {
         let left = clientX - containerRect.left;
         let top = clientY - containerRect.top;
         
-        if (left + 140 > containerRect.width) left = containerRect.width - 150;
-        if (top + 180 > containerRect.height) top = top - 180;
+        if (left + 100 > containerRect.width) left = containerRect.width - 100;
+        if (top + 130 > containerRect.height) top = top - 130;
 
         left = Math.max(10, left);
         top = Math.max(10, top);

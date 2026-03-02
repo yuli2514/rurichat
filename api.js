@@ -1552,14 +1552,155 @@ const API = {
                 i++;
             }
             
-            // 如果没有找到任何格式化消息，返回完整内容作为单条消息
+            // 如果没有找到任何格式化消息，使用智能句子拆分
             if (messages.length === 0) {
-                console.log('[getMixedContent] 未找到格式化消息，返回完整内容');
-                return [cleanResponse];
+                console.log('[getMixedContent] 未找到格式化消息，使用智能句子拆分');
+                return this._smartSentenceSplit(cleanResponse);
             }
             
             console.log('[getMixedContent] 解析完成，共', messages.length, '条消息');
             return messages;
+        },
+
+        /**
+         * 智能句子拆分 - 按句子语义拆分成多个气泡
+         * 不使用换行符分割，而是按句子结束标点（。！？…~，,）拆分
+         * 确保至少拆分为5个气泡，模拟真人聊天
+         */
+        _smartSentenceSplit: function(text) {
+            if (!text || !text.trim()) return [];
+            text = text.trim();
+            
+            // 如果文本很短（<=10字），不拆分
+            if (text.length <= 10) return [text];
+            
+            // 检查是否包含特殊指令格式（如 [QUOTE:xxx]、[表情包：xxx] 等），如果是则不拆分
+            if (/^\[.+\]$/.test(text)) return [text];
+            
+            // 第一步：按句子结束标点拆分（。！？…~），保留标点在句子末尾
+            const sentenceEnders = /([。！？!?…~]+)/g;
+            const parts = text.split(sentenceEnders);
+            
+            // 重新组合：把标点附加到前面的句子上
+            const sentences = [];
+            for (let i = 0; i < parts.length; i++) {
+                if (i % 2 === 0) {
+                    let sentence = parts[i];
+                    if (i + 1 < parts.length) {
+                        sentence += parts[i + 1];
+                    }
+                    sentence = sentence.trim();
+                    if (sentence) sentences.push(sentence);
+                }
+            }
+            
+            // 如果句子拆分不够5条，尝试用逗号进一步拆分
+            let result = sentences.length > 0 ? sentences : [text];
+            
+            if (result.length < 5) {
+                const expanded = [];
+                for (const s of result) {
+                    if (expanded.length + (result.length - result.indexOf(s)) >= 5 && expanded.length >= 5) {
+                        // 已经够了，剩余直接加入
+                        expanded.push(s);
+                        continue;
+                    }
+                    // 尝试按逗号拆分这个句子
+                    if (s.length > 10) {
+                        const commaParts = s.split(/([，,；;、]+)/g);
+                        let rebuilt = [];
+                        for (let j = 0; j < commaParts.length; j++) {
+                            if (j % 2 === 0) {
+                                let piece = commaParts[j];
+                                if (j + 1 < commaParts.length) {
+                                    piece += commaParts[j + 1];
+                                }
+                                piece = piece.trim();
+                                if (piece) rebuilt.push(piece);
+                            }
+                        }
+                        if (rebuilt.length > 1) {
+                            expanded.push(...rebuilt);
+                        } else {
+                            expanded.push(s);
+                        }
+                    } else {
+                        expanded.push(s);
+                    }
+                }
+                result = expanded;
+            }
+            
+            // 如果还不够5条，使用强制字数拆分来补充
+            if (result.length < 5 && text.length > 20) {
+                const targetCount = 5;
+                const targetLen = Math.ceil(text.length / targetCount);
+                result = [];
+                let remaining = text;
+                const allPuncts = '。！？…~，、,；：;:.!?';
+                
+                while (remaining.length > 0) {
+                    if (remaining.length <= targetLen * 1.3) {
+                        result.push(remaining);
+                        break;
+                    }
+                    
+                    let splitPos = targetLen;
+                    // 向后找标点
+                    let found = false;
+                    for (let i = targetLen; i < Math.min(remaining.length, targetLen + 10); i++) {
+                        if (allPuncts.includes(remaining[i])) {
+                            splitPos = i + 1;
+                            found = true;
+                            break;
+                        }
+                    }
+                    // 向前找标点
+                    if (!found) {
+                        for (let i = targetLen - 1; i >= Math.max(0, targetLen - 10); i--) {
+                            if (allPuncts.includes(remaining[i])) {
+                                splitPos = i + 1;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    result.push(remaining.substring(0, splitPos).trim());
+                    remaining = remaining.substring(splitPos).trim();
+                }
+            }
+            
+            // 过滤空项
+            result = result.filter(r => r && r.trim());
+            
+            // 清理每条气泡末尾的逗号（中英文逗号、顿号）
+            // 其他标点都可以保留
+            result = result.map(s => {
+                s = s.trim();
+                // 循环去除末尾的逗号类标点
+                while (s.length > 0 && /[，,、]$/.test(s)) {
+                    s = s.slice(0, -1).trim();
+                }
+                return s;
+            }).filter(s => s);
+            
+            // 如果结果为空或只有1条，回退
+            if (result.length <= 1) {
+                return this._forceCharSplit(text);
+            }
+            
+            // 限制最多8个气泡，避免刷屏
+            if (result.length > 8) {
+                const final = [];
+                const chunkSize = Math.ceil(result.length / 8);
+                for (let i = 0; i < result.length; i += chunkSize) {
+                    final.push(result.slice(i, i + chunkSize).join(''));
+                }
+                result = final;
+            }
+            
+            console.log('[smartSentenceSplit] 拆分为', result.length, '条消息');
+            return result;
         },
 
         /**
